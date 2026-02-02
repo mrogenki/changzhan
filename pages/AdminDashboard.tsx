@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Routes, Route, Link, useNavigate, useLocation, Navigate } from 'react-router-dom';
-import { LayoutDashboard, Calendar, Users, LogOut, ChevronRight, Search, FileDown, Plus, Edit, Trash2, CheckCircle, XCircle, Shield, UserPlus, DollarSign, TrendingUp, BarChart3 } from 'lucide-react';
+import { LayoutDashboard, Calendar, Users, LogOut, ChevronRight, Search, FileDown, Plus, Edit, Trash2, CheckCircle, XCircle, Shield, UserPlus, DollarSign, TrendingUp, BarChart3, Loader2 } from 'lucide-react';
 import { Activity, Registration, ActivityType, AdminUser, UserRole } from '../types';
 
 interface AdminDashboardProps {
@@ -14,7 +14,7 @@ interface AdminDashboardProps {
   onDeleteActivity: (id: string) => void;
   onUpdateRegistration: (reg: Registration) => void;
   onDeleteRegistration: (id: string) => void;
-  onAddUser: (user: AdminUser) => void;
+  onAddUser: (user: AdminUser) => Promise<boolean>;
   onDeleteUser: (id: string) => void;
 }
 
@@ -206,10 +206,13 @@ const DashboardHome: React.FC<{ activities: Activity[], registrations: Registrat
   );
 };
 
-const UserManager: React.FC<{ users: AdminUser[], onAddUser: (u: AdminUser) => void, onDeleteUser: (id: string) => void, currentUser: AdminUser }> = ({ users, onAddUser, onDeleteUser, currentUser }) => {
+const UserManager: React.FC<{ users: AdminUser[], onAddUser: (u: AdminUser) => Promise<boolean>, onDeleteUser: (id: string) => void, currentUser: AdminUser }> = ({ users, onAddUser, onDeleteUser, currentUser }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    setIsSubmitting(true);
     const formData = new FormData(e.currentTarget);
     const newUser: AdminUser = {
       id: Math.random().toString(36).substr(2, 9),
@@ -217,12 +220,27 @@ const UserManager: React.FC<{ users: AdminUser[], onAddUser: (u: AdminUser) => v
       password: formData.get('password') as string,
       role: formData.get('role') as UserRole
     };
-    onAddUser(newUser);
-    setIsModalOpen(false);
+    
+    const success = await onAddUser(newUser);
+    setIsSubmitting(false);
+    if (success) {
+      setIsModalOpen(false);
+    }
   };
+
+  const handleDelete = (id: string, name: string) => {
+    if (id === currentUser.id) {
+      alert('您不能刪除目前的登入帳號。');
+      return;
+    }
+    if (window.confirm(`確定要刪除管理員「${name}」嗎？`)) {
+      onDeleteUser(id);
+    }
+  };
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between text-gray-900">
         <h1 className="text-2xl font-bold">人員權限管理</h1>
         <button onClick={() => setIsModalOpen(true)} className="flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors">
           <UserPlus size={18} />
@@ -251,10 +269,12 @@ const UserManager: React.FC<{ users: AdminUser[], onAddUser: (u: AdminUser) => v
                   </span>
                 </td>
                 <td className="px-6 py-4 text-right">
-                  {user.id !== currentUser.id && (
-                    <button onClick={() => onDeleteUser(user.id)} className="text-gray-300 hover:text-red-600 transition-colors">
+                  {user.id !== currentUser.id ? (
+                    <button onClick={() => handleDelete(user.id, user.username)} className="text-gray-300 hover:text-red-600 transition-colors">
                       <Trash2 size={18} />
                     </button>
+                  ) : (
+                    <span className="text-[10px] font-bold text-gray-300 uppercase italic">Your Account</span>
                   )}
                 </td>
               </tr>
@@ -267,16 +287,16 @@ const UserManager: React.FC<{ users: AdminUser[], onAddUser: (u: AdminUser) => v
           <div className="bg-white w-full max-w-md rounded-2xl overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-200">
             <div className="p-6 border-b flex justify-between items-center text-gray-900">
               <h2 className="text-xl font-bold">新增管理人員</h2>
-              <button onClick={() => setIsModalOpen(false)}><XCircle className="text-gray-300" /></button>
+              <button onClick={() => setIsModalOpen(false)}><XCircle className="text-gray-300 hover:text-gray-500 transition-colors" /></button>
             </div>
             <form onSubmit={handleSubmit} className="p-6 space-y-4 text-gray-900">
               <div>
                 <label className="block text-sm font-bold mb-1">帳號名稱</label>
-                <input name="username" required className="w-full border rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-red-500 bg-white" />
+                <input name="username" required className="w-full border rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-red-500 bg-white" placeholder="用於登入的名稱" />
               </div>
               <div>
                 <label className="block text-sm font-bold mb-1">登入密碼</label>
-                <input name="password" type="password" required className="w-full border rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-red-500 bg-white" />
+                <input name="password" type="password" required className="w-full border rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-red-500 bg-white" placeholder="請設定 6 位以上密碼" />
               </div>
               <div>
                 <label className="block text-sm font-bold mb-1">分配權限</label>
@@ -288,7 +308,9 @@ const UserManager: React.FC<{ users: AdminUser[], onAddUser: (u: AdminUser) => v
               </div>
               <div className="flex gap-4 pt-4">
                 <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 border py-2 rounded-lg font-bold">取消</button>
-                <button type="submit" className="flex-1 bg-red-600 text-white py-2 rounded-lg font-bold">確認新增</button>
+                <button type="submit" disabled={isSubmitting} className="flex-1 bg-red-600 text-white py-2 rounded-lg font-bold flex items-center justify-center gap-2">
+                  {isSubmitting ? <Loader2 size={18} className="animate-spin" /> : '確認新增'}
+                </button>
               </div>
             </form>
           </div>
@@ -333,7 +355,7 @@ const CheckInManager: React.FC<{ activities: Activity[], registrations: Registra
     }
   };
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 text-gray-900">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <h1 className="text-2xl font-bold">報到管理</h1>
         <button onClick={handleExportCSV} className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors">
@@ -451,7 +473,7 @@ const ActivityManager: React.FC<{ activities: Activity[], onAddActivity: (a: Act
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 text-gray-900">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">活動管理</h1>
         <button onClick={() => { setEditingActivity(null); setIsModalOpen(true); }} className="flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors">
