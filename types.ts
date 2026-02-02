@@ -32,13 +32,14 @@ export interface Registration {
   title: string;
   referrer?: string;
   checkInStatus: boolean;
-  paidAmount?: number; // 新增：實收金額
+  paidAmount?: number;
   registeredAt: string;
 }
 
 export interface AdminUser {
   id: string;
-  username: string;
-  password?: string; // 僅內部存儲
+  name: string;
+  email: string;
   role: UserRole;
+  password?: string; // 僅供登入與新增時使用
 }

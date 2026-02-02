@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { HashRouter as Router, Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
 import { Menu, X, Loader2 } from 'lucide-react';
@@ -9,10 +10,15 @@ import LoginPage from './pages/LoginPage';
 import { Activity, Registration, AdminUser } from './types';
 import { INITIAL_ACTIVITIES, INITIAL_ADMINS } from './constants';
 
-// 初始化 Supabase
-const supabaseUrl = 'https://qxoglhkfxxqsjefynzqn.supabase.co';
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF4b2dsaGtmeHhxc2plZnluenFuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAwMzQwNTAsImV4cCI6MjA4NTYxMDA1MH0.gLvcHgY0rqLd26Nw61_M7nmjaz4TUsP9VL-XxN5wNSU';
-const supabase = createClient(supabaseUrl, supabaseKey);
+/**
+ * Supabase 配置指南：
+ * 請在下方填入您的 Supabase 專案資訊。
+ * 您可以從 Supabase Dashboard > Project Settings > API 找到這些值。
+ */
+const SUPABASE_URL = 'https://qxoglhkfxxqsjefynzqn.supabase.co'; 
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF4b2dsaGtmeHhxc2plZnluenFuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAwMzQwNTAsImV4cCI6MjA4NTYxMDA1MH0.gLvcHgY0rqLd26Nw61_M7nmjaz4TUsP9VL-XxN5wNSU';
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const Header: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -84,17 +90,15 @@ const App: React.FC = () => {
     return saved ? JSON.parse(saved) : null;
   });
 
-  // 從 Supabase 讀取所有資料
   const fetchData = async () => {
     setLoading(true);
     try {
       const { data: actData } = await supabase.from('activities').select('*').order('date', { ascending: true });
       const { data: regData } = await supabase.from('registrations').select('*').order('registeredAt', { ascending: false });
-      const { data: userData } = await supabase.from('admin_users').select('*');
+      const { data: userData } = await supabase.from('admins').select('*');
 
       if (actData && actData.length > 0) setActivities(actData);
       else {
-        // 如果是空的，填入初始資料
         await supabase.from('activities').insert(INITIAL_ACTIVITIES);
         setActivities(INITIAL_ACTIVITIES);
       }
@@ -103,7 +107,7 @@ const App: React.FC = () => {
       
       if (userData && userData.length > 0) setUsers(userData);
       else {
-        await supabase.from('admin_users').insert(INITIAL_ADMINS);
+        await supabase.from('admins').insert(INITIAL_ADMINS);
         setUsers(INITIAL_ADMINS);
       }
     } catch (err) {
@@ -127,66 +131,48 @@ const App: React.FC = () => {
     sessionStorage.removeItem('current_user');
   };
 
-  // 報名功能
   const handleRegister = async (newReg: Registration) => {
     const { error } = await supabase.from('registrations').insert([newReg]);
-    if (!error) {
-      setRegistrations(prev => [newReg, ...prev]);
-    }
+    if (!error) setRegistrations(prev => [newReg, ...prev]);
   };
 
-  // 活動管理功能
   const handleUpdateActivity = async (updated: Activity) => {
     const { error } = await supabase.from('activities').update(updated).eq('id', updated.id);
-    if (!error) {
-      setActivities(prev => prev.map(a => a.id === updated.id ? updated : a));
-    }
+    if (!error) setActivities(prev => prev.map(a => a.id === updated.id ? updated : a));
   };
 
   const handleAddActivity = async (newAct: Activity) => {
     const { error } = await supabase.from('activities').insert([newAct]);
-    if (!error) {
-      setActivities(prev => [...prev, newAct]);
-    }
+    if (!error) setActivities(prev => [...prev, newAct]);
   };
 
   const handleDeleteActivity = async (id: string) => {
-    const { error: regError } = await supabase.from('registrations').delete().eq('activityId', id);
-    const { error: actError } = await supabase.from('activities').delete().eq('id', id);
-    if (!actError) {
+    await supabase.from('registrations').delete().eq('activityId', id);
+    const { error } = await supabase.from('activities').delete().eq('id', id);
+    if (!error) {
       setActivities(prev => prev.filter(a => a.id !== id));
       setRegistrations(prev => prev.filter(r => r.activityId !== id));
     }
   };
 
-  // 報到與報名管理
   const handleDeleteRegistration = async (id: string) => {
     const { error } = await supabase.from('registrations').delete().eq('id', id);
-    if (!error) {
-      setRegistrations(prev => prev.filter(r => r.id !== id));
-    }
+    if (!error) setRegistrations(prev => prev.filter(r => r.id !== id));
   };
 
   const handleUpdateRegistration = async (updated: Registration) => {
     const { error } = await supabase.from('registrations').update(updated).eq('id', updated.id);
-    if (!error) {
-      setRegistrations(prev => prev.map(r => r.id === updated.id ? updated : r));
-    }
+    if (!error) setRegistrations(prev => prev.map(r => r.id === updated.id ? updated : r));
   };
 
-  // 用戶權限管理
   const handleAddUser = async (newUser: AdminUser) => {
-    const { error } = await supabase.from('admin_users').insert([newUser]);
-    if (!error) {
-      setUsers(prev => [...prev, newUser]);
-    }
+    const { error } = await supabase.from('admins').insert([newUser]);
+    if (!error) setUsers(prev => [...prev, newUser]);
   };
 
   const handleDeleteUser = async (id: string) => {
-    const { error } = await supabase.from('admin_users').delete().eq('id', id);
-    if (!error) {
-      setUsers(prev => prev.filter(u => u.id !== id));
-    }
+    const { error } = await supabase.from('admins').delete().eq('id', id);
+    if (!error) setUsers(prev => prev.filter(u => u.id !== id));
   };
 
   if (loading) {

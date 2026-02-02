@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ShieldCheck, Lock, User as UserIcon } from 'lucide-react';
+import { ShieldCheck, Lock, Mail } from 'lucide-react';
 import { AdminUser } from '../types';
 
 interface LoginPageProps {
@@ -10,13 +10,13 @@ interface LoginPageProps {
 }
 
 const LoginPage: React.FC<LoginPageProps> = ({ users, onLogin }) => {
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
   const handleLoginSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const user = users.find(u => u.username === username && u.password === password);
+    const user = users.find(u => u.email === email && u.password === password);
     if (user) {
       onLogin(user);
     } else {
@@ -31,49 +31,53 @@ const LoginPage: React.FC<LoginPageProps> = ({ users, onLogin }) => {
           <div className="inline-flex items-center justify-center w-16 h-16 bg-red-600 rounded-2xl text-white mb-4 shadow-lg">
             <ShieldCheck size={32} />
           </div>
-          <h1 className="text-3xl font-bold text-gray-900">管理員登入</h1>
-          <p className="text-gray-500 mt-2">請輸入您的帳號密碼以進入管理系統</p>
+          <h1 className="text-3xl font-bold text-gray-900 font-sans tracking-tight">管理員登入</h1>
+          <p className="text-gray-400 mt-2 font-medium">長展分會活動報名管理系統</p>
         </div>
 
-        <div className="bg-white p-8 rounded-3xl shadow-xl border border-gray-100">
+        <div className="bg-white p-10 rounded-[32px] shadow-2xl shadow-gray-200/50 border border-gray-100">
           <form onSubmit={handleLoginSubmit} className="space-y-6">
             <div>
-              <label className="block text-sm font-bold text-gray-700 mb-2">帳號</label>
+              <label className="block text-sm font-bold text-gray-700 mb-2 px-1">電子郵件</label>
               <div className="relative">
-                <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
                 <input 
                   required
-                  type="text" 
-                  value={username}
-                  onChange={e => setUsername(e.target.value)}
-                  className="w-full pl-12 pr-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all outline-none"
-                  placeholder="請輸入帳號"
+                  type="email" 
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  className="w-full pl-12 pr-4 py-4 rounded-2xl border border-gray-100 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all outline-none text-gray-700"
+                  placeholder="admin@changzhan.com"
                 />
               </div>
             </div>
             
             <div>
-              <label className="block text-sm font-bold text-gray-700 mb-2">密碼</label>
+              <label className="block text-sm font-bold text-gray-700 mb-2 px-1">登入密碼</label>
               <div className="relative">
-                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
                 <input 
                   required
                   type="password" 
                   value={password}
                   onChange={e => setPassword(e.target.value)}
-                  className="w-full pl-12 pr-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all outline-none"
-                  placeholder="請輸入密碼"
+                  className="w-full pl-12 pr-4 py-4 rounded-2xl border border-gray-100 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all outline-none text-gray-700"
+                  placeholder="••••••••"
                 />
               </div>
             </div>
 
-            {error && <p className="text-red-600 text-sm font-medium text-center">{error}</p>}
+            {error && (
+              <div className="bg-red-50 text-red-600 text-xs font-bold py-3 rounded-xl text-center border border-red-100">
+                {error}
+              </div>
+            )}
 
             <button 
               type="submit" 
-              className="w-full bg-red-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-red-700 active:scale-[0.98] transition-all shadow-md"
+              className="w-full bg-red-600 text-white py-4 rounded-2xl font-bold text-lg hover:bg-red-700 active:scale-[0.98] transition-all shadow-xl shadow-red-200"
             >
-              登入系統
+              進入管理後台
             </button>
           </form>
         </div>
