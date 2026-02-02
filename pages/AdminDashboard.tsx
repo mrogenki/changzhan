@@ -11,6 +11,7 @@ interface AdminDashboardProps {
   users: AdminUser[];
   onUpdateActivity: (act: Activity) => void;
   onAddActivity: (act: Activity) => void;
+  onDeleteActivity: (id: string) => void;
   onUpdateRegistration: (reg: Registration) => void;
   onDeleteRegistration: (id: string) => void;
   onAddUser: (user: AdminUser) => void;
@@ -409,9 +410,16 @@ const CheckInManager: React.FC<{ activities: Activity[], registrations: Registra
   );
 };
 
-const ActivityManager: React.FC<{ activities: Activity[], onAddActivity: (a: Activity) => void, onUpdateActivity: (a: Activity) => void }> = ({ activities, onAddActivity, onUpdateActivity }) => {
+const ActivityManager: React.FC<{ activities: Activity[], onAddActivity: (a: Activity) => void, onUpdateActivity: (a: Activity) => void, onDeleteActivity: (id: string) => void }> = ({ activities, onAddActivity, onUpdateActivity, onDeleteActivity }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingActivity, setEditingActivity] = useState<Activity | null>(null);
+  
+  const handleDelete = (act: Activity) => {
+    if (window.confirm(`確定要刪除活動「${act.title}」嗎？此動作將會連同報名資料一併移除且無法復原。`)) {
+      onDeleteActivity(act.id);
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
@@ -436,10 +444,12 @@ const ActivityManager: React.FC<{ activities: Activity[], onAddActivity: (a: Act
     setIsModalOpen(false);
     setEditingActivity(null);
   };
+
   const formatForInput = (dateStr?: string) => {
     if (!dateStr) return '';
     return dateStr.replace(' ', 'T');
   };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -456,9 +466,14 @@ const ActivityManager: React.FC<{ activities: Activity[], onAddActivity: (a: Act
             <div className="p-4 flex-grow">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-gray-100 text-gray-500 uppercase">{act.type}</span>
-                <button onClick={() => { setEditingActivity(act); setIsModalOpen(true); }} className="text-gray-400 hover:text-red-600 transition-colors">
-                  <Edit size={16} />
-                </button>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => { setEditingActivity(act); setIsModalOpen(true); }} className="text-gray-400 hover:text-red-600 transition-colors p-1">
+                    <Edit size={16} />
+                  </button>
+                  <button onClick={() => handleDelete(act)} className="text-gray-400 hover:text-red-600 transition-colors p-1">
+                    <Trash2 size={16} />
+                  </button>
+                </div>
               </div>
               <h3 className="font-bold line-clamp-1">{act.title}</h3>
               <p className="text-xs text-gray-400 mt-1">{act.date}</p>
@@ -542,6 +557,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
                 activities={props.activities} 
                 onAddActivity={props.onAddActivity}
                 onUpdateActivity={props.onUpdateActivity}
+                onDeleteActivity={props.onDeleteActivity}
               />
             } />
           )}

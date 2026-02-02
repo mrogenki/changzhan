@@ -1,13 +1,18 @@
-
 import React, { useState, useEffect } from 'react';
 import { HashRouter as Router, Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
-import { Menu, X } from 'lucide-react';
+import { Menu, X, Loader2 } from 'lucide-react';
+import { createClient } from '@supabase/supabase-js';
 import Home from './pages/Home';
 import ActivityDetail from './pages/ActivityDetail';
 import AdminDashboard from './pages/AdminDashboard';
 import LoginPage from './pages/LoginPage';
 import { Activity, Registration, AdminUser } from './types';
 import { INITIAL_ACTIVITIES, INITIAL_ADMINS } from './constants';
+
+// 初始化 Supabase
+const supabaseUrl = 'https://qxoglhkfxxqsjefynzqn.supabase.co';
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF4b2dsaGtmeHhxc2plZnluenFuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAwMzQwNTAsImV4cCI6MjA4NTYxMDA1MH0.gLvcHgY0rqLd26Nw61_M7nmjaz4TUsP9VL-XxN5wNSU';
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 const Header: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -70,37 +75,47 @@ const Footer: React.FC = () => {
 };
 
 const App: React.FC = () => {
-  const [activities, setActivities] = useState<Activity[]>(() => {
-    const saved = localStorage.getItem('activities');
-    return saved ? JSON.parse(saved) : INITIAL_ACTIVITIES;
-  });
-
-  const [registrations, setRegistrations] = useState<Registration[]>(() => {
-    const saved = localStorage.getItem('registrations');
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  const [users, setUsers] = useState<AdminUser[]>(() => {
-    const saved = localStorage.getItem('admin_users');
-    return saved ? JSON.parse(saved) : INITIAL_ADMINS;
-  });
-
+  const [activities, setActivities] = useState<Activity[]>([]);
+  const [registrations, setRegistrations] = useState<Registration[]>([]);
+  const [users, setUsers] = useState<AdminUser[]>([]);
+  const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<AdminUser | null>(() => {
     const saved = sessionStorage.getItem('current_user');
     return saved ? JSON.parse(saved) : null;
   });
 
-  useEffect(() => {
-    localStorage.setItem('activities', JSON.stringify(activities));
-  }, [activities]);
+  // 從 Supabase 讀取所有資料
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const { data: actData } = await supabase.from('activities').select('*').order('date', { ascending: true });
+      const { data: regData } = await supabase.from('registrations').select('*').order('registeredAt', { ascending: false });
+      const { data: userData } = await supabase.from('admin_users').select('*');
+
+      if (actData && actData.length > 0) setActivities(actData);
+      else {
+        // 如果是空的，填入初始資料
+        await supabase.from('activities').insert(INITIAL_ACTIVITIES);
+        setActivities(INITIAL_ACTIVITIES);
+      }
+
+      if (regData) setRegistrations(regData);
+      
+      if (userData && userData.length > 0) setUsers(userData);
+      else {
+        await supabase.from('admin_users').insert(INITIAL_ADMINS);
+        setUsers(INITIAL_ADMINS);
+      }
+    } catch (err) {
+      console.error('Fetch error:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    localStorage.setItem('registrations', JSON.stringify(registrations));
-  }, [registrations]);
-
-  useEffect(() => {
-    localStorage.setItem('admin_users', JSON.stringify(users));
-  }, [users]);
+    fetchData();
+  }, []);
 
   const handleLogin = (user: AdminUser) => {
     setCurrentUser(user);
@@ -112,33 +127,78 @@ const App: React.FC = () => {
     sessionStorage.removeItem('current_user');
   };
 
-  const handleRegister = (newReg: Registration) => {
-    setRegistrations(prev => [...prev, newReg]);
+  // 報名功能
+  const handleRegister = async (newReg: Registration) => {
+    const { error } = await supabase.from('registrations').insert([newReg]);
+    if (!error) {
+      setRegistrations(prev => [newReg, ...prev]);
+    }
   };
 
-  const handleUpdateActivity = (updated: Activity) => {
-    setActivities(prev => prev.map(a => a.id === updated.id ? updated : a));
+  // 活動管理功能
+  const handleUpdateActivity = async (updated: Activity) => {
+    const { error } = await supabase.from('activities').update(updated).eq('id', updated.id);
+    if (!error) {
+      setActivities(prev => prev.map(a => a.id === updated.id ? updated : a));
+    }
   };
 
-  const handleAddActivity = (newAct: Activity) => {
-    setActivities(prev => [...prev, newAct]);
+  const handleAddActivity = async (newAct: Activity) => {
+    const { error } = await supabase.from('activities').insert([newAct]);
+    if (!error) {
+      setActivities(prev => [...prev, newAct]);
+    }
   };
 
-  const handleDeleteRegistration = (id: string) => {
-    setRegistrations(prev => prev.filter(r => r.id !== id));
+  const handleDeleteActivity = async (id: string) => {
+    const { error: regError } = await supabase.from('registrations').delete().eq('activityId', id);
+    const { error: actError } = await supabase.from('activities').delete().eq('id', id);
+    if (!actError) {
+      setActivities(prev => prev.filter(a => a.id !== id));
+      setRegistrations(prev => prev.filter(r => r.activityId !== id));
+    }
   };
 
-  const handleUpdateRegistration = (updated: Registration) => {
-    setRegistrations(prev => prev.map(r => r.id === updated.id ? updated : r));
+  // 報到與報名管理
+  const handleDeleteRegistration = async (id: string) => {
+    const { error } = await supabase.from('registrations').delete().eq('id', id);
+    if (!error) {
+      setRegistrations(prev => prev.filter(r => r.id !== id));
+    }
   };
 
-  const handleAddUser = (newUser: AdminUser) => {
-    setUsers(prev => [...prev, newUser]);
+  const handleUpdateRegistration = async (updated: Registration) => {
+    const { error } = await supabase.from('registrations').update(updated).eq('id', updated.id);
+    if (!error) {
+      setRegistrations(prev => prev.map(r => r.id === updated.id ? updated : r));
+    }
   };
 
-  const handleDeleteUser = (id: string) => {
-    setUsers(prev => prev.filter(u => u.id !== id));
+  // 用戶權限管理
+  const handleAddUser = async (newUser: AdminUser) => {
+    const { error } = await supabase.from('admin_users').insert([newUser]);
+    if (!error) {
+      setUsers(prev => [...prev, newUser]);
+    }
   };
+
+  const handleDeleteUser = async (id: string) => {
+    const { error } = await supabase.from('admin_users').delete().eq('id', id);
+    if (!error) {
+      setUsers(prev => prev.filter(u => u.id !== id));
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center space-y-4">
+          <Loader2 className="animate-spin mx-auto text-red-600" size={48} />
+          <p className="text-gray-500 font-medium">正在連接雲端資料庫...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <Router>
@@ -161,6 +221,7 @@ const App: React.FC = () => {
                   users={users}
                   onUpdateActivity={handleUpdateActivity}
                   onAddActivity={handleAddActivity}
+                  onDeleteActivity={handleDeleteActivity}
                   onUpdateRegistration={handleUpdateRegistration}
                   onDeleteRegistration={handleDeleteRegistration}
                   onAddUser={handleAddUser}
