@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { HashRouter as Router, Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
 import { Menu, X, Loader2 } from 'lucide-react';
@@ -10,13 +9,20 @@ import LoginPage from './pages/LoginPage';
 import { Activity, Registration, AdminUser } from './types';
 import { INITIAL_ACTIVITIES, INITIAL_ADMINS } from './constants';
 
-/**
- * Supabase 配置指南：
- * 請在下方填入您的 Supabase 專案資訊。
- * 您可以從 Supabase Dashboard > Project Settings > API 找到這些值。
- */
-const SUPABASE_URL = 'https://qxoglhkfxxqsjefynzqn.supabase.co'; 
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF4b2dsaGtmeHhxc2plZnluenFuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAwMzQwNTAsImV4cCI6MjA4NTYxMDA1MH0.gLvcHgY0rqLd26Nw61_M7nmjaz4TUsP9VL-XxN5wNSU';
+// --- 安全讀取環境變數的機制 ---
+// 使用 try-catch 或可選鏈防止 import.meta 不存在時導致程式崩潰
+const getEnv = (key: string): string | undefined => {
+  try {
+    // 檢查 import.meta 及其 env 屬性是否存在
+    return (import.meta as any)?.env?.[key];
+  } catch (e) {
+    // 若環境完全不支援 import.meta，則返回 undefined
+    return undefined;
+  }
+};
+
+const SUPABASE_URL = getEnv('VITE_SUPABASE_URL') || 'https://qxoglhkfxxqsjefynzqn.supabase.co'; 
+const SUPABASE_ANON_KEY = getEnv('VITE_SUPABASE_ANON_KEY') || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF4b2dsaGtmeHhxc2plZnluenFuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAwMzQwNTAsImV4cCI6MjA4NTYxMDA1MH0.gLvcHgY0rqLd26Nw61_M7nmjaz4TUsP9VL-XxN5wNSU';
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -37,14 +43,10 @@ const Header: React.FC = () => {
               <span className="text-xl font-bold tracking-tight">長展分會活動報名</span>
             </Link>
           </div>
-          
           <div className="hidden sm:flex items-center space-x-8">
             <Link to="/" className="text-gray-700 hover:text-red-600 transition-colors">活動首頁</Link>
-            <Link to="/admin" className="text-gray-500 hover:text-gray-900 flex items-center gap-1 border border-gray-200 px-3 py-1 rounded-full text-sm">
-              管理後台
-            </Link>
+            <Link to="/admin" className="text-gray-500 hover:text-gray-900 flex items-center gap-1 border border-gray-200 px-3 py-1 rounded-full text-sm">管理後台</Link>
           </div>
-
           <div className="sm:hidden flex items-center">
             <button onClick={() => setIsOpen(!isOpen)} className="text-gray-500 hover:text-red-600">
               {isOpen ? <X size={24} /> : <Menu size={24} />}
@@ -52,7 +54,6 @@ const Header: React.FC = () => {
           </div>
         </div>
       </div>
-
       {isOpen && (
         <div className="sm:hidden bg-white border-t px-4 py-3 space-y-3">
           <Link to="/" onClick={() => setIsOpen(false)} className="block text-gray-700 font-medium">活動首頁</Link>
@@ -66,7 +67,6 @@ const Header: React.FC = () => {
 const Footer: React.FC = () => {
   const location = useLocation();
   if (location.pathname.startsWith('/admin')) return null;
-
   return (
     <footer className="bg-white border-t py-12">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
@@ -94,21 +94,21 @@ const App: React.FC = () => {
     setLoading(true);
     try {
       const { data: actData } = await supabase.from('activities').select('*').order('date', { ascending: true });
-      const { data: regData } = await supabase.from('registrations').select('*').order('registeredAt', { ascending: false });
+      const { data: regData } = await supabase.from('registrations').select('*').order('created_at', { ascending: false });
       const { data: userData } = await supabase.from('admins').select('*');
 
       if (actData && actData.length > 0) setActivities(actData);
-      else {
-        await supabase.from('activities').insert(INITIAL_ACTIVITIES);
-        setActivities(INITIAL_ACTIVITIES);
+      else if (actData) {
+          await supabase.from('activities').insert(INITIAL_ACTIVITIES);
+          setActivities(INITIAL_ACTIVITIES);
       }
 
       if (regData) setRegistrations(regData);
       
       if (userData && userData.length > 0) setUsers(userData);
-      else {
-        await supabase.from('admins').insert(INITIAL_ADMINS);
-        setUsers(INITIAL_ADMINS);
+      else if (userData) {
+          await supabase.from('admins').insert(INITIAL_ADMINS);
+          setUsers(INITIAL_ADMINS);
       }
     } catch (err) {
       console.error('Fetch error:', err);
@@ -132,8 +132,9 @@ const App: React.FC = () => {
   };
 
   const handleRegister = async (newReg: Registration) => {
-    const { error } = await supabase.from('registrations').insert([newReg]);
-    if (!error) setRegistrations(prev => [newReg, ...prev]);
+    const { id, ...regData } = newReg as any;
+    const { error } = await supabase.from('registrations').insert([regData]);
+    if (!error) fetchData(); 
   };
 
   const handleUpdateActivity = async (updated: Activity) => {
@@ -142,37 +143,37 @@ const App: React.FC = () => {
   };
 
   const handleAddActivity = async (newAct: Activity) => {
-    const { error } = await supabase.from('activities').insert([newAct]);
-    if (!error) setActivities(prev => [...prev, newAct]);
+    const { id, ...actData } = newAct as any;
+    const { error } = await supabase.from('activities').insert([actData]);
+    if (!error) fetchData();
+    else console.error("新增失敗:", error.message);
   };
 
   const handleDeleteActivity = async (id: string) => {
     await supabase.from('registrations').delete().eq('activityId', id);
     const { error } = await supabase.from('activities').delete().eq('id', id);
-    if (!error) {
-      setActivities(prev => prev.filter(a => a.id !== id));
-      setRegistrations(prev => prev.filter(r => r.activityId !== id));
-    }
+    if (!error) fetchData();
   };
 
   const handleDeleteRegistration = async (id: string) => {
     const { error } = await supabase.from('registrations').delete().eq('id', id);
-    if (!error) setRegistrations(prev => prev.filter(r => r.id !== id));
+    if (!error) fetchData();
   };
 
   const handleUpdateRegistration = async (updated: Registration) => {
     const { error } = await supabase.from('registrations').update(updated).eq('id', updated.id);
-    if (!error) setRegistrations(prev => prev.map(r => r.id === updated.id ? updated : r));
+    if (!error) fetchData();
   };
 
   const handleAddUser = async (newUser: AdminUser) => {
-    const { error } = await supabase.from('admins').insert([newUser]);
-    if (!error) setUsers(prev => [...prev, newUser]);
+    const { id, ...userData } = newUser as any;
+    const { error } = await supabase.from('admins').insert([userData]);
+    if (!error) fetchData();
   };
 
   const handleDeleteUser = async (id: string) => {
     const { error } = await supabase.from('admins').delete().eq('id', id);
-    if (!error) setUsers(prev => prev.filter(u => u.id !== id));
+    if (!error) fetchData();
   };
 
   if (loading) {
@@ -194,9 +195,7 @@ const App: React.FC = () => {
           <Routes>
             <Route path="/" element={<Home activities={activities} />} />
             <Route path="/activity/:id" element={<ActivityDetail activities={activities} onRegister={handleRegister} registrations={registrations} />} />
-            <Route path="/admin/login" element={
-              currentUser ? <Navigate to="/admin" /> : <LoginPage users={users} onLogin={handleLogin} />
-            } />
+            <Route path="/admin/login" element={currentUser ? <Navigate to="/admin" /> : <LoginPage users={users} onLogin={handleLogin} />} />
             <Route path="/admin/*" element={
               currentUser ? (
                 <AdminDashboard 
