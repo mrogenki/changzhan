@@ -88,7 +88,7 @@ const UserManager: React.FC<{ users: AdminUser[], onAddUser: (u: AdminUser) => v
   };
 
   const confirmDelete = (user: AdminUser) => {
-    if (window.confirm(`確定要移除管理員「${user.name}」嗎？此動作無法復原。`)) {
+    if (window.confirm(`確定要移除管理員「${user.name}」嗎？\n移除後此帳號將立即失去系統存取權限。`)) {
       onDeleteUser(user.id);
     }
   };
@@ -137,12 +137,16 @@ const UserManager: React.FC<{ users: AdminUser[], onAddUser: (u: AdminUser) => v
                   </span>
                 </td>
                 <td className="px-6 py-4 text-right">
-                  {user.id !== currentUser.id ? (
-                    <button onClick={() => confirmDelete(user)} className="text-gray-300 hover:text-red-600 p-2 transition-colors">
+                  {String(user.id) !== String(currentUser.id) ? (
+                    <button 
+                      onClick={() => confirmDelete(user)} 
+                      className="text-gray-300 hover:text-red-600 p-2 transition-colors hover:bg-red-50 rounded-lg"
+                      title="刪除此管理員"
+                    >
                       <Trash2 size={18} />
                     </button>
                   ) : (
-                    <span className="text-xs text-gray-300 font-medium px-2">當前帳號</span>
+                    <span className="text-[10px] text-gray-300 font-bold px-3 py-1 bg-gray-50 rounded-lg border border-gray-100 uppercase tracking-widest">當前帳號</span>
                   )}
                 </td>
               </tr>
@@ -339,6 +343,12 @@ const ActivityManager: React.FC<{ activities: Activity[], onAddActivity: (a: Act
     setEditingActivity(null);
   };
 
+  const confirmDelete = (act: Activity) => {
+    if (window.confirm(`確定要刪除活動「${act.title}」嗎？\n此動作將同時刪除該活動的所有報名資料且無法復原。`)) {
+      onDeleteActivity(act.id);
+    }
+  };
+
   return (
     <div className="space-y-6 text-gray-900">
       <div className="flex items-center justify-between">
@@ -355,8 +365,8 @@ const ActivityManager: React.FC<{ activities: Activity[], onAddActivity: (a: Act
               <div className="flex items-center justify-between mb-2">
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-gray-100 text-gray-500 uppercase">{act.type}</span>
                 <div className="flex items-center gap-2">
-                  <button onClick={() => { setEditingActivity(act); setIsModalOpen(true); }} className="text-gray-400 hover:text-red-600"><Edit size={16} /></button>
-                  <button onClick={() => onDeleteActivity(act.id)} className="text-gray-400 hover:text-red-600"><Trash2 size={16} /></button>
+                  <button onClick={() => { setEditingActivity(act); setIsModalOpen(true); }} className="text-gray-400 hover:text-red-600 p-1.5 hover:bg-red-50 rounded-md transition-colors"><Edit size={16} /></button>
+                  <button onClick={() => confirmDelete(act)} className="text-gray-400 hover:text-red-600 p-1.5 hover:bg-red-50 rounded-md transition-colors"><Trash2 size={16} /></button>
                 </div>
               </div>
               <h3 className="font-bold line-clamp-1">{act.title}</h3>
@@ -375,19 +385,19 @@ const ActivityManager: React.FC<{ activities: Activity[], onAddActivity: (a: Act
             <form onSubmit={handleSubmit} className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-1">活動類型</label>
-                <select name="type" defaultValue={editingActivity?.type} className="w-full border rounded-lg px-3 py-2 bg-white">
+                <select name="type" defaultValue={editingActivity?.type} className="w-full border rounded-lg px-3 py-2 bg-white outline-none focus:ring-2 focus:ring-red-500">
                   <option value={ActivityType.REGULAR}>例會</option>
                   <option value={ActivityType.SPECIAL}>精選活動</option>
                 </select>
               </div>
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-1">活動標題</label>
-                <input name="title" required defaultValue={editingActivity?.title} className="w-full border rounded-lg px-3 py-2" placeholder="活動標題" />
+                <input name="title" required defaultValue={editingActivity?.title} className="w-full border rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-red-500" placeholder="活動標題" />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-1">日期</label>
-                  <input type="date" name="date" required defaultValue={editingActivity?.date} className="w-full border rounded-lg px-3 py-2" />
+                  <input type="date" name="date" required defaultValue={editingActivity?.date} className="w-full border rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-red-500" />
                 </div>
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-1 flex items-center gap-1">
@@ -409,20 +419,20 @@ const ActivityManager: React.FC<{ activities: Activity[], onAddActivity: (a: Act
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-1">費用 (NT$)</label>
-                  <input name="cost" type="number" required defaultValue={editingActivity?.cost} className="w-full border rounded-lg px-3 py-2" placeholder="費用" />
+                  <input name="cost" type="number" required defaultValue={editingActivity?.cost} className="w-full border rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-red-500" placeholder="費用" />
                 </div>
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-1">封面圖片網址</label>
-                  <input name="image" defaultValue={editingActivity?.image} className="w-full border rounded-lg px-3 py-2" placeholder="https://..." />
+                  <input name="image" defaultValue={editingActivity?.image} className="w-full border rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-red-500" placeholder="https://..." />
                 </div>
               </div>
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-1">活動地點</label>
-                <input name="location" required defaultValue={editingActivity?.location} className="w-full border rounded-lg px-3 py-2" placeholder="活動地點" />
+                <input name="location" required defaultValue={editingActivity?.location} className="w-full border rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-red-500" placeholder="活動地點" />
               </div>
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-1">活動描述</label>
-                <textarea name="description" rows={4} required defaultValue={editingActivity?.description} className="w-full border rounded-lg px-3 py-2" placeholder="活動描述"></textarea>
+                <textarea name="description" rows={4} required defaultValue={editingActivity?.description} className="w-full border rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-red-500" placeholder="活動描述"></textarea>
               </div>
               <div className="flex gap-4 pt-4">
                 <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 border py-3 rounded-lg font-bold text-gray-500 hover:bg-gray-50 transition-colors">取消</button>
@@ -444,6 +454,12 @@ const CheckInManager: React.FC<{ activities: Activity[], registrations: Registra
     const matchesActivity = selectedActivity === 'all' || r.activityId === selectedActivity;
     return matchesSearch && matchesActivity;
   });
+
+  const confirmDelete = (reg: Registration) => {
+    if (window.confirm(`確定要刪除「${reg.name}」的報名紀錄嗎？\n此動作無法復原且會影響活動統計。`)) {
+      onDeleteRegistration(reg.id);
+    }
+  };
 
   return (
     <div className="space-y-6 text-gray-900">
@@ -478,7 +494,11 @@ const CheckInManager: React.FC<{ activities: Activity[], registrations: Registra
                     {reg.checkInStatus ? '已報到' : '未報到'}
                   </button>
                 </td>
-                <td className="py-4 text-right"><button onClick={() => onDeleteRegistration(reg.id)} className="text-gray-300 hover:text-red-600 transition-colors"><Trash2 size={18}/></button></td>
+                <td className="py-4 text-right">
+                  <button onClick={() => confirmDelete(reg)} className="text-gray-300 hover:text-red-600 transition-colors p-1.5 hover:bg-red-50 rounded-md">
+                    <Trash2 size={18}/>
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>

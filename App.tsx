@@ -80,7 +80,7 @@ const Footer: React.FC = () => {
 const App: React.FC = () => {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [registrations, setRegistrations] = useState<Registration[]>([]);
-  const [users, setUsers] = useState<AdminUser[]>(INITIAL_ADMINS);
+  const [users, setUsers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<AdminUser | null>(() => {
     const saved = sessionStorage.getItem('current_user');
@@ -90,24 +90,28 @@ const App: React.FC = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
+      // 獲取活動
       const { data: actData } = await supabase.from('activities').select('*').order('date', { ascending: true }).order('time', { ascending: true });
-      const { data: regData } = await supabase.from('registrations').select('*').order('registeredAt', { ascending: false });
-      const { data: userData } = await supabase.from('admins').select('*');
-
       if (actData && actData.length > 0) {
         setActivities(actData);
-      } else {
-        await supabase.from('activities').insert(INITIAL_ACTIVITIES);
-        setActivities(INITIAL_ACTIVITIES);
+      } else if (actData && actData.length === 0) {
+        // 只有在資料庫真的完全沒資料時才初始化一次
+        const { data: inserted } = await supabase.from('activities').insert(INITIAL_ACTIVITIES).select();
+        if (inserted) setActivities(inserted);
       }
 
+      // 獲取報名
+      const { data: regData } = await supabase.from('registrations').select('*').order('registeredAt', { ascending: false });
       if (regData) setRegistrations(regData);
       
+      // 獲取管理員
+      const { data: userData, error: userError } = await supabase.from('admins').select('*');
       if (userData && userData.length > 0) {
         setUsers(userData);
-      } else {
-        await supabase.from('admins').insert(INITIAL_ADMINS);
-        setUsers(INITIAL_ADMINS);
+      } else if (!userError && userData && userData.length === 0) {
+        // 資料庫空了，初始化管理員
+        const { data: inserted } = await supabase.from('admins').insert(INITIAL_ADMINS).select();
+        if (inserted) setUsers(inserted);
       }
     } catch (err) {
       console.error('Fetch error:', err);
@@ -133,46 +137,68 @@ const App: React.FC = () => {
   const handleRegister = async (newReg: Registration) => {
     const { id, ...regData } = newReg as any;
     const { error } = await supabase.from('registrations').insert([regData]);
-    if (!error) fetchData(); 
+    if (error) alert('報名失敗：' + error.message);
+    else fetchData(); 
   };
 
   const handleUpdateActivity = async (updated: Activity) => {
     const { error } = await supabase.from('activities').update(updated).eq('id', updated.id);
-    if (!error) fetchData();
+    if (error) alert('更新失敗：' + error.message);
+    else fetchData();
   };
 
   const handleAddActivity = async (newAct: Activity) => {
     const { id, ...actData } = newAct as any;
     const { error } = await supabase.from('activities').insert([actData]);
-    if (!error) fetchData();
+    if (error) alert('新增活動失敗：' + error.message);
+    else fetchData();
   };
 
   const handleDeleteActivity = async (id: string) => {
+    // 先刪除報名資料以防外鍵約束
     await supabase.from('registrations').delete().eq('activityId', id);
     const { error } = await supabase.from('activities').delete().eq('id', id);
-    if (!error) fetchData();
+    if (error) alert('刪除失敗：' + error.message);
+    else fetchData();
   };
 
   const handleDeleteRegistration = async (id: string) => {
     const { error } = await supabase.from('registrations').delete().eq('id', id);
-    if (!error) fetchData();
+    if (error) alert('刪除報名紀錄失敗：' + error.message);
+    else fetchData();
   };
 
   const handleUpdateRegistration = async (updated: Registration) => {
     const { error } = await supabase.from('registrations').update(updated).eq('id', updated.id);
-    if (!error) fetchData();
+    if (error) alert('更新報名狀態失敗：' + error.message);
+    else fetchData();
   };
 
   const handleAddUser = async (newUser: AdminUser) => {
+    // 如果資料庫 id 是自增整數，這裡不要傳入前端產生的隨機 id
     const { id, ...userData } = newUser as any;
     const { error } = await supabase.from('admins').insert([userData]);
-    if (!error) fetchData();
+    if (error) alert('新增管理員失敗：' + error.message);
+    else fetchData();
   };
 
   const handleDeleteUser = async (id: string) => {
-    const { error } = await supabase.from('admins').delete().eq('id', id);
-    if (!error) fetchData();
-  };
+  // 增加確認視窗防止誤刪
+  if (!window.confirm("確定要移除此人員嗎？")) return;
+
+  const { error } = await supabase
+    .from('admins')
+    .delete()
+    .eq('id', id); // 確保這裡傳入的是從資料庫讀取到的 uuid 字串
+
+  if (error) {
+    console.error("刪除失敗:", error.message);
+    alert("刪除失敗，請檢查權限設定");
+  } else {
+    // 刪除成功後重新獲取資料
+    fetchData();
+  }
+};
 
   if (loading) {
     return (
