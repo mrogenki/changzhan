@@ -1,6 +1,7 @@
+
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Calendar, MapPin, DollarSign, ChevronRight } from 'lucide-react';
+import { Calendar, MapPin, DollarSign, ChevronRight, Clock } from 'lucide-react';
 import { Activity, ActivityType } from '../types';
 
 interface HomeProps {
@@ -23,6 +24,8 @@ const ActivityCard: React.FC<{ activity: Activity }> = ({ activity }) => (
         <div className="flex items-center gap-2">
           <Calendar size={16} className="text-red-600" />
           <span>{activity.date}</span>
+          <Clock size={16} className="text-red-600 ml-2" />
+          <span>{activity.time}</span>
         </div>
         <div className="flex items-center gap-2">
           <MapPin size={16} className="text-red-600" />
@@ -44,10 +47,10 @@ const ActivityCard: React.FC<{ activity: Activity }> = ({ activity }) => (
 const Home: React.FC<HomeProps> = ({ activities }) => {
   const now = new Date();
 
-  // 過濾邏輯：必須是 active 狀態且日期大於現在
   const filterUpcoming = (a: Activity) => {
-    const activityDate = new Date(a.date.replace(/-/g, '/')); // 確保跨瀏覽器日期解析
-    return a.status === 'active' && activityDate > now;
+    // 結合日期與時間進行比較
+    const activityFullDate = new Date(`${a.date.replace(/-/g, '/')} ${a.time}`);
+    return a.status === 'active' && activityFullDate > now;
   };
 
   const regularMeetings = activities.filter(a => a.type === ActivityType.REGULAR && filterUpcoming(a));

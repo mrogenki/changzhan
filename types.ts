@@ -14,7 +14,8 @@ export interface Activity {
   id: string;
   type: ActivityType;
   title: string;
-  date: string;
+  date: string; // 格式: YYYY-MM-DD
+  time: string; // 格式: HH:mm
   location: string;
   cost: number;
   image: string;

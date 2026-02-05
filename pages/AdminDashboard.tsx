@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Routes, Route, Link, useNavigate, useLocation, Navigate } from 'react-router-dom';
-import { LayoutDashboard, Calendar, Users, LogOut, ChevronRight, Search, FileDown, Plus, Edit, Trash2, CheckCircle, XCircle, Shield, UserPlus, DollarSign, TrendingUp, BarChart3, Mail, User } from 'lucide-react';
+import { LayoutDashboard, Calendar, Users, LogOut, ChevronRight, Search, FileDown, Plus, Edit, Trash2, CheckCircle, XCircle, Shield, UserPlus, DollarSign, TrendingUp, BarChart3, Mail, User, Clock } from 'lucide-react';
 import { Activity, Registration, ActivityType, AdminUser, UserRole } from '../types';
 
 interface AdminDashboardProps {
@@ -272,6 +272,8 @@ const DashboardHome: React.FC<{ activities: Activity[], registrations: Registrat
                       <div className="flex items-center gap-2 text-xs text-gray-400 mt-1 font-medium">
                         <Calendar size={12} className="text-red-600" />
                         {stat.date}
+                        <Clock size={12} className="text-red-600 ml-2" />
+                        {stat.time}
                         <span className="mx-1">•</span>
                         <span className="px-2 py-0.5 rounded bg-gray-100 text-gray-500">{stat.type}</span>
                       </div>
@@ -312,19 +314,19 @@ const DashboardHome: React.FC<{ activities: Activity[], registrations: Registrat
   );
 };
 
-// CheckInManager 與 ActivityManager 組件保持原本邏輯，但在對應位置使用新的 props 或對接 App.tsx 傳下來的 function
 const ActivityManager: React.FC<{ activities: Activity[], onAddActivity: (a: Activity) => void, onUpdateActivity: (a: Activity) => void, onDeleteActivity: (id: string) => void }> = ({ activities, onAddActivity, onUpdateActivity, onDeleteActivity }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingActivity, setEditingActivity] = useState<Activity | null>(null);
+  
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
-    const rawDate = formData.get('date') as string;
     const activityData: Activity = {
       id: editingActivity?.id || Math.random().toString(36).substr(2, 9),
       type: formData.get('type') as ActivityType,
       title: formData.get('title') as string,
-      date: rawDate.replace('T', ' '),
+      date: formData.get('date') as string,
+      time: formData.get('time') as string,
       location: formData.get('location') as string,
       cost: Number(formData.get('cost')),
       image: formData.get('image') as string || 'https://images.unsplash.com/photo-1517457373958-b7bdd4587205?q=80&w=2069&auto=format&fit=crop',
@@ -358,7 +360,10 @@ const ActivityManager: React.FC<{ activities: Activity[], onAddActivity: (a: Act
                 </div>
               </div>
               <h3 className="font-bold line-clamp-1">{act.title}</h3>
-              <p className="text-xs text-gray-400 mt-1">{act.date}</p>
+              <p className="text-xs text-gray-400 mt-1 flex items-center gap-1 font-medium">
+                <Calendar size={12} className="text-red-600" /> {act.date} 
+                <Clock size={12} className="ml-1 text-red-600" /> {act.time}
+              </p>
             </div>
           </div>
         ))}
@@ -367,17 +372,61 @@ const ActivityManager: React.FC<{ activities: Activity[], onAddActivity: (a: Act
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-xl rounded-2xl p-6 shadow-2xl">
             <h2 className="text-xl font-bold mb-4">{editingActivity ? '修改活動' : '新增活動'}</h2>
-            <form onSubmit={handleSubmit} className="space-y-4 max-h-[70vh] overflow-y-auto">
-              <input name="title" required defaultValue={editingActivity?.title} className="w-full border rounded-lg px-3 py-2" placeholder="活動標題" />
-              <div className="grid grid-cols-2 gap-4">
-                <input type="datetime-local" name="date" required className="border rounded-lg px-3 py-2" />
-                <input name="cost" type="number" required defaultValue={editingActivity?.cost} className="border rounded-lg px-3 py-2" placeholder="費用" />
+            <form onSubmit={handleSubmit} className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">活動類型</label>
+                <select name="type" defaultValue={editingActivity?.type} className="w-full border rounded-lg px-3 py-2 bg-white">
+                  <option value={ActivityType.REGULAR}>例會</option>
+                  <option value={ActivityType.SPECIAL}>精選活動</option>
+                </select>
               </div>
-              <input name="location" required defaultValue={editingActivity?.location} className="w-full border rounded-lg px-3 py-2" placeholder="活動地點" />
-              <textarea name="description" rows={4} required defaultValue={editingActivity?.description} className="w-full border rounded-lg px-3 py-2" placeholder="活動描述"></textarea>
-              <div className="flex gap-4">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 border py-2 rounded-lg">取消</button>
-                <button type="submit" className="flex-1 bg-red-600 text-white py-2 rounded-lg">儲存</button>
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">活動標題</label>
+                <input name="title" required defaultValue={editingActivity?.title} className="w-full border rounded-lg px-3 py-2" placeholder="活動標題" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">日期</label>
+                  <input type="date" name="date" required defaultValue={editingActivity?.date} className="w-full border rounded-lg px-3 py-2" />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1 flex items-center gap-1">
+                    <Clock size={14} className="text-red-600" /> 時間 (24小時制)
+                  </label>
+                  <input 
+                    type="text" 
+                    name="time" 
+                    required 
+                    defaultValue={editingActivity?.time} 
+                    className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-red-500 outline-none" 
+                    placeholder="HH:mm (例如 18:30)"
+                    pattern="([01]?[0-9]|2[0-3]):[0-5][0-9]"
+                    title="請使用 24 小時制格式 (HH:mm)，例如 06:30 或 18:30"
+                  />
+                  <p className="text-[10px] text-gray-400 mt-1 font-bold italic">※ 例如 18:30 (勿使用上下午)</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">費用 (NT$)</label>
+                  <input name="cost" type="number" required defaultValue={editingActivity?.cost} className="w-full border rounded-lg px-3 py-2" placeholder="費用" />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">封面圖片網址</label>
+                  <input name="image" defaultValue={editingActivity?.image} className="w-full border rounded-lg px-3 py-2" placeholder="https://..." />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">活動地點</label>
+                <input name="location" required defaultValue={editingActivity?.location} className="w-full border rounded-lg px-3 py-2" placeholder="活動地點" />
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">活動描述</label>
+                <textarea name="description" rows={4} required defaultValue={editingActivity?.description} className="w-full border rounded-lg px-3 py-2" placeholder="活動描述"></textarea>
+              </div>
+              <div className="flex gap-4 pt-4">
+                <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 border py-3 rounded-lg font-bold text-gray-500 hover:bg-gray-50 transition-colors">取消</button>
+                <button type="submit" className="flex-1 bg-red-600 text-white py-3 rounded-lg font-bold shadow-lg shadow-red-100 hover:bg-red-700 active:scale-95 transition-all">儲存活動</button>
               </div>
             </form>
           </div>
@@ -400,14 +449,14 @@ const CheckInManager: React.FC<{ activities: Activity[], registrations: Registra
     <div className="space-y-6 text-gray-900">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">報到管理</h1>
-        <button onClick={() => {}} className="bg-green-600 text-white px-4 py-2 rounded-lg flex items-center gap-2"><FileDown size={18}/> 匯出報名表</button>
+        <button onClick={() => {}} className="bg-green-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-all hover:bg-green-700 active:scale-95"><FileDown size={18}/> 匯出報名表</button>
       </div>
       <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-          <input type="text" placeholder="搜尋姓名或電話..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full border rounded-lg px-4 py-2" />
-          <select value={selectedActivity} onChange={e => setSelectedActivity(e.target.value)} className="border rounded-lg px-4 py-2 bg-white">
+          <input type="text" placeholder="搜尋姓名或電話..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-red-500 outline-none" />
+          <select value={selectedActivity} onChange={e => setSelectedActivity(e.target.value)} className="border rounded-lg px-4 py-2 bg-white outline-none focus:ring-2 focus:ring-red-500">
             <option value="all">所有活動</option>
-            {activities.map(a => <option key={a.id} value={a.id}>{a.title}</option>)}
+            {activities.map(a => <option key={a.id} value={a.id}>{a.title} ({a.date})</option>)}
           </select>
         </div>
         <table className="w-full text-left">
@@ -416,20 +465,20 @@ const CheckInManager: React.FC<{ activities: Activity[], registrations: Registra
           </thead>
           <tbody className="divide-y">
             {filteredRegistrations.map(reg => (
-              <tr key={reg.id} className="hover:bg-gray-50">
+              <tr key={reg.id} className="hover:bg-gray-50 transition-colors">
                 <td className="py-4">
                   <div className="font-bold">{reg.name}</div>
                   <div className="text-xs text-gray-400">{reg.company}</div>
                 </td>
                 <td className="py-4">
-                  <input type="number" className="border rounded px-2 py-1 w-20 text-sm" value={reg.paidAmount || 0} onChange={(e) => onUpdateRegistration({...reg, paidAmount: parseInt(e.target.value)})} />
+                  <input type="number" className="border rounded px-2 py-1 w-20 text-sm focus:ring-1 focus:ring-red-500 outline-none" value={reg.paidAmount || 0} onChange={(e) => onUpdateRegistration({...reg, paidAmount: parseInt(e.target.value)})} />
                 </td>
                 <td className="py-4">
-                  <button onClick={() => onUpdateRegistration({...reg, checkInStatus: !reg.checkInStatus})} className={`px-3 py-1 rounded-full text-xs font-bold ${reg.checkInStatus ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'}`}>
+                  <button onClick={() => onUpdateRegistration({...reg, checkInStatus: !reg.checkInStatus})} className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${reg.checkInStatus ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}>
                     {reg.checkInStatus ? '已報到' : '未報到'}
                   </button>
                 </td>
-                <td className="py-4 text-right"><button onClick={() => onDeleteRegistration(reg.id)} className="text-gray-300 hover:text-red-600"><Trash2 size={18}/></button></td>
+                <td className="py-4 text-right"><button onClick={() => onDeleteRegistration(reg.id)} className="text-gray-300 hover:text-red-600 transition-colors"><Trash2 size={18}/></button></td>
               </tr>
             ))}
           </tbody>

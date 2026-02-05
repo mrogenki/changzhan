@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Calendar, MapPin, DollarSign, ArrowLeft, CheckCircle2, Share2, CopyCheck } from 'lucide-react';
+import { Calendar, MapPin, DollarSign, ArrowLeft, CheckCircle2, Share2, CopyCheck, Clock } from 'lucide-react';
 import { Activity, Registration } from '../types';
 
 interface ActivityDetailProps {
@@ -35,7 +35,7 @@ const ActivityDetail: React.FC<ActivityDetailProps> = ({ activities, registratio
 
   const handleShare = async () => {
     const shareUrl = window.location.href;
-    const shareText = `【長展分會活動推薦】\n活動：${activity.title}\n時間：${activity.date}\n地點：${activity.location}\n\n立即點擊連結報名：\n${shareUrl}`;
+    const shareText = `【長展分會活動推薦】\n活動：${activity.title}\n日期：${activity.date}\n時間：${activity.time}\n地點：${activity.location}\n\n立即點擊連結報名：\n${shareUrl}`;
 
     if (navigator.share) {
       try {
@@ -48,7 +48,6 @@ const ActivityDetail: React.FC<ActivityDetailProps> = ({ activities, registratio
         console.log('Share failed', err);
       }
     } else {
-      // Fallback: Copy to clipboard
       try {
         await navigator.clipboard.writeText(shareText);
         setShowCopyTooltip(true);
@@ -120,7 +119,6 @@ const ActivityDetail: React.FC<ActivityDetailProps> = ({ activities, registratio
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
-        {/* Info Column */}
         <div className="lg:col-span-2 space-y-8">
           <div className="rounded-2xl overflow-hidden shadow-sm">
             <img src={activity.image} alt={activity.title} className="w-full h-[400px] object-cover" />
@@ -139,8 +137,9 @@ const ActivityDetail: React.FC<ActivityDetailProps> = ({ activities, registratio
                   <Calendar size={24} />
                 </div>
                 <div>
-                  <p className="text-xs text-gray-400 uppercase font-bold tracking-wider">時間</p>
+                  <p className="text-xs text-gray-400 uppercase font-bold tracking-wider">日期時間</p>
                   <p className="font-medium">{activity.date}</p>
+                  <p className="text-sm text-gray-500 font-bold">{activity.time}</p>
                 </div>
               </div>
               <div className="flex items-center gap-4">
@@ -170,7 +169,6 @@ const ActivityDetail: React.FC<ActivityDetailProps> = ({ activities, registratio
           </div>
         </div>
 
-        {/* Form Column */}
         <div className="lg:col-span-1">
           <div className="bg-white p-8 rounded-2xl border border-gray-100 shadow-xl sticky top-24">
             <h3 className="text-2xl font-bold mb-6 text-center">報名資料</h3>

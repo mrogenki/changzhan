@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { HashRouter as Router, Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
 import { Menu, X, Loader2 } from 'lucide-react';
@@ -9,14 +10,10 @@ import LoginPage from './pages/LoginPage';
 import { Activity, Registration, AdminUser } from './types';
 import { INITIAL_ACTIVITIES, INITIAL_ADMINS } from './constants';
 
-// --- 安全讀取環境變數的機制 ---
-// 使用 try-catch 或可選鏈防止 import.meta 不存在時導致程式崩潰
 const getEnv = (key: string): string | undefined => {
   try {
-    // 檢查 import.meta 及其 env 屬性是否存在
     return (import.meta as any)?.env?.[key];
   } catch (e) {
-    // 若環境完全不支援 import.meta，則返回 undefined
     return undefined;
   }
 };
@@ -44,8 +41,8 @@ const Header: React.FC = () => {
             </Link>
           </div>
           <div className="hidden sm:flex items-center space-x-8">
-            <Link to="/" className="text-gray-700 hover:text-red-600 transition-colors">活動首頁</Link>
-            <Link to="/admin" className="text-gray-500 hover:text-gray-900 flex items-center gap-1 border border-gray-200 px-3 py-1 rounded-full text-sm">管理後台</Link>
+            <Link to="/" className="text-gray-700 hover:text-red-600 transition-colors font-medium">活動首頁</Link>
+            <Link to="/admin" className="text-gray-500 hover:text-gray-900 flex items-center gap-1 border border-gray-200 px-3 py-1 rounded-full text-sm font-bold">後台管理</Link>
           </div>
           <div className="sm:hidden flex items-center">
             <button onClick={() => setIsOpen(!isOpen)} className="text-gray-500 hover:text-red-600">
@@ -55,9 +52,9 @@ const Header: React.FC = () => {
         </div>
       </div>
       {isOpen && (
-        <div className="sm:hidden bg-white border-t px-4 py-3 space-y-3">
-          <Link to="/" onClick={() => setIsOpen(false)} className="block text-gray-700 font-medium">活動首頁</Link>
-          <Link to="/admin" onClick={() => setIsOpen(false)} className="block text-gray-500 text-sm">管理後台</Link>
+        <div className="sm:hidden bg-white border-t px-4 py-3 space-y-3 shadow-lg">
+          <Link to="/" onClick={() => setIsOpen(false)} className="block text-gray-700 font-bold">活動首頁</Link>
+          <Link to="/admin" onClick={() => setIsOpen(false)} className="block text-gray-500 text-sm font-bold">後台管理</Link>
         </div>
       )}
     </nav>
@@ -72,9 +69,9 @@ const Footer: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
         <div className="flex justify-center items-center gap-2 mb-4">
           <div className="w-6 h-6 bg-red-600 rounded-sm flex items-center justify-center text-white text-xs font-bold">長</div>
-          <span className="font-bold text-gray-800">長展分會</span>
+          <span className="font-bold text-gray-800 tracking-wider">BNI 長展分會</span>
         </div>
-        <p className="text-gray-400 text-sm">&copy; 2024 長展分會活動報名系統. All rights reserved.</p>
+        <p className="text-gray-400 text-xs">&copy; 2024 長展分會活動報名系統. All rights reserved.</p>
       </div>
     </footer>
   );
@@ -83,7 +80,7 @@ const Footer: React.FC = () => {
 const App: React.FC = () => {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [registrations, setRegistrations] = useState<Registration[]>([]);
-  const [users, setUsers] = useState<AdminUser[]>([]);
+  const [users, setUsers] = useState<AdminUser[]>(INITIAL_ADMINS);
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<AdminUser | null>(() => {
     const saved = sessionStorage.getItem('current_user');
@@ -93,22 +90,24 @@ const App: React.FC = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const { data: actData } = await supabase.from('activities').select('*').order('date', { ascending: true });
-      const { data: regData } = await supabase.from('registrations').select('*').order('created_at', { ascending: false });
+      const { data: actData } = await supabase.from('activities').select('*').order('date', { ascending: true }).order('time', { ascending: true });
+      const { data: regData } = await supabase.from('registrations').select('*').order('registeredAt', { ascending: false });
       const { data: userData } = await supabase.from('admins').select('*');
 
-      if (actData && actData.length > 0) setActivities(actData);
-      else if (actData) {
-          await supabase.from('activities').insert(INITIAL_ACTIVITIES);
-          setActivities(INITIAL_ACTIVITIES);
+      if (actData && actData.length > 0) {
+        setActivities(actData);
+      } else {
+        await supabase.from('activities').insert(INITIAL_ACTIVITIES);
+        setActivities(INITIAL_ACTIVITIES);
       }
 
       if (regData) setRegistrations(regData);
       
-      if (userData && userData.length > 0) setUsers(userData);
-      else if (userData) {
-          await supabase.from('admins').insert(INITIAL_ADMINS);
-          setUsers(INITIAL_ADMINS);
+      if (userData && userData.length > 0) {
+        setUsers(userData);
+      } else {
+        await supabase.from('admins').insert(INITIAL_ADMINS);
+        setUsers(INITIAL_ADMINS);
       }
     } catch (err) {
       console.error('Fetch error:', err);
@@ -139,14 +138,13 @@ const App: React.FC = () => {
 
   const handleUpdateActivity = async (updated: Activity) => {
     const { error } = await supabase.from('activities').update(updated).eq('id', updated.id);
-    if (!error) setActivities(prev => prev.map(a => a.id === updated.id ? updated : a));
+    if (!error) fetchData();
   };
 
   const handleAddActivity = async (newAct: Activity) => {
     const { id, ...actData } = newAct as any;
     const { error } = await supabase.from('activities').insert([actData]);
     if (!error) fetchData();
-    else console.error("新增失敗:", error.message);
   };
 
   const handleDeleteActivity = async (id: string) => {
@@ -178,10 +176,10 @@ const App: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center bg-white">
         <div className="text-center space-y-4">
-          <Loader2 className="animate-spin mx-auto text-red-600" size={48} />
-          <p className="text-gray-500 font-medium">正在連接雲端資料庫...</p>
+          <Loader2 className="animate-spin text-red-600" size={56} />
+          <p className="text-gray-400 font-bold tracking-widest text-xs uppercase">Connecting Database</p>
         </div>
       </div>
     );
@@ -191,7 +189,7 @@ const App: React.FC = () => {
     <Router>
       <div className="min-h-screen flex flex-col">
         <Header />
-        <main className="flex-grow">
+        <main className="flex-grow bg-gray-50/30">
           <Routes>
             <Route path="/" element={<Home activities={activities} />} />
             <Route path="/activity/:id" element={<ActivityDetail activities={activities} onRegister={handleRegister} registrations={registrations} />} />
