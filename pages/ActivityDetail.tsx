@@ -13,7 +13,6 @@ interface ActivityDetailProps {
 const ActivityDetail: React.FC<ActivityDetailProps> = ({ activities, registrations, onRegister }) => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  // 注意：URL 參數 id 是 string，但 Activity id 可能是 number，這裡使用寬鬆比較
   const activity = activities.find(a => String(a.id) === id);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -32,8 +31,7 @@ const ActivityDetail: React.FC<ActivityDetailProps> = ({ activities, registratio
     return <div className="p-20 text-center">活動不存在</div>;
   }
 
-  // 更新篩選條件：使用 activity_id
-  const alreadyRegisteredCount = registrations.filter(r => String(r.activity_id) === String(id)).length;
+  const alreadyRegisteredCount = registrations.filter(r => String(r.activityId) === String(id)).length;
 
   const handleShare = async () => {
     const shareUrl = window.location.href;
@@ -64,12 +62,19 @@ const ActivityDetail: React.FC<ActivityDetailProps> = ({ activities, registratio
     e.preventDefault();
     setIsSubmitting(true);
 
+    // 建構寫入資料庫的物件
+    // 注意：這裡移除了 check_in_status，因為這是後台欄位，且您的資料庫可能尚未建立
     const newRegistration: Registration = {
-      id: Math.random().toString(36).substr(2, 9), // 暫時使用隨機 ID，後端會忽略並自動產生 int8
-      activity_id: activity.id, // 使用 snake_case
-      ...formData,
-      check_in_status: false, // 使用 snake_case
-      created_at: new Date().toISOString() // 使用 snake_case
+      id: Math.random().toString(36).substr(2, 9), 
+      activityId: activity.id,
+      name: formData.name,
+      phone: formData.phone,
+      email: formData.email,
+      company: formData.company,
+      title: formData.title,
+      // referrer 是選填，如果有填才送出 (雖然 Supabase 通常接受空字串，但保持乾淨)
+      ...(formData.referrer ? { referrer: formData.referrer } : {}),
+      created_at: new Date().toISOString()
     };
 
     setTimeout(() => {

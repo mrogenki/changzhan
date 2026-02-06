@@ -226,10 +226,12 @@ const UserManager: React.FC<{ users: AdminUser[], onAddUser: (u: AdminUser) => v
 
 const DashboardHome: React.FC<{ activities: Activity[], registrations: Registration[] }> = ({ activities, registrations }) => {
   const activityStats = activities.map(activity => {
-    // 使用寬鬆比較 String(r.activity_id) == String(activity.id)
-    const activityRegs = registrations.filter(r => String(r.activity_id) === String(activity.id));
-    const checkedIn = activityRegs.filter(r => r.check_in_status).length; // 使用 snake_case
-    const revenue = activityRegs.reduce((sum, r) => sum + (r.paid_amount || 0), 0); // 使用 snake_case
+    // 使用寬鬆比較 String(r.activityId) == String(activity.id)
+    const activityRegs = registrations.filter(r => String(r.activityId) === String(activity.id));
+    // 處理可能為 undefined 的 check_in_status
+    const checkedIn = activityRegs.filter(r => r.check_in_status === true).length; 
+    // 處理可能為 undefined 的 paid_amount
+    const revenue = activityRegs.reduce((sum, r) => sum + (r.paid_amount || 0), 0);
     const rate = activityRegs.length > 0 ? Math.round((checkedIn / activityRegs.length) * 100) : 0;
     
     return {
@@ -457,7 +459,7 @@ const CheckInManager: React.FC<{ activities: Activity[], registrations: Registra
   const filteredRegistrations = registrations.filter(r => {
     const matchesSearch = r.name.toLowerCase().includes(searchTerm.toLowerCase()) || r.phone.includes(searchTerm);
     // 使用 String 轉換比較，因為來自資料庫的 ID 可能是數字或字串
-    const matchesActivity = selectedActivity === 'all' || String(r.activity_id) === String(selectedActivity);
+    const matchesActivity = selectedActivity === 'all' || String(r.activityId) === String(selectedActivity);
     return matchesSearch && matchesActivity;
   });
 
@@ -493,9 +495,11 @@ const CheckInManager: React.FC<{ activities: Activity[], registrations: Registra
                   <div className="text-xs text-gray-400">{reg.company}</div>
                 </td>
                 <td className="py-4">
+                  {/* 使用 || 0 處理 undefined */}
                   <input type="number" className="border rounded px-2 py-1 w-20 text-sm focus:ring-1 focus:ring-red-500 outline-none" value={reg.paid_amount || 0} onChange={(e) => onUpdateRegistration({...reg, paid_amount: parseInt(e.target.value)})} />
                 </td>
                 <td className="py-4">
+                  {/* 處理 undefined check_in_status */}
                   <button onClick={() => onUpdateRegistration({...reg, check_in_status: !reg.check_in_status})} className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${reg.check_in_status ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}>
                     {reg.check_in_status ? '已報到' : '未報到'}
                   </button>

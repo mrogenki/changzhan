@@ -172,8 +172,8 @@ const App: React.FC = () => {
   };
 
   const handleDeleteActivity = async (id: string | number) => {
-    // 先刪除報名資料以防外鍵約束 (使用新的欄位名稱 activity_id)
-    await supabase.from('registrations').delete().eq('activity_id', id);
+    // 先刪除報名資料以防外鍵約束 (改為 activityId)
+    await supabase.from('registrations').delete().eq('activityId', id);
     const { error } = await supabase.from('activities').delete().eq('id', id);
     if (error) alert('刪除失敗：' + error.message);
     else fetchData();

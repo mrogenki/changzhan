@@ -11,36 +11,39 @@ export enum UserRole {
 }
 
 export interface Activity {
-  id: string | number; // 資料庫可能是 int8 或 uuid，保留彈性
+  id: string | number;
   type: ActivityType;
   title: string;
-  date: string; // 格式: YYYY-MM-DD
-  time: string; // 格式: HH:mm
+  date: string;
+  time: string;
   location: string;
-  price: number; // 對應資料庫 price (int4)
-  picture: string; // 對應資料庫 picture (text)
+  price: number;
+  picture: string;
   description: string;
-  status?: 'active' | 'closed'; // 設為選填，若資料庫無此欄位則由前端預設
+  status?: 'active' | 'closed';
 }
 
 export interface Registration {
   id: string | number;
-  activity_id: string | number; // 改為 snake_case
+  activityId: string | number;
   name: string;
   phone: string;
   email: string;
-  company: string;
-  title: string;
+  
+  // 以下欄位若資料庫尚未建立，設為選填以避免前端錯誤
+  company?: string;
+  title?: string;
   referrer?: string;
-  check_in_status: boolean; // 改為 snake_case
-  paid_amount?: number; // 改為 snake_case
-  created_at: string; // 改為 snake_case (通常 DB 欄位為 created_at)
+  check_in_status?: boolean; // 後台管理用：報到狀態
+  paid_amount?: number;      // 後台管理用：繳費金額
+  
+  created_at: string;
 }
 
 export interface AdminUser {
-  id: string; // UUID
+  id: string;
   name: string;
   email: string;
   role: UserRole;
-  password?: string; // 僅供登入與新增時使用
+  password?: string;
 }
