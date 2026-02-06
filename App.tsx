@@ -150,7 +150,7 @@ const App: React.FC = () => {
     sessionStorage.removeItem('current_user');
   };
 
-  // 處理圖片上傳 (增強版：失敗時自動 Fallback 到 Base64)
+  // 處理圖片上傳 (增強版：失敗時自動 Fallback 到 Base64 + Canvas 壓縮)
   const handleUploadImage = async (file: File): Promise<string> => {
     try {
       // 1. 嘗試上傳到 Supabase Storage
@@ -167,7 +167,7 @@ const App: React.FC = () => {
         });
 
       if (uploadError) {
-        console.warn('Supabase Storage 上傳失敗 (可能是權限設定問題)，嘗試轉為 Base64 儲存', uploadError.message);
+        console.warn('Supabase Storage 上傳失敗 (可能無權限)，嘗試轉為壓縮 Base64 儲存', uploadError.message);
         throw uploadError; // 拋出錯誤以進入 catch 區塊進行 Fallback
       }
 
@@ -179,17 +179,55 @@ const App: React.FC = () => {
       return data.publicUrl;
 
     } catch (error: any) {
-      // 2. Fallback 機制：如果 Storage 上傳失敗，將圖片轉為 Base64 字串存入資料庫
-      // 限制檔案大小 (例如 2.5MB)，避免資料庫欄位過大
-      if (file.size > 2.5 * 1024 * 1024) {
-        throw new Error('圖片上傳失敗，且檔案過大 (>2.5MB) 無法轉存。請壓縮圖片或檢查 Storage 權限設定。');
-      }
-
+      // 2. Fallback 機制：使用 Canvas 壓縮圖片並轉為 Base64
+      // 這樣可以解決檔案過大無法存入 DB 的問題，同時避免 Storage 權限設定的麻煩
       return new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.readAsDataURL(file);
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = (e) => reject(new Error('圖片讀取失敗'));
+        reader.onload = (event) => {
+          const img = new Image();
+          img.src = event.target?.result as string;
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            let width = img.width;
+            let height = img.height;
+
+            // 壓縮尺寸：最大寬度/高度 1024px (兼顧清晰度與儲存大小)
+            const MAX_WIDTH = 1024;
+            const MAX_HEIGHT = 1024;
+
+            if (width > height) {
+              if (width > MAX_WIDTH) {
+                height *= MAX_WIDTH / width;
+                width = MAX_WIDTH;
+              }
+            } else {
+              if (height > MAX_HEIGHT) {
+                width *= MAX_HEIGHT / height;
+                height = MAX_HEIGHT;
+              }
+            }
+
+            canvas.width = width;
+            canvas.height = height;
+            
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+                reject(new Error('瀏覽器不支援 Canvas 處理'));
+                return;
+            }
+            
+            // 繪製並壓縮
+            ctx.drawImage(img, 0, 0, width, height);
+
+            // 轉為 JPEG 格式，品質設定為 0.7
+            // 這樣產生的 Base64 字串通常小於 200KB，可安全存入資料庫
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+            resolve(dataUrl);
+          };
+          img.onerror = () => reject(new Error('圖片處理失敗'));
+        };
+        reader.onerror = () => reject(new Error('檔案讀取失敗'));
       });
     }
   };
