@@ -148,11 +148,17 @@ const App: React.FC = () => {
     sessionStorage.removeItem('current_user');
   };
 
-  const handleRegister = async (newReg: Registration) => {
+  // 修改：回傳 Promise<boolean> 以便前端判斷
+  const handleRegister = async (newReg: Registration): Promise<boolean> => {
     const { id, ...regData } = newReg as any;
     const { error } = await supabase.from('registrations').insert([regData]);
-    if (error) alert('報名失敗：' + error.message);
-    else fetchData(); 
+    if (error) {
+      alert('報名失敗：' + error.message);
+      return false;
+    } else {
+      await fetchData(); // 等待資料更新
+      return true;
+    }
   };
 
   const handleUpdateActivity = async (updated: Activity) => {

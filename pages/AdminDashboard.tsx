@@ -485,7 +485,14 @@ const CheckInManager: React.FC<{ activities: Activity[], registrations: Registra
         </div>
         <table className="w-full text-left">
           <thead className="border-b text-sm font-bold text-gray-400 uppercase">
-            <tr><th className="pb-4">姓名 / 公司</th><th className="pb-4">繳費</th><th className="pb-4">狀態</th><th className="pb-4 text-right">操作</th></tr>
+            <tr>
+              <th className="pb-4">姓名 / 公司</th>
+              {/* 新增引薦人欄位 */}
+              <th className="pb-4">引薦人</th>
+              <th className="pb-4">繳費</th>
+              <th className="pb-4">狀態</th>
+              <th className="pb-4 text-right">操作</th>
+            </tr>
           </thead>
           <tbody className="divide-y">
             {filteredRegistrations.map(reg => (
@@ -493,6 +500,10 @@ const CheckInManager: React.FC<{ activities: Activity[], registrations: Registra
                 <td className="py-4">
                   <div className="font-bold">{reg.name}</div>
                   <div className="text-xs text-gray-400">{reg.company}</div>
+                </td>
+                {/* 顯示引薦人，若無則顯示橫線 */}
+                <td className="py-4 text-sm text-gray-500">
+                  {reg.referrer || '-'}
                 </td>
                 <td className="py-4">
                   {/* 使用 || 0 處理 undefined */}

@@ -7,7 +7,7 @@ import { Activity, Registration } from '../types';
 interface ActivityDetailProps {
   activities: Activity[];
   registrations: Registration[];
-  onRegister: (reg: Registration) => void;
+  onRegister: (reg: Registration) => Promise<boolean>; // 更新型別
 }
 
 const ActivityDetail: React.FC<ActivityDetailProps> = ({ activities, registrations, onRegister }) => {
@@ -58,12 +58,12 @@ const ActivityDetail: React.FC<ActivityDetailProps> = ({ activities, registratio
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
 
     // 建構寫入資料庫的物件
-    // 注意：這裡移除了 check_in_status，因為這是後台欄位，且您的資料庫可能尚未建立
+    // 這裡只負責建立物件，不要加入 check_in_status 等後台欄位，讓資料庫使用預設值
     const newRegistration: Registration = {
       id: Math.random().toString(36).substr(2, 9), 
       activityId: activity.id,
@@ -72,16 +72,24 @@ const ActivityDetail: React.FC<ActivityDetailProps> = ({ activities, registratio
       email: formData.email,
       company: formData.company,
       title: formData.title,
-      // referrer 是選填，如果有填才送出 (雖然 Supabase 通常接受空字串，但保持乾淨)
+      // referrer 是選填
       ...(formData.referrer ? { referrer: formData.referrer } : {}),
       created_at: new Date().toISOString()
     };
 
-    setTimeout(() => {
-      onRegister(newRegistration);
+    // 使用 await 等待 App.tsx 的 handleRegister 回傳結果
+    try {
+      const success = await onRegister(newRegistration);
+      if (success) {
+        setIsSuccess(true);
+        // 不再重置 isSubmitting，讓畫面停留在成功狀態
+      } else {
+        setIsSubmitting(false); // 失敗才恢復按鈕
+      }
+    } catch (error) {
+      console.error(error);
       setIsSubmitting(false);
-      setIsSuccess(true);
-    }, 1000);
+    }
   };
 
   if (isSuccess) {
