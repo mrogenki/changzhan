@@ -50,7 +50,9 @@ const Home: React.FC<HomeProps> = ({ activities }) => {
   const filterUpcoming = (a: Activity) => {
     // 結合日期與時間進行比較
     const activityFullDate = new Date(`${a.date.replace(/-/g, '/')} ${a.time}`);
-    return a.status === 'active' && activityFullDate > now;
+    // 如果 status 不存在 (undefined)，默認為 active
+    const isActive = a.status === 'active' || !a.status;
+    return isActive && activityFullDate > now;
   };
 
   const regularMeetings = activities.filter(a => a.type === ActivityType.REGULAR && filterUpcoming(a));

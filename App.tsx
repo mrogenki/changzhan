@@ -93,13 +93,24 @@ const App: React.FC = () => {
       // 獲取活動
       const { data: actData } = await supabase.from('activities').select('*').order('date', { ascending: true }).order('time', { ascending: true });
       if (actData && actData.length > 0) {
-        setActivities(actData);
+        // 資料庫沒有 status 欄位，手動補上預設值，避免前端錯誤
+        const mappedActs = actData.map((a: any) => ({
+          ...a,
+          status: a.status || 'active'
+        }));
+        setActivities(mappedActs);
       } else if (actData && actData.length === 0) {
         // 只有在資料庫真的完全沒資料時才初始化一次
-        // 注意：這裡插入時 ID 會由資料庫自動產生，所以要排除 id
-        const initActs = INITIAL_ACTIVITIES.map(({ id, ...rest }) => rest);
+        // 排除 id (讓 DB 自增) 和 status (DB 無此欄位)
+        const initActs = INITIAL_ACTIVITIES.map(({ id, status, ...rest }) => rest);
         const { data: inserted } = await supabase.from('activities').insert(initActs).select();
-        if (inserted) setActivities(inserted);
+        if (inserted) {
+          const mappedInserted = inserted.map((a: any) => ({
+            ...a,
+            status: a.status || 'active'
+          }));
+          setActivities(mappedInserted);
+        }
       }
 
       // 獲取報名
@@ -145,14 +156,16 @@ const App: React.FC = () => {
   };
 
   const handleUpdateActivity = async (updated: Activity) => {
-    const { error } = await supabase.from('activities').update(updated).eq('id', updated.id);
+    // 移除 status 和 id (update 需要 eq id，但 payload 不一定要包含)
+    const { status, ...updateData } = updated as any;
+    const { error } = await supabase.from('activities').update(updateData).eq('id', updated.id);
     if (error) alert('更新失敗：' + error.message);
     else fetchData();
   };
 
   const handleAddActivity = async (newAct: Activity) => {
-    // 移除前端產生的 ID，讓資料庫 (int8) 自動遞增
-    const { id, ...actData } = newAct as any;
+    // 移除前端產生的 ID 和 status，避免寫入 DB 錯誤
+    const { id, status, ...actData } = newAct as any;
     const { error } = await supabase.from('activities').insert([actData]);
     if (error) alert('新增活動失敗：' + error.message);
     else fetchData();

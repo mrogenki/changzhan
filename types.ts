@@ -20,7 +20,7 @@ export interface Activity {
   price: number; // 對應資料庫 price (int4)
   picture: string; // 對應資料庫 picture (text)
   description: string;
-  status: 'active' | 'closed';
+  status?: 'active' | 'closed'; // 設為選填，若資料庫無此欄位則由前端預設
 }
 
 export interface Registration {
