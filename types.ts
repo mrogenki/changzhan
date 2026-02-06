@@ -25,16 +25,16 @@ export interface Activity {
 
 export interface Registration {
   id: string | number;
-  activityId: string | number;
+  activity_id: string | number; // 改為 snake_case
   name: string;
   phone: string;
   email: string;
   company: string;
   title: string;
   referrer?: string;
-  checkInStatus: boolean;
-  paidAmount?: number;
-  registeredAt: string;
+  check_in_status: boolean; // 改為 snake_case
+  paid_amount?: number; // 改為 snake_case
+  created_at: string; // 改為 snake_case (通常 DB 欄位為 created_at)
 }
 
 export interface AdminUser {

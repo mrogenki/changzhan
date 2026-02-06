@@ -32,7 +32,8 @@ const ActivityDetail: React.FC<ActivityDetailProps> = ({ activities, registratio
     return <div className="p-20 text-center">活動不存在</div>;
   }
 
-  const alreadyRegisteredCount = registrations.filter(r => String(r.activityId) === String(id)).length;
+  // 更新篩選條件：使用 activity_id
+  const alreadyRegisteredCount = registrations.filter(r => String(r.activity_id) === String(id)).length;
 
   const handleShare = async () => {
     const shareUrl = window.location.href;
@@ -65,10 +66,10 @@ const ActivityDetail: React.FC<ActivityDetailProps> = ({ activities, registratio
 
     const newRegistration: Registration = {
       id: Math.random().toString(36).substr(2, 9), // 暫時使用隨機 ID，後端會忽略並自動產生 int8
-      activityId: activity.id,
+      activity_id: activity.id, // 使用 snake_case
       ...formData,
-      checkInStatus: false,
-      registeredAt: new Date().toISOString()
+      check_in_status: false, // 使用 snake_case
+      created_at: new Date().toISOString() // 使用 snake_case
     };
 
     setTimeout(() => {
