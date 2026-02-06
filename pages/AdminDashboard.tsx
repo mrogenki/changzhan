@@ -397,6 +397,10 @@ const ActivityManager: React.FC<{
   
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    
+    // 修正：必須在 await 操作之前取得 FormData，因為在 await 之後 event.currentTarget 會被 React/瀏覽器設為 null
+    const formData = new FormData(e.currentTarget);
+    
     setIsUploading(true);
 
     try {
@@ -408,7 +412,6 @@ const ActivityManager: React.FC<{
         finalPictureUrl = await onUploadImage(selectedFile);
       }
 
-      const formData = new FormData(e.currentTarget);
       const activityData: Activity = {
         id: editingActivity?.id || '', 
         type: formData.get('type') as ActivityType,
