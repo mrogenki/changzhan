@@ -400,9 +400,10 @@ const ActivityManager: React.FC<{
     setIsUploading(true);
 
     try {
-      let finalPictureUrl = editingActivity?.picture || 'https://images.unsplash.com/photo-1517457373958-b7bdd4587205?q=80&w=2069&auto=format&fit=crop';
+      // 預設為目前的預覽網址 (支援直接貼上 URL 的情況)
+      let finalPictureUrl = previewUrl; 
 
-      // 如果有選擇新圖片，先上傳
+      // 如果有選擇新圖片檔案，則進行上傳 (或轉 Base64)
       if (selectedFile) {
         finalPictureUrl = await onUploadImage(selectedFile);
       }
@@ -426,9 +427,9 @@ const ActivityManager: React.FC<{
 
       setIsModalOpen(false);
       setEditingActivity(null);
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      alert('儲存失敗，請稍後再試');
+      alert('儲存失敗：' + error.message);
     } finally {
       setIsUploading(false);
     }
@@ -521,7 +522,7 @@ const ActivityManager: React.FC<{
               {/* 圖片上傳區塊 */}
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-1 flex items-center gap-1">
-                  <ImageIcon size={14} className="text-red-600" /> 封面圖片
+                  <ImageIcon size={14} className="text-red-600" /> 封面圖片 (上傳或輸入網址)
                 </label>
                 <div 
                   className="relative group cursor-pointer border-2 border-dashed border-gray-300 rounded-xl p-2 hover:border-red-500 transition-colors bg-gray-50 flex flex-col items-center justify-center min-h-[160px]"
@@ -537,7 +538,7 @@ const ActivityManager: React.FC<{
                   ) : (
                     <div className="text-gray-400 flex flex-col items-center">
                       <UploadCloud size={32} className="mb-2" />
-                      <span className="text-sm">點擊上傳圖片</span>
+                      <span className="text-sm">點擊選擇圖片</span>
                     </div>
                   )}
                   <input 
@@ -548,7 +549,18 @@ const ActivityManager: React.FC<{
                     onChange={handleFileChange}
                   />
                 </div>
-                <p className="text-xs text-gray-400 mt-1">建議尺寸 16:9，支援 JPG, PNG 格式。</p>
+                <div className="mt-2">
+                  <input 
+                    type="text"
+                    value={previewUrl}
+                    onChange={(e) => {
+                      setPreviewUrl(e.target.value);
+                      setSelectedFile(null); // 手動輸入網址時，清除已選檔案
+                    }}
+                    placeholder="或在此直接貼上圖片網址..."
+                    className="w-full text-xs text-gray-500 border border-gray-200 rounded px-2 py-1.5 bg-gray-50 focus:bg-white outline-none focus:ring-1 focus:ring-red-500"
+                  />
+                </div>
               </div>
 
               <div>
@@ -562,7 +574,7 @@ const ActivityManager: React.FC<{
                   disabled={isUploading}
                   className="flex-1 bg-red-600 text-white py-3 rounded-lg font-bold shadow-lg shadow-red-100 hover:bg-red-700 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
-                  {isUploading ? <><Loader2 className="animate-spin" size={20} /> 上傳中...</> : '儲存活動'}
+                  {isUploading ? <><Loader2 className="animate-spin" size={20} /> 處理中...</> : '儲存活動'}
                 </button>
               </div>
             </form>

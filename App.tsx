@@ -150,34 +150,47 @@ const App: React.FC = () => {
     sessionStorage.removeItem('current_user');
   };
 
-  // 處理圖片上傳
+  // 處理圖片上傳 (增強版：失敗時自動 Fallback 到 Base64)
   const handleUploadImage = async (file: File): Promise<string> => {
     try {
-      // 1. 產生檔案路徑
-      const fileExt = file.name.split('.').pop();
+      // 1. 嘗試上傳到 Supabase Storage
+      const fileExt = file.name.split('.').pop()?.toLowerCase() || 'jpg';
       const fileName = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
       const filePath = `activity-covers/${fileName}`;
 
-      // 2. 上傳到 Supabase Storage (假設 bucket 名稱為 'activity-images')
+      // 使用 upsert: false 避免覆蓋
       const { error: uploadError } = await supabase.storage
         .from('activity-images')
-        .upload(filePath, file);
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
 
       if (uploadError) {
-        // 若 bucket 不存在，嘗試建立 (通常需在 Supabase 後台建立，這裡僅為防呆)
-        console.error('Upload error:', uploadError);
-        throw new Error('圖片上傳失敗，請確認後台 Storage 設定');
+        console.warn('Supabase Storage 上傳失敗 (可能是權限設定問題)，嘗試轉為 Base64 儲存', uploadError.message);
+        throw uploadError; // 拋出錯誤以進入 catch 區塊進行 Fallback
       }
 
-      // 3. 取得公開連結
+      // 上傳成功，取得公開連結
       const { data } = supabase.storage
         .from('activity-images')
         .getPublicUrl(filePath);
 
       return data.publicUrl;
+
     } catch (error: any) {
-      alert(error.message);
-      throw error;
+      // 2. Fallback 機制：如果 Storage 上傳失敗，將圖片轉為 Base64 字串存入資料庫
+      // 限制檔案大小 (例如 2.5MB)，避免資料庫欄位過大
+      if (file.size > 2.5 * 1024 * 1024) {
+        throw new Error('圖片上傳失敗，且檔案過大 (>2.5MB) 無法轉存。請壓縮圖片或檢查 Storage 權限設定。');
+      }
+
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = (e) => reject(new Error('圖片讀取失敗'));
+      });
     }
   };
 
