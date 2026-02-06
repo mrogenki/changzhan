@@ -87,8 +87,10 @@ const App: React.FC = () => {
     return saved ? JSON.parse(saved) : null;
   });
 
-  const fetchData = async () => {
-    setLoading(true);
+  // 修改：加入參數控制是否顯示 Loading 遮罩
+  // 預設為 false (靜默更新)，只有初始化時傳入 true
+  const fetchData = async (isInitialLoad = false) => {
+    if (isInitialLoad) setLoading(true);
     try {
       // 獲取活動
       const { data: actData } = await supabase.from('activities').select('*').order('date', { ascending: true }).order('time', { ascending: true });
@@ -130,12 +132,12 @@ const App: React.FC = () => {
     } catch (err) {
       console.error('Fetch error:', err);
     } finally {
-      setLoading(false);
+      if (isInitialLoad) setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchData();
+    fetchData(true); // 首次載入顯示 Loading
   }, []);
 
   const handleLogin = (user: AdminUser) => {
@@ -156,7 +158,7 @@ const App: React.FC = () => {
       alert('報名失敗：' + error.message);
       return false;
     } else {
-      await fetchData(); // 等待資料更新
+      await fetchData(); // 靜默更新，不觸發全螢幕 loading，避免頁面重置
       return true;
     }
   };
