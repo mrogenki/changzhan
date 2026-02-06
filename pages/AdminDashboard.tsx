@@ -12,9 +12,9 @@ interface AdminDashboardProps {
   users: AdminUser[];
   onUpdateActivity: (act: Activity) => void;
   onAddActivity: (act: Activity) => void;
-  onDeleteActivity: (id: string) => void;
+  onDeleteActivity: (id: string | number) => void;
   onUpdateRegistration: (reg: Registration) => void;
-  onDeleteRegistration: (id: string) => void;
+  onDeleteRegistration: (id: string | number) => void;
   onAddUser: (user: AdminUser) => void;
   onDeleteUser: (id: string) => void;
 }
@@ -78,8 +78,9 @@ const UserManager: React.FC<{ users: AdminUser[], onAddUser: (u: AdminUser) => v
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    // 這裡我們不產生 ID，讓 App.tsx 處理 (傳送給後端時排除 ID，由後端產生 UUID)
     const newUser: AdminUser = {
-      id: Math.random().toString(36).substr(2, 9),
+      id: '', // 暫時為空，後端產生
       ...formData
     };
     onAddUser(newUser);
@@ -225,7 +226,8 @@ const UserManager: React.FC<{ users: AdminUser[], onAddUser: (u: AdminUser) => v
 
 const DashboardHome: React.FC<{ activities: Activity[], registrations: Registration[] }> = ({ activities, registrations }) => {
   const activityStats = activities.map(activity => {
-    const activityRegs = registrations.filter(r => r.activityId === activity.id);
+    // 使用寬鬆比較 String(r.activityId) == String(activity.id)
+    const activityRegs = registrations.filter(r => String(r.activityId) === String(activity.id));
     const checkedIn = activityRegs.filter(r => r.checkInStatus).length;
     const revenue = activityRegs.reduce((sum, r) => sum + (r.paidAmount || 0), 0);
     const rate = activityRegs.length > 0 ? Math.round((checkedIn / activityRegs.length) * 100) : 0;
@@ -318,7 +320,7 @@ const DashboardHome: React.FC<{ activities: Activity[], registrations: Registrat
   );
 };
 
-const ActivityManager: React.FC<{ activities: Activity[], onAddActivity: (a: Activity) => void, onUpdateActivity: (a: Activity) => void, onDeleteActivity: (id: string) => void }> = ({ activities, onAddActivity, onUpdateActivity, onDeleteActivity }) => {
+const ActivityManager: React.FC<{ activities: Activity[], onAddActivity: (a: Activity) => void, onUpdateActivity: (a: Activity) => void, onDeleteActivity: (id: string | number) => void }> = ({ activities, onAddActivity, onUpdateActivity, onDeleteActivity }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingActivity, setEditingActivity] = useState<Activity | null>(null);
   
@@ -326,14 +328,15 @@ const ActivityManager: React.FC<{ activities: Activity[], onAddActivity: (a: Act
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     const activityData: Activity = {
-      id: editingActivity?.id || Math.random().toString(36).substr(2, 9),
+      // 如果是編輯，保留 ID；如果是新增，App.tsx 會處理 ID (移除它以讓 DB 自增)
+      id: editingActivity?.id || '', 
       type: formData.get('type') as ActivityType,
       title: formData.get('title') as string,
       date: formData.get('date') as string,
       time: formData.get('time') as string,
       location: formData.get('location') as string,
-      cost: Number(formData.get('cost')),
-      image: formData.get('image') as string || 'https://images.unsplash.com/photo-1517457373958-b7bdd4587205?q=80&w=2069&auto=format&fit=crop',
+      price: Number(formData.get('price')), // 改為 price
+      picture: formData.get('picture') as string || 'https://images.unsplash.com/photo-1517457373958-b7bdd4587205?q=80&w=2069&auto=format&fit=crop', // 改為 picture
       description: formData.get('description') as string,
       status: 'active'
     };
@@ -360,7 +363,7 @@ const ActivityManager: React.FC<{ activities: Activity[], onAddActivity: (a: Act
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {activities.map(act => (
           <div key={act.id} className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden flex">
-            <img src={act.image} className="w-32 object-cover" alt={act.title} />
+            <img src={act.picture} className="w-32 object-cover" alt={act.title} />
             <div className="p-4 flex-grow">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-gray-100 text-gray-500 uppercase">{act.type}</span>
@@ -419,11 +422,13 @@ const ActivityManager: React.FC<{ activities: Activity[], onAddActivity: (a: Act
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-1">費用 (NT$)</label>
-                  <input name="cost" type="number" required defaultValue={editingActivity?.cost} className="w-full border rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-red-500" placeholder="費用" />
+                  {/* name 改為 price */}
+                  <input name="price" type="number" required defaultValue={editingActivity?.price} className="w-full border rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-red-500" placeholder="費用" />
                 </div>
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-1">封面圖片網址</label>
-                  <input name="image" defaultValue={editingActivity?.image} className="w-full border rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-red-500" placeholder="https://..." />
+                  {/* name 改為 picture */}
+                  <input name="picture" defaultValue={editingActivity?.picture} className="w-full border rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-red-500" placeholder="https://..." />
                 </div>
               </div>
               <div>
@@ -446,12 +451,13 @@ const ActivityManager: React.FC<{ activities: Activity[], onAddActivity: (a: Act
   );
 };
 
-const CheckInManager: React.FC<{ activities: Activity[], registrations: Registration[], onUpdateRegistration: (r: Registration) => void, onDeleteRegistration: (id: string) => void }> = ({ activities, registrations, onUpdateRegistration, onDeleteRegistration }) => {
+const CheckInManager: React.FC<{ activities: Activity[], registrations: Registration[], onUpdateRegistration: (r: Registration) => void, onDeleteRegistration: (id: string | number) => void }> = ({ activities, registrations, onUpdateRegistration, onDeleteRegistration }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedActivity, setSelectedActivity] = useState('all');
   const filteredRegistrations = registrations.filter(r => {
     const matchesSearch = r.name.toLowerCase().includes(searchTerm.toLowerCase()) || r.phone.includes(searchTerm);
-    const matchesActivity = selectedActivity === 'all' || r.activityId === selectedActivity;
+    // 使用 String 轉換比較，因為來自資料庫的 ID 可能是數字或字串
+    const matchesActivity = selectedActivity === 'all' || String(r.activityId) === String(selectedActivity);
     return matchesSearch && matchesActivity;
   });
 

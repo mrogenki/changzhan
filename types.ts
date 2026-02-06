@@ -11,21 +11,21 @@ export enum UserRole {
 }
 
 export interface Activity {
-  id: string;
+  id: string | number; // 資料庫可能是 int8 或 uuid，保留彈性
   type: ActivityType;
   title: string;
   date: string; // 格式: YYYY-MM-DD
   time: string; // 格式: HH:mm
   location: string;
-  cost: number;
-  image: string;
+  price: number; // 對應資料庫 price (int4)
+  picture: string; // 對應資料庫 picture (text)
   description: string;
   status: 'active' | 'closed';
 }
 
 export interface Registration {
-  id: string;
-  activityId: string;
+  id: string | number;
+  activityId: string | number;
   name: string;
   phone: string;
   email: string;
@@ -38,7 +38,7 @@ export interface Registration {
 }
 
 export interface AdminUser {
-  id: string;
+  id: string; // UUID
   name: string;
   email: string;
   role: UserRole;

@@ -11,7 +11,7 @@ interface HomeProps {
 const ActivityCard: React.FC<{ activity: Activity }> = ({ activity }) => (
   <Link to={`/activity/${activity.id}`} className="group bg-white rounded-xl border border-gray-100 overflow-hidden hover:shadow-xl transition-all duration-300">
     <div className="relative h-48 overflow-hidden">
-      <img src={activity.image} alt={activity.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+      <img src={activity.picture} alt={activity.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
       <div className="absolute top-4 left-4">
         <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${activity.type === ActivityType.REGULAR ? 'bg-red-600 text-white' : 'bg-gray-800 text-white'}`}>
           {activity.type}
@@ -33,7 +33,7 @@ const ActivityCard: React.FC<{ activity: Activity }> = ({ activity }) => (
         </div>
         <div className="flex items-center gap-2">
           <DollarSign size={16} className="text-red-600" />
-          <span>NT$ {activity.cost.toLocaleString()}</span>
+          <span>NT$ {activity.price.toLocaleString()}</span>
         </div>
       </div>
       <div className="flex items-center justify-between pt-4 border-t border-gray-50">

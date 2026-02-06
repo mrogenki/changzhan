@@ -13,7 +13,8 @@ interface ActivityDetailProps {
 const ActivityDetail: React.FC<ActivityDetailProps> = ({ activities, registrations, onRegister }) => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const activity = activities.find(a => a.id === id);
+  // 注意：URL 參數 id 是 string，但 Activity id 可能是 number，這裡使用寬鬆比較
+  const activity = activities.find(a => String(a.id) === id);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
@@ -31,7 +32,7 @@ const ActivityDetail: React.FC<ActivityDetailProps> = ({ activities, registratio
     return <div className="p-20 text-center">活動不存在</div>;
   }
 
-  const alreadyRegisteredCount = registrations.filter(r => r.activityId === id).length;
+  const alreadyRegisteredCount = registrations.filter(r => String(r.activityId) === String(id)).length;
 
   const handleShare = async () => {
     const shareUrl = window.location.href;
@@ -63,7 +64,7 @@ const ActivityDetail: React.FC<ActivityDetailProps> = ({ activities, registratio
     setIsSubmitting(true);
 
     const newRegistration: Registration = {
-      id: Math.random().toString(36).substr(2, 9),
+      id: Math.random().toString(36).substr(2, 9), // 暫時使用隨機 ID，後端會忽略並自動產生 int8
       activityId: activity.id,
       ...formData,
       checkInStatus: false,
@@ -121,7 +122,7 @@ const ActivityDetail: React.FC<ActivityDetailProps> = ({ activities, registratio
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
         <div className="lg:col-span-2 space-y-8">
           <div className="rounded-2xl overflow-hidden shadow-sm">
-            <img src={activity.image} alt={activity.title} className="w-full h-[400px] object-cover" />
+            <img src={activity.picture} alt={activity.title} className="w-full h-[400px] object-cover" />
           </div>
           
           <div>
@@ -157,7 +158,7 @@ const ActivityDetail: React.FC<ActivityDetailProps> = ({ activities, registratio
                 </div>
                 <div>
                   <p className="text-xs text-gray-400 uppercase font-bold tracking-wider">費用</p>
-                  <p className="font-medium">NT$ {activity.cost.toLocaleString()}</p>
+                  <p className="font-medium">NT$ {activity.price.toLocaleString()}</p>
                 </div>
               </div>
             </div>
