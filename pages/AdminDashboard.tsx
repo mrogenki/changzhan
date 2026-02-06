@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Routes, Route, Link, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { LayoutDashboard, Calendar, Users, LogOut, ChevronRight, Search, FileDown, Plus, Edit, Trash2, CheckCircle, XCircle, Shield, UserPlus, DollarSign, TrendingUp, BarChart3, Mail, User, Clock } from 'lucide-react';
 import { Activity, Registration, ActivityType, AdminUser, UserRole } from '../types';
@@ -18,6 +18,43 @@ interface AdminDashboardProps {
   onAddUser: (user: AdminUser) => void;
   onDeleteUser: (id: string) => void;
 }
+
+// 獨立的輸入元件：解決輸入時頻繁更新導致卡頓的問題
+// 邏輯：只在 onBlur (失去焦點) 或按 Enter 時才觸發資料庫更新
+const PaidAmountInput: React.FC<{ value?: number; onSave: (val: number) => void }> = ({ value, onSave }) => {
+  const [localValue, setLocalValue] = useState(value?.toString() || '0');
+
+  // 當外部資料變更時 (例如重新整理)，同步更新內部狀態
+  useEffect(() => {
+    setLocalValue(value?.toString() || '0');
+  }, [value]);
+
+  const handleBlur = () => {
+    const num = parseInt(localValue);
+    // 只有當數值有效且與原本數值不同時才更新，減少 API 請求
+    if (!isNaN(num) && num !== (value || 0)) {
+      onSave(num);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.currentTarget.blur(); // 觸發 blur 以儲存
+    }
+  };
+
+  return (
+    <input
+      type="number"
+      className="border rounded px-2 py-1 w-24 text-sm focus:ring-1 focus:ring-red-500 outline-none transition-all text-right"
+      value={localValue}
+      onChange={(e) => setLocalValue(e.target.value)}
+      onBlur={handleBlur}
+      onKeyDown={handleKeyDown}
+      placeholder="0"
+    />
+  );
+};
 
 const Sidebar: React.FC<{ user: AdminUser; onLogout: () => void }> = ({ user, onLogout }) => {
   const location = useLocation();
@@ -506,8 +543,11 @@ const CheckInManager: React.FC<{ activities: Activity[], registrations: Registra
                   {reg.referrer || '-'}
                 </td>
                 <td className="py-4">
-                  {/* 使用 || 0 處理 undefined */}
-                  <input type="number" className="border rounded px-2 py-1 w-20 text-sm focus:ring-1 focus:ring-red-500 outline-none" value={reg.paid_amount || 0} onChange={(e) => onUpdateRegistration({...reg, paid_amount: parseInt(e.target.value)})} />
+                  {/* 使用新的 PaidAmountInput 元件取代原生的 input */}
+                  <PaidAmountInput 
+                    value={reg.paid_amount || 0} 
+                    onSave={(val) => onUpdateRegistration({...reg, paid_amount: val})} 
+                  />
                 </td>
                 <td className="py-4">
                   {/* 處理 undefined check_in_status */}

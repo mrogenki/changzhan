@@ -104,7 +104,7 @@ const ActivityDetail: React.FC<ActivityDetailProps> = ({ activities, registratio
           onClick={() => navigate('/')}
           className="bg-red-600 text-white px-8 py-3 rounded-full font-bold hover:bg-red-700 transition-colors"
         >
-          返回活動列表
+          返回活動首頁
         </button>
       </div>
     );
