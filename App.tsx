@@ -150,6 +150,37 @@ const App: React.FC = () => {
     sessionStorage.removeItem('current_user');
   };
 
+  // 處理圖片上傳
+  const handleUploadImage = async (file: File): Promise<string> => {
+    try {
+      // 1. 產生檔案路徑
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
+      const filePath = `activity-covers/${fileName}`;
+
+      // 2. 上傳到 Supabase Storage (假設 bucket 名稱為 'activity-images')
+      const { error: uploadError } = await supabase.storage
+        .from('activity-images')
+        .upload(filePath, file);
+
+      if (uploadError) {
+        // 若 bucket 不存在，嘗試建立 (通常需在 Supabase 後台建立，這裡僅為防呆)
+        console.error('Upload error:', uploadError);
+        throw new Error('圖片上傳失敗，請確認後台 Storage 設定');
+      }
+
+      // 3. 取得公開連結
+      const { data } = supabase.storage
+        .from('activity-images')
+        .getPublicUrl(filePath);
+
+      return data.publicUrl;
+    } catch (error: any) {
+      alert(error.message);
+      throw error;
+    }
+  };
+
   // 修改：回傳 Promise<boolean> 以便前端判斷
   const handleRegister = async (newReg: Registration): Promise<boolean> => {
     const { id, ...regData } = newReg as any;
@@ -251,6 +282,7 @@ const App: React.FC = () => {
                   onDeleteRegistration={handleDeleteRegistration}
                   onAddUser={handleAddUser}
                   onDeleteUser={handleDeleteUser}
+                  onUploadImage={handleUploadImage} // 傳遞上傳函式
                 />
               ) : (
                 <Navigate to="/admin/login" />

@@ -1,7 +1,7 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Routes, Route, Link, useNavigate, useLocation, Navigate } from 'react-router-dom';
-import { LayoutDashboard, Calendar, Users, LogOut, ChevronRight, Search, FileDown, Plus, Edit, Trash2, CheckCircle, XCircle, Shield, UserPlus, DollarSign, TrendingUp, BarChart3, Mail, User, Clock } from 'lucide-react';
+import { LayoutDashboard, Calendar, Users, LogOut, ChevronRight, Search, FileDown, Plus, Edit, Trash2, CheckCircle, XCircle, Shield, UserPlus, DollarSign, TrendingUp, BarChart3, Mail, User, Clock, Image as ImageIcon, UploadCloud, Loader2 } from 'lucide-react';
 import { Activity, Registration, ActivityType, AdminUser, UserRole } from '../types';
 
 interface AdminDashboardProps {
@@ -17,6 +17,7 @@ interface AdminDashboardProps {
   onDeleteRegistration: (id: string | number) => void;
   onAddUser: (user: AdminUser) => void;
   onDeleteUser: (id: string) => void;
+  onUploadImage: (file: File) => Promise<string>; // 新增 Prop
 }
 
 // 獨立的輸入元件：解決輸入時頻繁更新導致卡頓的問題
@@ -359,30 +360,78 @@ const DashboardHome: React.FC<{ activities: Activity[], registrations: Registrat
   );
 };
 
-const ActivityManager: React.FC<{ activities: Activity[], onAddActivity: (a: Activity) => void, onUpdateActivity: (a: Activity) => void, onDeleteActivity: (id: string | number) => void }> = ({ activities, onAddActivity, onUpdateActivity, onDeleteActivity }) => {
+const ActivityManager: React.FC<{ 
+  activities: Activity[], 
+  onAddActivity: (a: Activity) => void, 
+  onUpdateActivity: (a: Activity) => void, 
+  onDeleteActivity: (id: string | number) => void,
+  onUploadImage: (file: File) => Promise<string> // 新增 Prop
+}> = ({ activities, onAddActivity, onUpdateActivity, onDeleteActivity, onUploadImage }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingActivity, setEditingActivity] = useState<Activity | null>(null);
   
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  // 圖片上傳相關狀態
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string>('');
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // 初始化或重置表單時設定預覽圖
+  useEffect(() => {
+    if (editingActivity) {
+      setPreviewUrl(editingActivity.picture);
+    } else {
+      setPreviewUrl('https://images.unsplash.com/photo-1517457373958-b7bdd4587205?q=80&w=2069&auto=format&fit=crop'); // 預設圖
+    }
+    setSelectedFile(null);
+  }, [editingActivity, isModalOpen]);
+
+  // 處理檔案選擇與預覽
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setSelectedFile(file);
+      setPreviewUrl(URL.createObjectURL(file));
+    }
+  };
+  
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const formData = new FormData(e.currentTarget);
-    const activityData: Activity = {
-      // 如果是編輯，保留 ID；如果是新增，App.tsx 會處理 ID (移除它以讓 DB 自增)
-      id: editingActivity?.id || '', 
-      type: formData.get('type') as ActivityType,
-      title: formData.get('title') as string,
-      date: formData.get('date') as string,
-      time: formData.get('time') as string,
-      location: formData.get('location') as string,
-      price: Number(formData.get('price')), // 改為 price
-      picture: formData.get('picture') as string || 'https://images.unsplash.com/photo-1517457373958-b7bdd4587205?q=80&w=2069&auto=format&fit=crop', // 改為 picture
-      description: formData.get('description') as string,
-      status: 'active'
-    };
-    if (editingActivity) onUpdateActivity(activityData);
-    else onAddActivity(activityData);
-    setIsModalOpen(false);
-    setEditingActivity(null);
+    setIsUploading(true);
+
+    try {
+      let finalPictureUrl = editingActivity?.picture || 'https://images.unsplash.com/photo-1517457373958-b7bdd4587205?q=80&w=2069&auto=format&fit=crop';
+
+      // 如果有選擇新圖片，先上傳
+      if (selectedFile) {
+        finalPictureUrl = await onUploadImage(selectedFile);
+      }
+
+      const formData = new FormData(e.currentTarget);
+      const activityData: Activity = {
+        id: editingActivity?.id || '', 
+        type: formData.get('type') as ActivityType,
+        title: formData.get('title') as string,
+        date: formData.get('date') as string,
+        time: formData.get('time') as string,
+        location: formData.get('location') as string,
+        price: Number(formData.get('price')),
+        picture: finalPictureUrl, // 使用處理後的圖片網址
+        description: formData.get('description') as string,
+        status: 'active'
+      };
+
+      if (editingActivity) onUpdateActivity(activityData);
+      else onAddActivity(activityData);
+
+      setIsModalOpen(false);
+      setEditingActivity(null);
+    } catch (error) {
+      console.error(error);
+      alert('儲存失敗，請稍後再試');
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const confirmDelete = (act: Activity) => {
@@ -455,32 +504,66 @@ const ActivityManager: React.FC<{ activities: Activity[], onAddActivity: (a: Act
                     pattern="([01]?[0-9]|2[0-3]):[0-5][0-9]"
                     title="請使用 24 小時制格式 (HH:mm)，例如 06:30 或 18:30"
                   />
-                  <p className="text-[10px] text-gray-400 mt-1 font-bold italic">※ 例如 18:30 (勿使用上下午)</p>
+                  <p className="text-[10px] text-gray-400 mt-1 font-bold italic">※ 例如 18:30</p>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-1">費用 (NT$)</label>
-                  {/* name 改為 price */}
                   <input name="price" type="number" required defaultValue={editingActivity?.price} className="w-full border rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-red-500" placeholder="費用" />
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">封面圖片網址</label>
-                  {/* name 改為 picture */}
-                  <input name="picture" defaultValue={editingActivity?.picture} className="w-full border rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-red-500" placeholder="https://..." />
+                  <label className="block text-sm font-bold text-gray-700 mb-1">活動地點</label>
+                  <input name="location" required defaultValue={editingActivity?.location} className="w-full border rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-red-500" placeholder="活動地點" />
                 </div>
               </div>
+
+              {/* 圖片上傳區塊 */}
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1">活動地點</label>
-                <input name="location" required defaultValue={editingActivity?.location} className="w-full border rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-red-500" placeholder="活動地點" />
+                <label className="block text-sm font-bold text-gray-700 mb-1 flex items-center gap-1">
+                  <ImageIcon size={14} className="text-red-600" /> 封面圖片
+                </label>
+                <div 
+                  className="relative group cursor-pointer border-2 border-dashed border-gray-300 rounded-xl p-2 hover:border-red-500 transition-colors bg-gray-50 flex flex-col items-center justify-center min-h-[160px]"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  {previewUrl ? (
+                    <div className="relative w-full h-full">
+                      <img src={previewUrl} alt="Preview" className="w-full h-40 object-cover rounded-lg" />
+                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-lg">
+                        <span className="text-white font-bold flex items-center gap-2"><UploadCloud size={20}/> 更換圖片</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-gray-400 flex flex-col items-center">
+                      <UploadCloud size={32} className="mb-2" />
+                      <span className="text-sm">點擊上傳圖片</span>
+                    </div>
+                  )}
+                  <input 
+                    type="file" 
+                    ref={fileInputRef}
+                    className="hidden" 
+                    accept="image/*"
+                    onChange={handleFileChange}
+                  />
+                </div>
+                <p className="text-xs text-gray-400 mt-1">建議尺寸 16:9，支援 JPG, PNG 格式。</p>
               </div>
+
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-1">活動描述</label>
                 <textarea name="description" rows={4} required defaultValue={editingActivity?.description} className="w-full border rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-red-500" placeholder="活動描述"></textarea>
               </div>
               <div className="flex gap-4 pt-4">
                 <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 border py-3 rounded-lg font-bold text-gray-500 hover:bg-gray-50 transition-colors">取消</button>
-                <button type="submit" className="flex-1 bg-red-600 text-white py-3 rounded-lg font-bold shadow-lg shadow-red-100 hover:bg-red-700 active:scale-95 transition-all">儲存活動</button>
+                <button 
+                  type="submit" 
+                  disabled={isUploading}
+                  className="flex-1 bg-red-600 text-white py-3 rounded-lg font-bold shadow-lg shadow-red-100 hover:bg-red-700 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {isUploading ? <><Loader2 className="animate-spin" size={20} /> 上傳中...</> : '儲存活動'}
+                </button>
               </div>
             </form>
           </div>
@@ -579,7 +662,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
         <Routes>
           <Route path="/" element={<DashboardHome activities={props.activities} registrations={props.registrations} />} />
           <Route path="/check-in" element={<CheckInManager activities={props.activities} registrations={props.registrations} onUpdateRegistration={props.onUpdateRegistration} onDeleteRegistration={props.onDeleteRegistration} />} />
-          {canAccessActivities && <Route path="/activities" element={<ActivityManager activities={props.activities} onAddActivity={props.onAddActivity} onUpdateActivity={props.onUpdateActivity} onDeleteActivity={props.onDeleteActivity} />} />}
+          {canAccessActivities && <Route path="/activities" element={<ActivityManager activities={props.activities} onAddActivity={props.onAddActivity} onUpdateActivity={props.onUpdateActivity} onDeleteActivity={props.onDeleteActivity} onUploadImage={props.onUploadImage} />} />}
           {canAccessUsers && <Route path="/users" element={<UserManager users={props.users} onAddUser={props.onAddUser} onDeleteUser={props.onDeleteUser} currentUser={props.currentUser} />} />}
           <Route path="*" element={<Navigate to="/admin" replace />} />
         </Routes>
