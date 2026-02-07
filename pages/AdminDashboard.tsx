@@ -174,50 +174,69 @@ const MemberManager: React.FC<{
 
     const reader = new FileReader();
     reader.onload = (event) => {
-      const text = event.target?.result as string;
-      if (!text) return;
-      
-      const lines = text.split(/\r\n|\n/);
-      const newMembers: Member[] = [];
-      
-      // 從第 2 行開始 (跳過標題)
-      for (let i = 1; i < lines.length; i++) {
-        const line = lines[i].trim();
-        if (!line) continue;
-        
-        // 簡單的 CSV 分割 (處理逗號)
-        // 注意：這裡假設 CSV 內容沒有包含逗號，若有複雜內容建議使用專業 parser
-        // 為了相容性，使用正則表達式處理引號內的逗號 (簡易版)
-        const cols = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(s => s.trim().replace(/^"|"$/g, '').replace(/""/g, '"'));
-        
-        if (cols.length < 5) continue; // 基本檢查：至少要有前 5 個欄位
-
-        newMembers.push({
-          id: Date.now() + i, // 暫時 ID，資料庫會重產
-          member_no: cols[0],
-          industry_chain: (['美食', '工程', '健康', '幸福', '工商'].includes(cols[1]) ? cols[1] : '工商') as any,
-          industry_category: cols[2],
-          name: cols[3],
-          company: cols[4],
-          intro: cols[5] || '',
-          website: cols[6] || ''
-        });
-      }
-
-      if (newMembers.length > 0) {
-        if (window.confirm(`解析成功！共發現 ${newMembers.length} 筆資料。\n確定要匯入嗎？`)) {
-          if (onAddMembers) {
-            onAddMembers(newMembers);
-          } else {
-            alert('系統錯誤：找不到匯入函式');
-          }
+      try {
+        const text = event.target?.result as string;
+        if (!text) {
+          alert('檔案內容為空');
+          return;
         }
-      } else {
-        alert('解析失敗或檔案內容為空，請檢查 CSV 格式。');
+        
+        // 優化：同時支援 \r\n, \n, \r (解決 Excel/Mac 格式問題)
+        const lines = text.split(/\r\n|\n|\r/);
+        const newMembers: Member[] = [];
+        
+        // 判斷是否有標題列 (檢查第一行是否包含 "會員" 或 "編號")
+        let startIndex = 0;
+        if (lines.length > 0 && (lines[0].includes('會員') || lines[0].includes('編號'))) {
+          startIndex = 1;
+        }
+        
+        for (let i = startIndex; i < lines.length; i++) {
+          const line = lines[i].trim();
+          if (!line) continue;
+          
+          // 簡易 CSV 解析
+          const cols = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(s => s.trim().replace(/^"|"$/g, '').replace(/""/g, '"'));
+          
+          // 寬鬆檢查：只要有前 4 個欄位 (編號, 產業, 行業, 姓名) 就算有效
+          if (cols.length < 4) {
+             console.warn(`Line ${i+1} skipped due to insufficient columns:`, line);
+             continue;
+          }
+
+          // 處理 "-" 符號，轉為空字串
+          const cleanVal = (val: string) => (val === '-' || !val) ? '' : val;
+
+          newMembers.push({
+            id: Date.now() + i, // 暫時 ID，資料庫會重產
+            member_no: cleanVal(cols[0]),
+            industry_chain: (['美食', '工程', '健康', '幸福', '工商'].includes(cols[1]) ? cols[1] : '工商') as any,
+            industry_category: cleanVal(cols[2]),
+            name: cleanVal(cols[3]),
+            company: cleanVal(cols[4]),
+            intro: cleanVal(cols[5]),
+            website: cleanVal(cols[6])
+          });
+        }
+
+        if (newMembers.length > 0) {
+          if (window.confirm(`解析成功！共發現 ${newMembers.length} 筆資料。\n確定要匯入嗎？`)) {
+            if (onAddMembers) {
+              onAddMembers(newMembers);
+            } else {
+              alert('系統錯誤：找不到匯入函式 (onAddMembers is undefined)');
+            }
+          }
+        } else {
+          alert(`解析失敗。讀取到 ${lines.length} 行，但無法識別有效資料。\n原因可能是：\n1. 檔案格式不正確 (需為逗號分隔 CSV)\n2. 沒有有效資料行\n3. 編碼問題 (請嘗試另存為 UTF-8 編碼)`);
+        }
+      } catch (err) {
+        console.error(err);
+        alert('讀取檔案發生錯誤，請檢查檔案是否損毀。');
+      } finally {
+        // 清空 input 讓同一檔案可以再次選取
+        if (fileInputRef.current) fileInputRef.current.value = '';
       }
-      
-      // 清空 input 讓同一檔案可以再次選取
-      if (fileInputRef.current) fileInputRef.current.value = '';
     };
     reader.readAsText(file);
   };
@@ -297,7 +316,7 @@ const MemberManager: React.FC<{
                 </td>
                 <td className="px-6 py-4 text-gray-700 font-medium">{member.industry_category}</td>
                 <td className="px-6 py-4 font-bold text-gray-900">
-                  {member.company}
+                  {member.company || <span className="text-gray-300 font-normal">-</span>}
                   {member.website && (
                     <a href={member.website} target="_blank" rel="noopener noreferrer" className="ml-2 inline-block text-gray-400 hover:text-red-600">
                       <Globe size={14} />
