@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Calendar, MapPin, DollarSign, ArrowLeft, CheckCircle2, Share2, CopyCheck, Clock, Loader2 } from 'lucide-react';
@@ -11,9 +10,9 @@ import { Activity, Registration } from '../types';
 // 3. Email Templates -> Create New Template -> 獲得 Template ID
 //    Template 變數建議設定為: {{user_name}}, {{activity_title}}, {{activity_date}}, {{activity_time}}, {{activity_location}}
 // 4. Account -> Public Key
-const EMAILJS_SERVICE_ID = 'YOUR_SERVICE_ID';
-const EMAILJS_TEMPLATE_ID = 'YOUR_TEMPLATE_ID';
-const EMAILJS_PUBLIC_KEY = 'YOUR_PUBLIC_KEY';
+const EMAILJS_SERVICE_ID: string = 'service_3cvfu3x';
+const EMAILJS_TEMPLATE_ID: string = 'template_tsptg0x';
+const EMAILJS_PUBLIC_KEY: string = 'ajJknYqtnk3p1_WmI';
 
 interface ActivityDetailProps {
   activities: Activity[];
