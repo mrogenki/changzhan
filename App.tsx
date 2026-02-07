@@ -68,10 +68,10 @@ const Footer: React.FC = () => {
     <footer className="bg-white border-t py-12">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
         <div className="flex justify-center items-center gap-2 mb-4">
-          <div className="w-6 h-6 bg-red-600 rounded-sm flex items-center justify-center text-white text-xs font-bold">長</div>
+          <div className="w-6 h-6 bg-red-600 rounded-md flex items-center justify-center text-white text-xs font-bold">長</div>
           <span className="font-bold text-gray-800 tracking-wider">BNI 長展分會</span>
         </div>
-        <p className="text-gray-400 text-xs">&copy; 2024 長展分會活動報名系統. All rights reserved.</p>
+        <p className="text-gray-400 text-xs">&copy; 2026 長展分會活動報名系統. All rights reserved.</p>
       </div>
     </footer>
   );
