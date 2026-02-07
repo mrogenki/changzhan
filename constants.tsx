@@ -20,8 +20,8 @@ export const INITIAL_ADMINS: AdminUser[] = [
   {
     id: 'super-admin-01',
     name: '總管理員',
-    email: 'admin@changzhan.com',
-    password: 'password123',
+    phone: '0925981577',
+    password: '981577',
     role: UserRole.SUPER_ADMIN
   }
 ];

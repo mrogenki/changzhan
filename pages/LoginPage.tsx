@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ShieldCheck, Lock, Mail } from 'lucide-react';
+import { ShieldCheck, Lock, Smartphone } from 'lucide-react';
 import { AdminUser } from '../types';
 import { INITIAL_ADMINS } from '../constants';
 
@@ -11,7 +11,7 @@ interface LoginPageProps {
 }
 
 const LoginPage: React.FC<LoginPageProps> = ({ users, onLogin }) => {
-  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
@@ -19,11 +19,11 @@ const LoginPage: React.FC<LoginPageProps> = ({ users, onLogin }) => {
     e.preventDefault();
     
     // 優先檢查資料庫中的使用者
-    let foundUser = users.find(u => u.email === email && u.password === password);
+    let foundUser = users.find(u => u.phone === phone && u.password === password);
     
     // 備援：如果資料庫中找不到，檢查常數中的初始管理員 (保證絕對能登入)
     if (!foundUser) {
-      foundUser = INITIAL_ADMINS.find(u => u.email === email && u.password === password);
+      foundUser = INITIAL_ADMINS.find(u => u.phone === phone && u.password === password);
     }
 
     if (foundUser) {
@@ -49,16 +49,16 @@ const LoginPage: React.FC<LoginPageProps> = ({ users, onLogin }) => {
         <div className="bg-white p-10 rounded-[40px] shadow-2xl shadow-gray-200/50 border border-gray-100 animate-in fade-in zoom-in duration-500">
           <form onSubmit={handleLoginSubmit} className="space-y-6">
             <div>
-              <label className="block text-sm font-bold text-gray-700 mb-2 px-1 uppercase tracking-widest text-[10px]">電子郵件</label>
+              <label className="block text-sm font-bold text-gray-700 mb-2 px-1 uppercase tracking-widest text-[10px]">手機號碼</label>
               <div className="relative">
-                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
+                <Smartphone className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
                 <input 
                   required
-                  type="email" 
-                  value={email}
-                  onChange={e => setEmail(e.target.value)}
+                  type="tel" 
+                  value={phone}
+                  onChange={e => setPhone(e.target.value)}
                   className="w-full pl-12 pr-4 py-4 rounded-2xl border border-gray-100 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all outline-none text-gray-700 font-medium"
-                  placeholder="admin@changzhan.com"
+                  placeholder="09xx-xxx-xxx"
                 />
               </div>
             </div>

@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Routes, Route, Link, useNavigate, useLocation, Navigate } from 'react-router-dom';
-import { LayoutDashboard, Calendar, Users, LogOut, ChevronRight, Search, FileDown, Plus, Edit, Trash2, CheckCircle, XCircle, Shield, UserPlus, DollarSign, TrendingUp, BarChart3, Mail, User, Clock, Image as ImageIcon, UploadCloud, Loader2 } from 'lucide-react';
+import { LayoutDashboard, Calendar, Users, LogOut, ChevronRight, Search, FileDown, Plus, Edit, Trash2, CheckCircle, XCircle, Shield, UserPlus, DollarSign, TrendingUp, BarChart3, Mail, User, Clock, Image as ImageIcon, UploadCloud, Loader2, Smartphone } from 'lucide-react';
 import { Activity, Registration, ActivityType, AdminUser, UserRole } from '../types';
 
 interface AdminDashboardProps {
@@ -112,7 +112,7 @@ const Sidebar: React.FC<{ user: AdminUser; onLogout: () => void }> = ({ user, on
 
 const UserManager: React.FC<{ users: AdminUser[], onAddUser: (u: AdminUser) => void, onDeleteUser: (id: string) => void, currentUser: AdminUser }> = ({ users, onAddUser, onDeleteUser, currentUser }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [formData, setFormData] = useState({ name: '', email: '', password: '', role: UserRole.STAFF });
+  const [formData, setFormData] = useState({ name: '', phone: '', password: '', role: UserRole.STAFF });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -123,7 +123,7 @@ const UserManager: React.FC<{ users: AdminUser[], onAddUser: (u: AdminUser) => v
     };
     onAddUser(newUser);
     setIsModalOpen(false);
-    setFormData({ name: '', email: '', password: '', role: UserRole.STAFF });
+    setFormData({ name: '', phone: '', password: '', role: UserRole.STAFF });
   };
 
   const confirmDelete = (user: AdminUser) => {
@@ -150,7 +150,7 @@ const UserManager: React.FC<{ users: AdminUser[], onAddUser: (u: AdminUser) => v
           <thead className="bg-gray-50 border-b border-gray-100">
             <tr className="text-xs font-bold text-gray-400 uppercase tracking-widest">
               <th className="px-6 py-4">人員名稱</th>
-              <th className="px-6 py-4">電子郵件</th>
+              <th className="px-6 py-4">手機號碼</th>
               <th className="px-6 py-4">權限等級</th>
               <th className="px-6 py-4 text-right">操作</th>
             </tr>
@@ -166,7 +166,7 @@ const UserManager: React.FC<{ users: AdminUser[], onAddUser: (u: AdminUser) => v
                     <span className="font-bold text-gray-900">{user.name}</span>
                   </div>
                 </td>
-                <td className="px-6 py-4 text-gray-500 text-sm">{user.email}</td>
+                <td className="px-6 py-4 text-gray-500 text-sm">{user.phone}</td>
                 <td className="px-6 py-4">
                   <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter ${
                     user.role === UserRole.SUPER_ADMIN ? 'bg-purple-100 text-purple-700' :
@@ -216,15 +216,15 @@ const UserManager: React.FC<{ users: AdminUser[], onAddUser: (u: AdminUser) => v
               </div>
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-2 flex items-center gap-2">
-                  <Mail size={14} className="text-red-600" /> 電子郵件 (登入帳號)
+                  <Smartphone size={14} className="text-red-600" /> 手機號碼 (登入帳號)
                 </label>
                 <input 
-                  type="email" 
+                  type="tel" 
                   required 
                   className="w-full border-gray-200 border rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-red-500 transition-all"
-                  placeholder="example@changzhan.com"
-                  value={formData.email}
-                  onChange={e => setFormData({...formData, email: e.target.value})}
+                  placeholder="09xx-xxx-xxx"
+                  value={formData.phone}
+                  onChange={e => setFormData({...formData, phone: e.target.value})}
                 />
               </div>
               <div>
@@ -280,6 +280,61 @@ const DashboardHome: React.FC<{ activities: Activity[], registrations: Registrat
       revenue
     };
   });
+
+  const handleSingleExport = (activity: Activity) => {
+    // 篩選出該活動的報名資料
+    const targetRegs = registrations.filter(r => String(r.activityId) === String(activity.id));
+
+    if (targetRegs.length === 0) {
+      alert(`「${activity.title}」目前尚無報名資料，無法匯出。`);
+      return;
+    }
+
+    // 準備 CSV 內容 (含 BOM)
+    let csvContent = '\uFEFF';
+    
+    // 標題列
+    const headers = ['活動名稱', '日期', '姓名', '電話', 'Email', '公司', '職稱', '引薦人', '繳費金額', '報到狀態', '報名時間'];
+    csvContent += headers.join(',') + '\n';
+
+    // 資料列
+    targetRegs.forEach(reg => {
+      const checkIn = reg.check_in_status ? '已報到' : '未報到';
+      const paid = reg.paid_amount || 0;
+      const regTime = new Date(reg.created_at).toLocaleString('zh-TW');
+
+      const escape = (text: string | undefined) => {
+        if (!text) return '""';
+        return `"${text.replace(/"/g, '""')}"`;
+      };
+
+      const row = [
+        escape(activity.title),
+        escape(activity.date),
+        escape(reg.name),
+        escape(reg.phone),
+        escape(reg.email),
+        escape(reg.company),
+        escape(reg.title),
+        escape(reg.referrer),
+        paid,
+        escape(checkIn),
+        escape(regTime)
+      ];
+      
+      csvContent += row.join(',') + '\n';
+    });
+
+    // 下載
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `${activity.date}_${activity.title}_報名名單.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   return (
     <div className="space-y-8 pb-12">
@@ -341,13 +396,24 @@ const DashboardHome: React.FC<{ activities: Activity[], registrations: Registrat
                       </div>
                     </td>
                     <td className="px-8 py-6 text-right">
-                      <Link 
-                        to="/admin/check-in" 
-                        state={{ activityId: stat.id }}
-                        className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-gray-100 text-gray-400 hover:bg-red-600 hover:text-white transition-all shadow-sm"
-                      >
-                        <ChevronRight size={20} />
-                      </Link>
+                      <div className="flex justify-end items-center gap-2">
+                        {/* 新增個別匯出按鈕 */}
+                        <button 
+                          onClick={() => handleSingleExport(stat)}
+                          className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-green-50 text-green-600 hover:bg-green-600 hover:text-white transition-all shadow-sm"
+                          title="匯出此活動報名表"
+                        >
+                          <FileDown size={20} />
+                        </button>
+                        <Link 
+                          to="/admin/check-in" 
+                          state={{ activityId: stat.id }}
+                          className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-gray-100 text-gray-400 hover:bg-red-600 hover:text-white transition-all shadow-sm"
+                          title="進入報到管理"
+                        >
+                          <ChevronRight size={20} />
+                        </Link>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -604,11 +670,81 @@ const CheckInManager: React.FC<{ activities: Activity[], registrations: Registra
     }
   };
 
+  const handleExport = () => {
+    if (filteredRegistrations.length === 0) {
+      alert('目前列表無資料可匯出');
+      return;
+    }
+
+    // 準備 CSV 內容
+    // 加入 BOM \uFEFF 讓 Excel 能正確識別中文編碼
+    let csvContent = '\uFEFF';
+    
+    // 標題列
+    const headers = ['活動名稱', '日期', '姓名', '電話', 'Email', '公司', '職稱', '引薦人', '繳費金額', '報到狀態', '報名時間'];
+    csvContent += headers.join(',') + '\n';
+
+    // 資料列
+    filteredRegistrations.forEach(reg => {
+      const activity = activities.find(a => String(a.id) === String(reg.activityId));
+      const actTitle = activity ? activity.title : '未知活動';
+      const actDate = activity ? activity.date : '';
+      const checkIn = reg.check_in_status ? '已報到' : '未報到';
+      const paid = reg.paid_amount || 0;
+      const regTime = new Date(reg.created_at).toLocaleString('zh-TW');
+
+      // 處理欄位內的逗號與引號，避免 CSV 格式跑版
+      const escape = (text: string | undefined) => {
+        if (!text) return '""';
+        return `"${text.replace(/"/g, '""')}"`;
+      };
+
+      const row = [
+        escape(actTitle),
+        escape(actDate),
+        escape(reg.name),
+        escape(reg.phone),
+        escape(reg.email),
+        escape(reg.company),
+        escape(reg.title),
+        escape(reg.referrer),
+        paid,
+        escape(checkIn),
+        escape(regTime)
+      ];
+      
+      csvContent += row.join(',') + '\n';
+    });
+
+    // 產生下載連結
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    
+    // 設定檔名
+    let filename = '活動報名名單.csv';
+    if (selectedActivity !== 'all') {
+      const act = activities.find(a => String(a.id) === String(selectedActivity));
+      if (act) {
+        filename = `${act.date}_${act.title}_報名名單.csv`;
+      }
+    } else {
+      const dateStr = new Date().toISOString().split('T')[0];
+      filename = `所有活動報名名單_${dateStr}.csv`;
+    }
+    
+    link.href = url;
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div className="space-y-6 text-gray-900">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">報到管理</h1>
-        <button onClick={() => {}} className="bg-green-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-all hover:bg-green-700 active:scale-95"><FileDown size={18}/> 匯出報名表</button>
+        <button onClick={handleExport} className="bg-green-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-all hover:bg-green-700 active:scale-95"><FileDown size={18}/> 匯出報名表</button>
       </div>
       <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">

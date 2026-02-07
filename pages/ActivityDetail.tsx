@@ -1,8 +1,19 @@
 
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Calendar, MapPin, DollarSign, ArrowLeft, CheckCircle2, Share2, CopyCheck, Clock } from 'lucide-react';
+import { Calendar, MapPin, DollarSign, ArrowLeft, CheckCircle2, Share2, CopyCheck, Clock, Loader2 } from 'lucide-react';
+import emailjs from '@emailjs/browser';
 import { Activity, Registration } from '../types';
+
+// TODO: 請替換為您 EmailJS 後台的實際資訊
+// 1. 前往 https://www.emailjs.com/ 註冊
+// 2. Add Service (例如 Gmail) -> 獲得 Service ID
+// 3. Email Templates -> Create New Template -> 獲得 Template ID
+//    Template 變數建議設定為: {{user_name}}, {{activity_title}}, {{activity_date}}, {{activity_time}}, {{activity_location}}
+// 4. Account -> Public Key
+const EMAILJS_SERVICE_ID = 'YOUR_SERVICE_ID';
+const EMAILJS_TEMPLATE_ID = 'YOUR_TEMPLATE_ID';
+const EMAILJS_PUBLIC_KEY = 'YOUR_PUBLIC_KEY';
 
 interface ActivityDetailProps {
   activities: Activity[];
@@ -16,6 +27,7 @@ const ActivityDetail: React.FC<ActivityDetailProps> = ({ activities, registratio
   const activity = activities.find(a => String(a.id) === id);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [showCopyTooltip, setShowCopyTooltip] = useState(false);
   const [formData, setFormData] = useState({
@@ -58,6 +70,41 @@ const ActivityDetail: React.FC<ActivityDetailProps> = ({ activities, registratio
     }
   };
 
+  const sendConfirmationEmail = async (reg: Registration) => {
+    // 檢查是否已設定 EmailJS 金鑰，若為預設值則跳過發送 (避免報錯)
+    if (EMAILJS_SERVICE_ID === 'YOUR_SERVICE_ID') {
+      console.warn('EmailJS 尚未設定，跳過郵件發送');
+      return;
+    }
+
+    setIsSendingEmail(true);
+    try {
+      await emailjs.send(
+        EMAILJS_SERVICE_ID,
+        EMAILJS_TEMPLATE_ID,
+        {
+          to_name: reg.name,
+          to_email: reg.email,
+          activity_title: activity.title,
+          activity_date: activity.date,
+          activity_time: activity.time,
+          activity_location: activity.location,
+          activity_price: activity.price,
+          company: reg.company,
+          title: reg.title,
+          message: `感謝您報名 ${activity.title}，我們期待您的蒞臨！`
+        },
+        EMAILJS_PUBLIC_KEY
+      );
+      console.log('報名確認信發送成功');
+    } catch (error) {
+      console.error('報名確認信發送失敗:', error);
+      // 這裡不跳出 alert，因為報名已經成功，Email 失敗不應該阻擋成功頁面
+    } finally {
+      setIsSendingEmail(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -81,6 +128,9 @@ const ActivityDetail: React.FC<ActivityDetailProps> = ({ activities, registratio
     try {
       const success = await onRegister(newRegistration);
       if (success) {
+        // 報名成功後，嘗試發送 Email
+        await sendConfirmationEmail(newRegistration);
+        
         setIsSuccess(true);
         // 不再重置 isSubmitting，讓畫面停留在成功狀態
       } else {
@@ -96,13 +146,14 @@ const ActivityDetail: React.FC<ActivityDetailProps> = ({ activities, registratio
     return (
       <div className="max-w-2xl mx-auto px-4 py-20 text-center">
         <div className="flex justify-center mb-6">
-          <CheckCircle2 size={80} className="text-green-500" />
+          <CheckCircle2 size={80} className="text-green-500 animate-in zoom-in duration-300" />
         </div>
         <h2 className="text-3xl font-bold mb-4">報名成功！</h2>
-        <p className="text-gray-500 mb-8">感謝您的參與，我們期待在活動現場見到您。</p>
+        <p className="text-gray-500 mb-2">感謝您的參與，我們期待在活動現場見到您。</p>
+        <p className="text-sm text-gray-400 mb-8">(確認信已寄送至您的信箱)</p>
         <button 
           onClick={() => navigate('/')}
-          className="bg-red-600 text-white px-8 py-3 rounded-full font-bold hover:bg-red-700 transition-colors"
+          className="bg-red-600 text-white px-8 py-3 rounded-full font-bold hover:bg-red-700 transition-colors shadow-lg shadow-red-100"
         >
           返回活動列表
         </button>
@@ -211,7 +262,7 @@ const ActivityDetail: React.FC<ActivityDetailProps> = ({ activities, registratio
                 />
               </div>
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">電子郵件</label>
+                <label className="block text-sm font-bold text-gray-700 mb-2">電子郵件 (將寄送確認信)</label>
                 <input 
                   required
                   type="email" 
@@ -257,9 +308,14 @@ const ActivityDetail: React.FC<ActivityDetailProps> = ({ activities, registratio
               <button 
                 type="submit" 
                 disabled={isSubmitting}
-                className="w-full bg-red-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-red-700 active:scale-[0.98] transition-all disabled:opacity-50 mt-4"
+                className="w-full bg-red-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-red-700 active:scale-[0.98] transition-all disabled:opacity-50 mt-4 flex items-center justify-center gap-2"
               >
-                {isSubmitting ? '處理中...' : '提交報名'}
+                {isSubmitting ? (
+                   <>
+                     <Loader2 className="animate-spin" size={20} />
+                     {isSendingEmail ? '正在發送通知...' : '處理中...'}
+                   </>
+                ) : '提交報名'}
               </button>
             </form>
             <p className="text-center text-xs text-gray-400 mt-6 leading-tight">

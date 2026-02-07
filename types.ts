@@ -43,7 +43,7 @@ export interface Registration {
 export interface AdminUser {
   id: string;
   name: string;
-  email: string;
+  phone: string; // 改為手機號碼
   role: UserRole;
   password?: string;
 }
