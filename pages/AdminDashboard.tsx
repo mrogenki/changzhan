@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Routes, Route, Link, useNavigate, useLocation, Navigate } from 'react-router-dom';
-import { LayoutDashboard, Calendar, Users, LogOut, ChevronRight, Search, FileDown, Plus, Edit, Trash2, CheckCircle, XCircle, Shield, UserPlus, DollarSign, TrendingUp, BarChart3, Mail, User, Clock, Image as ImageIcon, UploadCloud, Loader2, Smartphone, Building2, Briefcase, Globe } from 'lucide-react';
+import { LayoutDashboard, Calendar, Users, LogOut, ChevronRight, Search, FileDown, Plus, Edit, Trash2, CheckCircle, XCircle, Shield, UserPlus, DollarSign, TrendingUp, BarChart3, Mail, User, Clock, Image as ImageIcon, UploadCloud, Loader2, Smartphone, Building2, Briefcase, Globe, FileUp, Download } from 'lucide-react';
 import { Activity, Registration, ActivityType, AdminUser, UserRole, Member } from '../types';
 
 interface AdminDashboardProps {
@@ -10,7 +10,7 @@ interface AdminDashboardProps {
   activities: Activity[];
   registrations: Registration[];
   users: AdminUser[];
-  members: Member[]; // 新增 Prop
+  members: Member[];
   onUpdateActivity: (act: Activity) => void;
   onAddActivity: (act: Activity) => void;
   onDeleteActivity: (id: string | number) => void;
@@ -18,9 +18,10 @@ interface AdminDashboardProps {
   onDeleteRegistration: (id: string | number) => void;
   onAddUser: (user: AdminUser) => void;
   onDeleteUser: (id: string) => void;
-  onAddMember: (member: Member) => void; // 新增 Prop
-  onUpdateMember: (member: Member) => void; // 新增 Prop
-  onDeleteMember: (id: string | number) => void; // 新增 Prop
+  onAddMember: (member: Member) => void;
+  onAddMembers?: (members: Member[]) => void; // 新增：批次匯入 Prop
+  onUpdateMember: (member: Member) => void;
+  onDeleteMember: (id: string | number) => void;
   onUploadImage: (file: File) => Promise<string>;
 }
 
@@ -120,11 +121,13 @@ const Sidebar: React.FC<{ user: AdminUser; onLogout: () => void }> = ({ user, on
 const MemberManager: React.FC<{ 
   members: Member[], 
   onAddMember: (m: Member) => void, 
+  onAddMembers?: (m: Member[]) => void, // 批次匯入
   onUpdateMember: (m: Member) => void, 
   onDeleteMember: (id: string | number) => void 
-}> = ({ members, onAddMember, onUpdateMember, onDeleteMember }) => {
+}> = ({ members, onAddMember, onAddMembers, onUpdateMember, onDeleteMember }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingMember, setEditingMember] = useState<Member | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -137,7 +140,7 @@ const MemberManager: React.FC<{
       name: formData.get('name') as string,
       company: formData.get('company') as string,
       website: formData.get('website') as string,
-      intro: formData.get('intro') as string // 獲取簡介內容
+      intro: formData.get('intro') as string
     };
 
     if (editingMember) onUpdateMember(memberData);
@@ -151,6 +154,72 @@ const MemberManager: React.FC<{
     if (window.confirm(`確定要刪除會員「${member.name} (${member.company})」嗎？`)) {
       onDeleteMember(member.id);
     }
+  };
+
+  const handleDownloadTemplate = () => {
+    const csvContent = '\uFEFF會員編號,產業鏈(美食/工程/健康/幸福/工商),行業別,姓名,公司名稱,會員簡介,網站連結\n001,工商,網站設計,王小明,長展科技,專注於高質感網站設計...,https://example.com';
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', '會員匯入範本.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleImportCSV = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target?.result as string;
+      if (!text) return;
+      
+      const lines = text.split(/\r\n|\n/);
+      const newMembers: Member[] = [];
+      
+      // 從第 2 行開始 (跳過標題)
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+        
+        // 簡單的 CSV 分割 (處理逗號)
+        // 注意：這裡假設 CSV 內容沒有包含逗號，若有複雜內容建議使用專業 parser
+        // 為了相容性，使用正則表達式處理引號內的逗號 (簡易版)
+        const cols = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(s => s.trim().replace(/^"|"$/g, '').replace(/""/g, '"'));
+        
+        if (cols.length < 5) continue; // 基本檢查：至少要有前 5 個欄位
+
+        newMembers.push({
+          id: Date.now() + i, // 暫時 ID，資料庫會重產
+          member_no: cols[0],
+          industry_chain: (['美食', '工程', '健康', '幸福', '工商'].includes(cols[1]) ? cols[1] : '工商') as any,
+          industry_category: cols[2],
+          name: cols[3],
+          company: cols[4],
+          intro: cols[5] || '',
+          website: cols[6] || ''
+        });
+      }
+
+      if (newMembers.length > 0) {
+        if (window.confirm(`解析成功！共發現 ${newMembers.length} 筆資料。\n確定要匯入嗎？`)) {
+          if (onAddMembers) {
+            onAddMembers(newMembers);
+          } else {
+            alert('系統錯誤：找不到匯入函式');
+          }
+        }
+      } else {
+        alert('解析失敗或檔案內容為空，請檢查 CSV 格式。');
+      }
+      
+      // 清空 input 讓同一檔案可以再次選取
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    };
+    reader.readAsText(file);
   };
 
   // 排序顯示：依照會員編號 (修正：安全轉換為字串後比較)
@@ -168,11 +237,35 @@ const MemberManager: React.FC<{
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <h1 className="text-2xl font-bold">會員資料管理</h1>
-        <button onClick={() => { setEditingMember(null); setIsModalOpen(true); }} className="flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded-lg">
-          <UserPlus size={18} /> 新增會員
-        </button>
+        <div className="flex gap-2">
+          <button 
+            onClick={handleDownloadTemplate} 
+            className="flex items-center gap-2 bg-gray-100 text-gray-600 px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors border border-gray-200"
+            title="下載 CSV 範本"
+          >
+            <Download size={18} /> <span className="hidden sm:inline">下載範本</span>
+          </button>
+          <div className="relative">
+            <button 
+              onClick={() => fileInputRef.current?.click()} 
+              className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors shadow-sm"
+            >
+              <FileUp size={18} /> 匯入 CSV
+            </button>
+            <input 
+              ref={fileInputRef}
+              type="file" 
+              accept=".csv" 
+              className="hidden" 
+              onChange={handleImportCSV} 
+            />
+          </div>
+          <button onClick={() => { setEditingMember(null); setIsModalOpen(true); }} className="flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors shadow-sm">
+            <UserPlus size={18} /> 新增會員
+          </button>
+        </div>
       </div>
 
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
@@ -955,7 +1048,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
           {canAccessActivities && (
             <>
               <Route path="/activities" element={<ActivityManager activities={props.activities} onAddActivity={props.onAddActivity} onUpdateActivity={props.onUpdateActivity} onDeleteActivity={props.onDeleteActivity} onUploadImage={props.onUploadImage} />} />
-              <Route path="/members" element={<MemberManager members={props.members} onAddMember={props.onAddMember} onUpdateMember={props.onUpdateMember} onDeleteMember={props.onDeleteMember} />} />
+              <Route path="/members" element={
+                <MemberManager 
+                  members={props.members} 
+                  onAddMember={props.onAddMember} 
+                  onAddMembers={props.onAddMembers} // 傳遞批次匯入
+                  onUpdateMember={props.onUpdateMember} 
+                  onDeleteMember={props.onDeleteMember} 
+                />
+              } />
             </>
           )}
           {canAccessUsers && <Route path="/users" element={<UserManager users={props.users} onAddUser={props.onAddUser} onDeleteUser={props.onDeleteUser} currentUser={props.currentUser} />} />}

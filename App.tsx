@@ -301,6 +301,29 @@ const App: React.FC = () => {
     else fetchData();
   };
 
+  // 新增：批次匯入會員
+  const handleAddMembers = async (newMembers: Member[]) => {
+    setLoading(true);
+    try {
+      // 移除 id，讓資料庫自動生成 (如果 id 是數字流水號可保留，視資料庫設定而定，這裡假設移除以防衝突)
+      const membersData = newMembers.map(({ id, ...rest }) => rest);
+      
+      const { error } = await supabase.from('members').insert(membersData);
+      
+      if (error) {
+        alert('批次匯入失敗：' + error.message);
+      } else {
+        alert(`成功匯入 ${newMembers.length} 筆會員資料！`);
+        await fetchData(); // 重新整理資料
+      }
+    } catch (err: any) {
+      console.error(err);
+      alert('發生錯誤：' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleUpdateMember = async (updated: Member) => {
     const { error } = await supabase.from('members').update(updated).eq('id', updated.id);
     if (error) alert('更新會員失敗：' + error.message);
@@ -351,6 +374,7 @@ const App: React.FC = () => {
                   onAddUser={handleAddUser}
                   onDeleteUser={handleDeleteUser}
                   onAddMember={handleAddMember} // 傳遞會員操作
+                  onAddMembers={handleAddMembers} // 新增：傳遞批次匯入
                   onUpdateMember={handleUpdateMember} // 傳遞會員操作
                   onDeleteMember={handleDeleteMember} // 傳遞會員操作
                   onUploadImage={handleUploadImage} 
