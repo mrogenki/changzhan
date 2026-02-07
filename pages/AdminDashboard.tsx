@@ -131,12 +131,13 @@ const MemberManager: React.FC<{
     const formData = new FormData(e.currentTarget);
     const memberData: Member = {
       id: editingMember?.id || '',
-      member_no: formData.get('member_no') as string, // 新增會員編號
+      member_no: formData.get('member_no') as string,
       industry_chain: formData.get('industry_chain') as any,
       industry_category: formData.get('industry_category') as string,
       name: formData.get('name') as string,
       company: formData.get('company') as string,
-      website: formData.get('website') as string
+      website: formData.get('website') as string,
+      intro: formData.get('intro') as string // 獲取簡介內容
     };
 
     if (editingMember) onUpdateMember(memberData);
@@ -152,12 +153,17 @@ const MemberManager: React.FC<{
     }
   };
 
-  // 排序顯示：依照會員編號
+  // 排序顯示：依照會員編號 (修正：安全轉換為字串後比較)
   const sortedMembers = [...members].sort((a, b) => {
-    if (a.member_no && b.member_no) {
-      return a.member_no.localeCompare(b.member_no);
-    }
-    return 0;
+    const valA = a.member_no !== undefined && a.member_no !== null ? String(a.member_no) : '';
+    const valB = b.member_no !== undefined && b.member_no !== null ? String(b.member_no) : '';
+    
+    // 如果兩者都沒有編號，保持原順序或用 ID 排
+    if (!valA && !valB) return 0;
+    if (!valA) return 1;
+    if (!valB) return -1;
+    
+    return valA.localeCompare(valB, undefined, { numeric: true });
   });
 
   return (
@@ -223,7 +229,7 @@ const MemberManager: React.FC<{
 
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-lg rounded-2xl p-8 shadow-2xl">
+          <div className="bg-white w-full max-w-lg rounded-2xl p-8 shadow-2xl max-h-[90vh] overflow-y-auto">
             <h2 className="text-xl font-bold mb-6">{editingMember ? '修改會員資料' : '新增會員'}</h2>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-3 gap-4">
@@ -256,6 +262,16 @@ const MemberManager: React.FC<{
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-1">品牌 / 公司名稱</label>
                 <input name="company" required defaultValue={editingMember?.company} className="w-full border rounded-lg px-3 py-3 outline-none focus:ring-2 focus:ring-red-500" placeholder="公司名稱" />
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">會員簡介 (選填)</label>
+                <textarea 
+                  name="intro" 
+                  rows={3} 
+                  defaultValue={editingMember?.intro} 
+                  className="w-full border rounded-lg px-3 py-3 outline-none focus:ring-2 focus:ring-red-500 resize-none" 
+                  placeholder="請輸入簡短的服務介紹或個人簡介..." 
+                />
               </div>
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-1">網站連結 (選填)</label>

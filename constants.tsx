@@ -34,7 +34,8 @@ export const INITIAL_MEMBERS: Member[] = [
     industry_category: '網站設計',
     name: '王小明',
     company: '長展科技',
-    website: 'https://example.com'
+    website: 'https://example.com',
+    intro: '專注於高質感網站設計與系統開發，協助企業建立專業數位形象。'
   },
   {
     id: 'm2',
@@ -43,6 +44,7 @@ export const INITIAL_MEMBERS: Member[] = [
     industry_category: '婚禮顧問',
     name: '陳美麗',
     company: '幸福婚顧',
-    website: ''
+    website: '',
+    intro: '為新人打造獨一無二的夢幻婚禮，從策劃到執行，提供最貼心的全程服務。'
   }
 ];

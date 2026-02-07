@@ -12,11 +12,17 @@ const MemberList: React.FC<MemberListProps> = ({ members }) => {
   const chains = ['美食', '工程', '健康', '幸福', '工商'];
 
   // 排序：依照會員編號 (若有) 或 ID
+  // 修正：將 member_no 轉為字串後再比較，並啟用數值模式 ({numeric: true})
   const sortedMembers = [...members].sort((a, b) => {
-    if (a.member_no && b.member_no) {
-      return a.member_no.localeCompare(b.member_no);
-    }
-    return 0;
+    const valA = a.member_no !== undefined && a.member_no !== null ? String(a.member_no) : '';
+    const valB = b.member_no !== undefined && b.member_no !== null ? String(b.member_no) : '';
+    
+    // 如果兩者都沒有編號，保持原順序或用 ID 排
+    if (!valA && !valB) return 0;
+    if (!valA) return 1;
+    if (!valB) return -1;
+
+    return valA.localeCompare(valB, undefined, { numeric: true });
   });
 
   const filteredMembers = filter === 'all' 
@@ -68,25 +74,37 @@ const MemberList: React.FC<MemberListProps> = ({ members }) => {
           {filteredMembers.map(member => (
             <div key={member.id} className="bg-white rounded-2xl border border-gray-100 p-6 hover:shadow-xl transition-all duration-300 group flex flex-col">
               <div className="mb-4 flex items-start justify-between">
-                <span className={`text-xs font-bold px-3 py-1 rounded-full ${getChainColor(member.industry_chain)}`}>
-                  {member.industry_chain}
-                </span>
-                {member.member_no && (
-                  <span className="text-xs font-mono text-gray-300 font-bold">#{member.member_no}</span>
+                <div className="flex flex-wrap items-center gap-2 pr-2">
+                  <span className={`text-xs font-bold px-3 py-1 rounded-full ${getChainColor(member.industry_chain)}`}>
+                    {member.industry_chain}
+                  </span>
+                  <span className="text-xs font-medium text-gray-500 bg-gray-50 border border-gray-100 px-3 py-1 rounded-full">
+                    {member.industry_category}
+                  </span>
+                </div>
+                {member.member_no !== undefined && member.member_no !== null && (
+                  <span className="text-xs font-mono text-gray-300 font-bold whitespace-nowrap">#{member.member_no}</span>
                 )}
               </div>
               
               <div className="flex-grow">
-                <h3 className="text-xl font-bold text-gray-900 mb-1 group-hover:text-red-600 transition-colors">{member.company}</h3>
-                <p className="text-sm text-gray-400 font-medium mb-4">{member.industry_category}</p>
+                <h3 className="text-xl font-bold text-gray-900 mb-3 group-hover:text-red-600 transition-colors">{member.company}</h3>
+                {/* 行業別已移動至上方 */}
                 
-                <div className="flex items-center gap-2 text-gray-700 font-medium mb-2">
+                <div className="flex items-center gap-2 text-gray-700 font-medium mb-3">
                   <User size={16} className="text-red-600" />
                   {member.name}
                 </div>
+
+                {/* 顯示簡介 */}
+                {member.intro && (
+                  <p className="text-sm text-gray-500 mb-4 line-clamp-3 leading-relaxed">
+                    {member.intro}
+                  </p>
+                )}
               </div>
 
-              <div className="mt-6 pt-4 border-t border-gray-50">
+              <div className="mt-auto pt-4 border-t border-gray-50">
                 {member.website ? (
                   <a 
                     href={member.website} 
