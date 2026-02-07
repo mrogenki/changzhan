@@ -7,8 +7,9 @@ import Home from './pages/Home';
 import ActivityDetail from './pages/ActivityDetail';
 import AdminDashboard from './pages/AdminDashboard';
 import LoginPage from './pages/LoginPage';
-import { Activity, Registration, AdminUser } from './types';
-import { INITIAL_ACTIVITIES, INITIAL_ADMINS } from './constants';
+import MemberList from './pages/MemberList'; // 新增 import
+import { Activity, Registration, AdminUser, Member } from './types';
+import { INITIAL_ACTIVITIES, INITIAL_ADMINS, INITIAL_MEMBERS } from './constants'; // 新增 import
 
 const getEnv = (key: string): string | undefined => {
   try {
@@ -42,6 +43,7 @@ const Header: React.FC = () => {
           </div>
           <div className="hidden sm:flex items-center space-x-8">
             <Link to="/" className="text-gray-700 hover:text-red-600 transition-colors font-medium">活動首頁</Link>
+            <Link to="/members" className="text-gray-700 hover:text-red-600 transition-colors font-medium">會員列表</Link>
             <Link to="/admin" className="text-gray-500 hover:text-gray-900 flex items-center gap-1 border border-gray-200 px-3 py-1 rounded-full text-sm font-bold">後台管理</Link>
           </div>
           <div className="sm:hidden flex items-center">
@@ -54,6 +56,7 @@ const Header: React.FC = () => {
       {isOpen && (
         <div className="sm:hidden bg-white border-t px-4 py-3 space-y-3 shadow-lg">
           <Link to="/" onClick={() => setIsOpen(false)} className="block text-gray-700 font-bold">活動首頁</Link>
+          <Link to="/members" onClick={() => setIsOpen(false)} className="block text-gray-700 font-bold">會員列表</Link>
           <Link to="/admin" onClick={() => setIsOpen(false)} className="block text-gray-500 text-sm font-bold">後台管理</Link>
         </div>
       )}
@@ -81,6 +84,7 @@ const App: React.FC = () => {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [registrations, setRegistrations] = useState<Registration[]>([]);
   const [users, setUsers] = useState<AdminUser[]>([]);
+  const [members, setMembers] = useState<Member[]>([]); // 新增 members state
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<AdminUser | null>(() => {
     const saved = sessionStorage.getItem('current_user');
@@ -103,7 +107,6 @@ const App: React.FC = () => {
         setActivities(mappedActs);
       } else if (actData && actData.length === 0) {
         // 只有在資料庫真的完全沒資料時才初始化一次
-        // 排除 id (讓 DB 自增) 和 status (DB 無此欄位)
         const initActs = INITIAL_ACTIVITIES.map(({ id, status, ...rest }) => rest);
         const { data: inserted } = await supabase.from('activities').insert(initActs).select();
         if (inserted) {
@@ -124,11 +127,22 @@ const App: React.FC = () => {
       if (userData && userData.length > 0) {
         setUsers(userData);
       } else if (!userError && userData && userData.length === 0) {
-        // 資料庫空了，初始化管理員 (排除 ID，讓 DB 產生 UUID)
         const initAdmins = INITIAL_ADMINS.map(({ id, ...rest }) => rest);
         const { data: inserted } = await supabase.from('admins').insert(initAdmins).select();
         if (inserted) setUsers(inserted);
       }
+
+      // 獲取會員 (新增)
+      const { data: memberData, error: memberError } = await supabase.from('members').select('*');
+      if (memberData && memberData.length > 0) {
+        setMembers(memberData);
+      } else if (!memberError && memberData && memberData.length === 0) {
+        // 資料庫無資料時初始化
+        const initMembers = INITIAL_MEMBERS.map(({ id, ...rest }) => rest);
+        const { data: inserted } = await supabase.from('members').insert(initMembers).select();
+        if (inserted) setMembers(inserted);
+      }
+
     } catch (err) {
       console.error('Fetch error:', err);
     } finally {
@@ -150,15 +164,13 @@ const App: React.FC = () => {
     sessionStorage.removeItem('current_user');
   };
 
-  // 處理圖片上傳 (增強版：失敗時自動 Fallback 到 Base64 + Canvas 壓縮)
+  // 處理圖片上傳
   const handleUploadImage = async (file: File): Promise<string> => {
     try {
-      // 1. 嘗試上傳到 Supabase Storage
       const fileExt = file.name.split('.').pop()?.toLowerCase() || 'jpg';
       const fileName = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
       const filePath = `activity-covers/${fileName}`;
 
-      // 使用 upsert: false 避免覆蓋
       const { error: uploadError } = await supabase.storage
         .from('activity-images')
         .upload(filePath, file, {
@@ -167,11 +179,10 @@ const App: React.FC = () => {
         });
 
       if (uploadError) {
-        console.warn('Supabase Storage 上傳失敗 (可能無權限)，嘗試轉為壓縮 Base64 儲存', uploadError.message);
-        throw uploadError; // 拋出錯誤以進入 catch 區塊進行 Fallback
+        console.warn('Supabase Storage 上傳失敗，嘗試轉為壓縮 Base64', uploadError.message);
+        throw uploadError; 
       }
 
-      // 上傳成功，取得公開連結
       const { data } = supabase.storage
         .from('activity-images')
         .getPublicUrl(filePath);
@@ -179,8 +190,6 @@ const App: React.FC = () => {
       return data.publicUrl;
 
     } catch (error: any) {
-      // 2. Fallback 機制：使用 Canvas 壓縮圖片並轉為 Base64
-      // 這樣可以解決檔案過大無法存入 DB 的問題，同時避免 Storage 權限設定的麻煩
       return new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.readAsDataURL(file);
@@ -191,11 +200,8 @@ const App: React.FC = () => {
             const canvas = document.createElement('canvas');
             let width = img.width;
             let height = img.height;
-
-            // 壓縮尺寸：最大寬度/高度 1024px (兼顧清晰度與儲存大小)
             const MAX_WIDTH = 1024;
             const MAX_HEIGHT = 1024;
-
             if (width > height) {
               if (width > MAX_WIDTH) {
                 height *= MAX_WIDTH / width;
@@ -207,21 +213,14 @@ const App: React.FC = () => {
                 height = MAX_HEIGHT;
               }
             }
-
             canvas.width = width;
             canvas.height = height;
-            
             const ctx = canvas.getContext('2d');
             if (!ctx) {
                 reject(new Error('瀏覽器不支援 Canvas 處理'));
                 return;
             }
-            
-            // 繪製並壓縮
             ctx.drawImage(img, 0, 0, width, height);
-
-            // 轉為 JPEG 格式，品質設定為 0.7
-            // 這樣產生的 Base64 字串通常小於 200KB，可安全存入資料庫
             const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
             resolve(dataUrl);
           };
@@ -240,13 +239,12 @@ const App: React.FC = () => {
       alert('報名失敗：' + error.message);
       return false;
     } else {
-      await fetchData(); // 靜默更新，不觸發全螢幕 loading，避免頁面重置
+      await fetchData(); 
       return true;
     }
   };
 
   const handleUpdateActivity = async (updated: Activity) => {
-    // 移除 status 和 id (update 需要 eq id，但 payload 不一定要包含)
     const { status, ...updateData } = updated as any;
     const { error } = await supabase.from('activities').update(updateData).eq('id', updated.id);
     if (error) alert('更新失敗：' + error.message);
@@ -254,7 +252,6 @@ const App: React.FC = () => {
   };
 
   const handleAddActivity = async (newAct: Activity) => {
-    // 移除前端產生的 ID 和 status，避免寫入 DB 錯誤
     const { id, status, ...actData } = newAct as any;
     const { error } = await supabase.from('activities').insert([actData]);
     if (error) alert('新增活動失敗：' + error.message);
@@ -262,7 +259,6 @@ const App: React.FC = () => {
   };
 
   const handleDeleteActivity = async (id: string | number) => {
-    // 先刪除報名資料以防外鍵約束 (改為 activityId)
     await supabase.from('registrations').delete().eq('activityId', id);
     const { error } = await supabase.from('activities').delete().eq('id', id);
     if (error) alert('刪除失敗：' + error.message);
@@ -282,7 +278,6 @@ const App: React.FC = () => {
   };
 
   const handleAddUser = async (newUser: AdminUser) => {
-    // 重要：移除前端產生的 ID，讓 Supabase 產生 UUID
     const { id, ...userData } = newUser as any;
     const { error } = await supabase.from('admins').insert([userData]);
     if (error) alert('新增管理員失敗：' + error.message);
@@ -296,6 +291,26 @@ const App: React.FC = () => {
     } else {
       fetchData();
     }
+  };
+
+  // 會員管理相關功能 (新增)
+  const handleAddMember = async (newMember: Member) => {
+    const { id, ...memberData } = newMember as any;
+    const { error } = await supabase.from('members').insert([memberData]);
+    if (error) alert('新增會員失敗：' + error.message);
+    else fetchData();
+  };
+
+  const handleUpdateMember = async (updated: Member) => {
+    const { error } = await supabase.from('members').update(updated).eq('id', updated.id);
+    if (error) alert('更新會員失敗：' + error.message);
+    else fetchData();
+  };
+
+  const handleDeleteMember = async (id: string | number) => {
+    const { error } = await supabase.from('members').delete().eq('id', id);
+    if (error) alert('刪除會員失敗：' + error.message);
+    else fetchData();
   };
 
   if (loading) {
@@ -316,6 +331,7 @@ const App: React.FC = () => {
         <main className="flex-grow bg-gray-50/30">
           <Routes>
             <Route path="/" element={<Home activities={activities} />} />
+            <Route path="/members" element={<MemberList members={members} />} /> {/* 新增路由 */}
             <Route path="/activity/:id" element={<ActivityDetail activities={activities} onRegister={handleRegister} registrations={registrations} />} />
             <Route path="/admin/login" element={currentUser ? <Navigate to="/admin" /> : <LoginPage users={users} onLogin={handleLogin} />} />
             <Route path="/admin/*" element={
@@ -326,6 +342,7 @@ const App: React.FC = () => {
                   activities={activities} 
                   registrations={registrations}
                   users={users}
+                  members={members} // 傳遞 members
                   onUpdateActivity={handleUpdateActivity}
                   onAddActivity={handleAddActivity}
                   onDeleteActivity={handleDeleteActivity}
@@ -333,7 +350,10 @@ const App: React.FC = () => {
                   onDeleteRegistration={handleDeleteRegistration}
                   onAddUser={handleAddUser}
                   onDeleteUser={handleDeleteUser}
-                  onUploadImage={handleUploadImage} // 傳遞上傳函式
+                  onAddMember={handleAddMember} // 傳遞會員操作
+                  onUpdateMember={handleUpdateMember} // 傳遞會員操作
+                  onDeleteMember={handleDeleteMember} // 傳遞會員操作
+                  onUploadImage={handleUploadImage} 
                 />
               ) : (
                 <Navigate to="/admin/login" />

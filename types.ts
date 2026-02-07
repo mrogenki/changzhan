@@ -47,3 +47,13 @@ export interface AdminUser {
   role: UserRole;
   password?: string;
 }
+
+export interface Member {
+  id: string | number;
+  member_no: string; // 新增：會員編號
+  industry_chain: '美食' | '工程' | '健康' | '幸福' | '工商'; // 產業鏈
+  industry_category: string; // 行業別
+  name: string; // 大名
+  company: string; // 品牌/公司名稱
+  website?: string; // 網站
+}

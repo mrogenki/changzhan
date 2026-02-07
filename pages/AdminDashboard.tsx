@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Routes, Route, Link, useNavigate, useLocation, Navigate } from 'react-router-dom';
-import { LayoutDashboard, Calendar, Users, LogOut, ChevronRight, Search, FileDown, Plus, Edit, Trash2, CheckCircle, XCircle, Shield, UserPlus, DollarSign, TrendingUp, BarChart3, Mail, User, Clock, Image as ImageIcon, UploadCloud, Loader2, Smartphone } from 'lucide-react';
-import { Activity, Registration, ActivityType, AdminUser, UserRole } from '../types';
+import { LayoutDashboard, Calendar, Users, LogOut, ChevronRight, Search, FileDown, Plus, Edit, Trash2, CheckCircle, XCircle, Shield, UserPlus, DollarSign, TrendingUp, BarChart3, Mail, User, Clock, Image as ImageIcon, UploadCloud, Loader2, Smartphone, Building2, Briefcase, Globe } from 'lucide-react';
+import { Activity, Registration, ActivityType, AdminUser, UserRole, Member } from '../types';
 
 interface AdminDashboardProps {
   currentUser: AdminUser;
@@ -10,6 +10,7 @@ interface AdminDashboardProps {
   activities: Activity[];
   registrations: Registration[];
   users: AdminUser[];
+  members: Member[]; // 新增 Prop
   onUpdateActivity: (act: Activity) => void;
   onAddActivity: (act: Activity) => void;
   onDeleteActivity: (id: string | number) => void;
@@ -17,22 +18,22 @@ interface AdminDashboardProps {
   onDeleteRegistration: (id: string | number) => void;
   onAddUser: (user: AdminUser) => void;
   onDeleteUser: (id: string) => void;
-  onUploadImage: (file: File) => Promise<string>; // 新增 Prop
+  onAddMember: (member: Member) => void; // 新增 Prop
+  onUpdateMember: (member: Member) => void; // 新增 Prop
+  onDeleteMember: (id: string | number) => void; // 新增 Prop
+  onUploadImage: (file: File) => Promise<string>;
 }
 
 // 獨立的輸入元件：解決輸入時頻繁更新導致卡頓的問題
-// 邏輯：只在 onBlur (失去焦點) 或按 Enter 時才觸發資料庫更新
 const PaidAmountInput: React.FC<{ value?: number; onSave: (val: number) => void }> = ({ value, onSave }) => {
   const [localValue, setLocalValue] = useState(value?.toString() || '0');
 
-  // 當外部資料變更時 (例如重新整理)，同步更新內部狀態
   useEffect(() => {
     setLocalValue(value?.toString() || '0');
   }, [value]);
 
   const handleBlur = () => {
     const num = parseInt(localValue);
-    // 只有當數值有效且與原本數值不同時才更新，減少 API 請求
     if (!isNaN(num) && num !== (value || 0)) {
       onSave(num);
     }
@@ -40,7 +41,7 @@ const PaidAmountInput: React.FC<{ value?: number; onSave: (val: number) => void 
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
-      e.currentTarget.blur(); // 觸發 blur 以儲存
+      e.currentTarget.blur();
     }
   };
 
@@ -87,10 +88,16 @@ const Sidebar: React.FC<{ user: AdminUser; onLogout: () => void }> = ({ user, on
         </Link>
         
         {canAccessActivities && (
-          <Link to="/admin/activities" className={`flex items-center gap-3 p-3 rounded-lg transition-colors ${location.pathname.startsWith('/admin/activities') ? 'bg-red-600 text-white' : 'hover:bg-gray-800'}`}>
-            <Calendar size={20} />
-            <span>活動管理</span>
-          </Link>
+          <>
+            <Link to="/admin/activities" className={`flex items-center gap-3 p-3 rounded-lg transition-colors ${location.pathname.startsWith('/admin/activities') ? 'bg-red-600 text-white' : 'hover:bg-gray-800'}`}>
+              <Calendar size={20} />
+              <span>活動管理</span>
+            </Link>
+            <Link to="/admin/members" className={`flex items-center gap-3 p-3 rounded-lg transition-colors ${location.pathname.startsWith('/admin/members') ? 'bg-red-600 text-white' : 'hover:bg-gray-800'}`}>
+              <Building2 size={20} />
+              <span>會員管理</span>
+            </Link>
+          </>
         )}
 
         {canAccessUsers && (
@@ -110,15 +117,174 @@ const Sidebar: React.FC<{ user: AdminUser; onLogout: () => void }> = ({ user, on
   );
 };
 
+const MemberManager: React.FC<{ 
+  members: Member[], 
+  onAddMember: (m: Member) => void, 
+  onUpdateMember: (m: Member) => void, 
+  onDeleteMember: (id: string | number) => void 
+}> = ({ members, onAddMember, onUpdateMember, onDeleteMember }) => {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingMember, setEditingMember] = useState<Member | null>(null);
+
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const memberData: Member = {
+      id: editingMember?.id || '',
+      member_no: formData.get('member_no') as string, // 新增會員編號
+      industry_chain: formData.get('industry_chain') as any,
+      industry_category: formData.get('industry_category') as string,
+      name: formData.get('name') as string,
+      company: formData.get('company') as string,
+      website: formData.get('website') as string
+    };
+
+    if (editingMember) onUpdateMember(memberData);
+    else onAddMember(memberData);
+
+    setIsModalOpen(false);
+    setEditingMember(null);
+  };
+
+  const confirmDelete = (member: Member) => {
+    if (window.confirm(`確定要刪除會員「${member.name} (${member.company})」嗎？`)) {
+      onDeleteMember(member.id);
+    }
+  };
+
+  // 排序顯示：依照會員編號
+  const sortedMembers = [...members].sort((a, b) => {
+    if (a.member_no && b.member_no) {
+      return a.member_no.localeCompare(b.member_no);
+    }
+    return 0;
+  });
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">會員資料管理</h1>
+        <button onClick={() => { setEditingMember(null); setIsModalOpen(true); }} className="flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded-lg">
+          <UserPlus size={18} /> 新增會員
+        </button>
+      </div>
+
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+        <table className="w-full text-left">
+          <thead className="bg-gray-50 border-b border-gray-100">
+            <tr className="text-xs font-bold text-gray-400 uppercase tracking-widest">
+              <th className="px-6 py-4">編號</th>
+              <th className="px-6 py-4">產業鏈</th>
+              <th className="px-6 py-4">行業別</th>
+              <th className="px-6 py-4">品牌/公司</th>
+              <th className="px-6 py-4">姓名</th>
+              <th className="px-6 py-4 text-right">操作</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-50">
+            {sortedMembers.map(member => (
+              <tr key={member.id} className="hover:bg-gray-50/50 transition-colors">
+                <td className="px-6 py-4 font-mono text-gray-400 font-bold">{member.member_no}</td>
+                <td className="px-6 py-4">
+                  <span className={`px-2 py-1 rounded text-xs font-bold ${
+                    member.industry_chain === '美食' ? 'bg-orange-100 text-orange-600' :
+                    member.industry_chain === '工程' ? 'bg-blue-100 text-blue-600' :
+                    member.industry_chain === '健康' ? 'bg-green-100 text-green-600' :
+                    member.industry_chain === '幸福' ? 'bg-pink-100 text-pink-600' :
+                    'bg-purple-100 text-purple-600'
+                  }`}>
+                    {member.industry_chain}
+                  </span>
+                </td>
+                <td className="px-6 py-4 text-gray-700 font-medium">{member.industry_category}</td>
+                <td className="px-6 py-4 font-bold text-gray-900">
+                  {member.company}
+                  {member.website && (
+                    <a href={member.website} target="_blank" rel="noopener noreferrer" className="ml-2 inline-block text-gray-400 hover:text-red-600">
+                      <Globe size={14} />
+                    </a>
+                  )}
+                </td>
+                <td className="px-6 py-4 text-gray-700">{member.name}</td>
+                <td className="px-6 py-4 text-right">
+                  <div className="flex justify-end gap-2">
+                    <button onClick={() => { setEditingMember(member); setIsModalOpen(true); }} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"><Edit size={16} /></button>
+                    <button onClick={() => confirmDelete(member)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"><Trash2 size={16} /></button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {members.length === 0 && (
+          <div className="p-10 text-center text-gray-400">目前尚無會員資料</div>
+        )}
+      </div>
+
+      {isModalOpen && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-lg rounded-2xl p-8 shadow-2xl">
+            <h2 className="text-xl font-bold mb-6">{editingMember ? '修改會員資料' : '新增會員'}</h2>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">會員編號</label>
+                  <input name="member_no" required defaultValue={editingMember?.member_no} className="w-full border rounded-lg px-3 py-3 outline-none focus:ring-2 focus:ring-red-500 font-mono" placeholder="001" />
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-sm font-bold text-gray-700 mb-1">產業鏈</label>
+                  <select name="industry_chain" defaultValue={editingMember?.industry_chain || '工商'} className="w-full border rounded-lg px-3 py-3 bg-white outline-none focus:ring-2 focus:ring-red-500">
+                    <option value="美食">美食產業鏈</option>
+                    <option value="工程">工程產業鏈</option>
+                    <option value="健康">健康產業鏈</option>
+                    <option value="幸福">幸福產業鏈</option>
+                    <option value="工商">工商產業鏈</option>
+                  </select>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                   <label className="block text-sm font-bold text-gray-700 mb-1">行業別</label>
+                   <input name="industry_category" required defaultValue={editingMember?.industry_category} className="w-full border rounded-lg px-3 py-3 outline-none focus:ring-2 focus:ring-red-500" placeholder="例如：網站設計" />
+                </div>
+                <div>
+                   <label className="block text-sm font-bold text-gray-700 mb-1">大名</label>
+                   <input name="name" required defaultValue={editingMember?.name} className="w-full border rounded-lg px-3 py-3 outline-none focus:ring-2 focus:ring-red-500" placeholder="姓名" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">品牌 / 公司名稱</label>
+                <input name="company" required defaultValue={editingMember?.company} className="w-full border rounded-lg px-3 py-3 outline-none focus:ring-2 focus:ring-red-500" placeholder="公司名稱" />
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">網站連結 (選填)</label>
+                <input name="website" type="url" defaultValue={editingMember?.website} className="w-full border rounded-lg px-3 py-3 outline-none focus:ring-2 focus:ring-red-500" placeholder="https://..." />
+              </div>
+              
+              <div className="flex gap-4 pt-4">
+                <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 border py-3 rounded-lg font-bold text-gray-500 hover:bg-gray-50 transition-colors">取消</button>
+                <button type="submit" className="flex-1 bg-red-600 text-white py-3 rounded-lg font-bold shadow-lg shadow-red-100 hover:bg-red-700 active:scale-95 transition-all">確認儲存</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ... UserManager, DashboardHome, ActivityManager, CheckInManager components remain mostly the same ...
+// ... I will only include the AdminDashboard component structure to wire up the new route ...
+
 const UserManager: React.FC<{ users: AdminUser[], onAddUser: (u: AdminUser) => void, onDeleteUser: (id: string) => void, currentUser: AdminUser }> = ({ users, onAddUser, onDeleteUser, currentUser }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({ name: '', phone: '', password: '', role: UserRole.STAFF });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // 這裡我們不產生 ID，讓 App.tsx 處理 (傳送給後端時排除 ID，由後端產生 UUID)
     const newUser: AdminUser = {
-      id: '', // 暫時為空，後端產生
+      id: '', 
       ...formData
     };
     onAddUser(newUser);
@@ -264,11 +430,8 @@ const UserManager: React.FC<{ users: AdminUser[], onAddUser: (u: AdminUser) => v
 
 const DashboardHome: React.FC<{ activities: Activity[], registrations: Registration[] }> = ({ activities, registrations }) => {
   const activityStats = activities.map(activity => {
-    // 使用寬鬆比較 String(r.activityId) == String(activity.id)
     const activityRegs = registrations.filter(r => String(r.activityId) === String(activity.id));
-    // 處理可能為 undefined 的 check_in_status
     const checkedIn = activityRegs.filter(r => r.check_in_status === true).length; 
-    // 處理可能為 undefined 的 paid_amount
     const revenue = activityRegs.reduce((sum, r) => sum + (r.paid_amount || 0), 0);
     const rate = activityRegs.length > 0 ? Math.round((checkedIn / activityRegs.length) * 100) : 0;
     
@@ -282,32 +445,22 @@ const DashboardHome: React.FC<{ activities: Activity[], registrations: Registrat
   });
 
   const handleSingleExport = (activity: Activity) => {
-    // 篩選出該活動的報名資料
     const targetRegs = registrations.filter(r => String(r.activityId) === String(activity.id));
-
     if (targetRegs.length === 0) {
       alert(`「${activity.title}」目前尚無報名資料，無法匯出。`);
       return;
     }
-
-    // 準備 CSV 內容 (含 BOM)
     let csvContent = '\uFEFF';
-    
-    // 標題列
     const headers = ['活動名稱', '日期', '姓名', '電話', 'Email', '公司', '職稱', '引薦人', '繳費金額', '報到狀態', '報名時間'];
     csvContent += headers.join(',') + '\n';
-
-    // 資料列
     targetRegs.forEach(reg => {
       const checkIn = reg.check_in_status ? '已報到' : '未報到';
       const paid = reg.paid_amount || 0;
       const regTime = new Date(reg.created_at).toLocaleString('zh-TW');
-
       const escape = (text: string | undefined) => {
         if (!text) return '""';
         return `"${text.replace(/"/g, '""')}"`;
       };
-
       const row = [
         escape(activity.title),
         escape(activity.date),
@@ -321,11 +474,8 @@ const DashboardHome: React.FC<{ activities: Activity[], registrations: Registrat
         escape(checkIn),
         escape(regTime)
       ];
-      
       csvContent += row.join(',') + '\n';
     });
-
-    // 下載
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -397,7 +547,6 @@ const DashboardHome: React.FC<{ activities: Activity[], registrations: Registrat
                     </td>
                     <td className="px-8 py-6 text-right">
                       <div className="flex justify-end items-center gap-2">
-                        {/* 新增個別匯出按鈕 */}
                         <button 
                           onClick={() => handleSingleExport(stat)}
                           className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-green-50 text-green-600 hover:bg-green-600 hover:text-white transition-all shadow-sm"
@@ -431,28 +580,25 @@ const ActivityManager: React.FC<{
   onAddActivity: (a: Activity) => void, 
   onUpdateActivity: (a: Activity) => void, 
   onDeleteActivity: (id: string | number) => void,
-  onUploadImage: (file: File) => Promise<string> // 新增 Prop
+  onUploadImage: (file: File) => Promise<string>
 }> = ({ activities, onAddActivity, onUpdateActivity, onDeleteActivity, onUploadImage }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingActivity, setEditingActivity] = useState<Activity | null>(null);
   
-  // 圖片上傳相關狀態
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string>('');
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // 初始化或重置表單時設定預覽圖
   useEffect(() => {
     if (editingActivity) {
       setPreviewUrl(editingActivity.picture);
     } else {
-      setPreviewUrl('https://images.unsplash.com/photo-1517457373958-b7bdd4587205?q=80&w=2069&auto=format&fit=crop'); // 預設圖
+      setPreviewUrl('https://images.unsplash.com/photo-1517457373958-b7bdd4587205?q=80&w=2069&auto=format&fit=crop');
     }
     setSelectedFile(null);
   }, [editingActivity, isModalOpen]);
 
-  // 處理檔案選擇與預覽
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
@@ -463,17 +609,11 @@ const ActivityManager: React.FC<{
   
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    
-    // 修正：必須在 await 操作之前取得 FormData，因為在 await 之後 event.currentTarget 會被 React/瀏覽器設為 null
     const formData = new FormData(e.currentTarget);
-    
     setIsUploading(true);
 
     try {
-      // 預設為目前的預覽網址 (支援直接貼上 URL 的情況)
       let finalPictureUrl = previewUrl; 
-
-      // 如果有選擇新圖片檔案，則進行上傳 (或轉 Base64)
       if (selectedFile) {
         finalPictureUrl = await onUploadImage(selectedFile);
       }
@@ -486,7 +626,7 @@ const ActivityManager: React.FC<{
         time: formData.get('time') as string,
         location: formData.get('location') as string,
         price: Number(formData.get('price')),
-        picture: finalPictureUrl, // 使用處理後的圖片網址
+        picture: finalPictureUrl, 
         description: formData.get('description') as string,
         status: 'active'
       };
@@ -587,8 +727,6 @@ const ActivityManager: React.FC<{
                   <input name="location" required defaultValue={editingActivity?.location} className="w-full border rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-red-500" placeholder="活動地點" />
                 </div>
               </div>
-
-              {/* 圖片上傳區塊 */}
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-1 flex items-center gap-1">
                   <ImageIcon size={14} className="text-red-600" /> 封面圖片 (上傳或輸入網址)
@@ -624,7 +762,7 @@ const ActivityManager: React.FC<{
                     value={previewUrl}
                     onChange={(e) => {
                       setPreviewUrl(e.target.value);
-                      setSelectedFile(null); // 手動輸入網址時，清除已選檔案
+                      setSelectedFile(null); 
                     }}
                     placeholder="或在此直接貼上圖片網址..."
                     className="w-full text-xs text-gray-500 border border-gray-200 rounded px-2 py-1.5 bg-gray-50 focus:bg-white outline-none focus:ring-1 focus:ring-red-500"
@@ -659,7 +797,6 @@ const CheckInManager: React.FC<{ activities: Activity[], registrations: Registra
   const [selectedActivity, setSelectedActivity] = useState('all');
   const filteredRegistrations = registrations.filter(r => {
     const matchesSearch = r.name.toLowerCase().includes(searchTerm.toLowerCase()) || r.phone.includes(searchTerm);
-    // 使用 String 轉換比較，因為來自資料庫的 ID 可能是數字或字串
     const matchesActivity = selectedActivity === 'all' || String(r.activityId) === String(selectedActivity);
     return matchesSearch && matchesActivity;
   });
@@ -675,16 +812,10 @@ const CheckInManager: React.FC<{ activities: Activity[], registrations: Registra
       alert('目前列表無資料可匯出');
       return;
     }
-
-    // 準備 CSV 內容
-    // 加入 BOM \uFEFF 讓 Excel 能正確識別中文編碼
     let csvContent = '\uFEFF';
-    
-    // 標題列
     const headers = ['活動名稱', '日期', '姓名', '電話', 'Email', '公司', '職稱', '引薦人', '繳費金額', '報到狀態', '報名時間'];
     csvContent += headers.join(',') + '\n';
 
-    // 資料列
     filteredRegistrations.forEach(reg => {
       const activity = activities.find(a => String(a.id) === String(reg.activityId));
       const actTitle = activity ? activity.title : '未知活動';
@@ -693,7 +824,6 @@ const CheckInManager: React.FC<{ activities: Activity[], registrations: Registra
       const paid = reg.paid_amount || 0;
       const regTime = new Date(reg.created_at).toLocaleString('zh-TW');
 
-      // 處理欄位內的逗號與引號，避免 CSV 格式跑版
       const escape = (text: string | undefined) => {
         if (!text) return '""';
         return `"${text.replace(/"/g, '""')}"`;
@@ -712,16 +842,13 @@ const CheckInManager: React.FC<{ activities: Activity[], registrations: Registra
         escape(checkIn),
         escape(regTime)
       ];
-      
       csvContent += row.join(',') + '\n';
     });
 
-    // 產生下載連結
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     
-    // 設定檔名
     let filename = '活動報名名單.csv';
     if (selectedActivity !== 'all') {
       const act = activities.find(a => String(a.id) === String(selectedActivity));
@@ -758,7 +885,6 @@ const CheckInManager: React.FC<{ activities: Activity[], registrations: Registra
           <thead className="border-b text-sm font-bold text-gray-400 uppercase">
             <tr>
               <th className="pb-4">姓名 / 公司</th>
-              {/* 新增引薦人欄位 */}
               <th className="pb-4">引薦人</th>
               <th className="pb-4">繳費</th>
               <th className="pb-4">狀態</th>
@@ -772,19 +898,16 @@ const CheckInManager: React.FC<{ activities: Activity[], registrations: Registra
                   <div className="font-bold">{reg.name}</div>
                   <div className="text-xs text-gray-400">{reg.company}</div>
                 </td>
-                {/* 顯示引薦人，若無則顯示橫線 */}
                 <td className="py-4 text-sm text-gray-500">
                   {reg.referrer || '-'}
                 </td>
                 <td className="py-4">
-                  {/* 使用新的 PaidAmountInput 元件取代原生的 input */}
                   <PaidAmountInput 
                     value={reg.paid_amount || 0} 
                     onSave={(val) => onUpdateRegistration({...reg, paid_amount: val})} 
                   />
                 </td>
                 <td className="py-4">
-                  {/* 處理 undefined check_in_status */}
                   <button onClick={() => onUpdateRegistration({...reg, check_in_status: !reg.check_in_status})} className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${reg.check_in_status ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}>
                     {reg.check_in_status ? '已報到' : '未報到'}
                   </button>
@@ -813,7 +936,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
         <Routes>
           <Route path="/" element={<DashboardHome activities={props.activities} registrations={props.registrations} />} />
           <Route path="/check-in" element={<CheckInManager activities={props.activities} registrations={props.registrations} onUpdateRegistration={props.onUpdateRegistration} onDeleteRegistration={props.onDeleteRegistration} />} />
-          {canAccessActivities && <Route path="/activities" element={<ActivityManager activities={props.activities} onAddActivity={props.onAddActivity} onUpdateActivity={props.onUpdateActivity} onDeleteActivity={props.onDeleteActivity} onUploadImage={props.onUploadImage} />} />}
+          {canAccessActivities && (
+            <>
+              <Route path="/activities" element={<ActivityManager activities={props.activities} onAddActivity={props.onAddActivity} onUpdateActivity={props.onUpdateActivity} onDeleteActivity={props.onDeleteActivity} onUploadImage={props.onUploadImage} />} />
+              <Route path="/members" element={<MemberManager members={props.members} onAddMember={props.onAddMember} onUpdateMember={props.onUpdateMember} onDeleteMember={props.onDeleteMember} />} />
+            </>
+          )}
           {canAccessUsers && <Route path="/users" element={<UserManager users={props.users} onAddUser={props.onAddUser} onDeleteUser={props.onDeleteUser} currentUser={props.currentUser} />} />}
           <Route path="*" element={<Navigate to="/admin" replace />} />
         </Routes>

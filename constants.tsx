@@ -1,5 +1,5 @@
 
-import { Activity, ActivityType, AdminUser, UserRole } from './types';
+import { Activity, ActivityType, AdminUser, UserRole, Member } from './types';
 
 export const INITIAL_ACTIVITIES: Activity[] = [
   {
@@ -23,5 +23,26 @@ export const INITIAL_ADMINS: AdminUser[] = [
     phone: '0925981577',
     password: '981577',
     role: UserRole.SUPER_ADMIN
+  }
+];
+
+export const INITIAL_MEMBERS: Member[] = [
+  {
+    id: 'm1',
+    member_no: '001',
+    industry_chain: '工商',
+    industry_category: '網站設計',
+    name: '王小明',
+    company: '長展科技',
+    website: 'https://example.com'
+  },
+  {
+    id: 'm2',
+    member_no: '002',
+    industry_chain: '幸福',
+    industry_category: '婚禮顧問',
+    name: '陳美麗',
+    company: '幸福婚顧',
+    website: ''
   }
 ];
