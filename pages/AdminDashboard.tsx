@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Routes, Route, Link, useNavigate, useLocation, Navigate } from 'react-router-dom';
-import { LayoutDashboard, Calendar, Users, LogOut, ChevronRight, Search, FileDown, Plus, Edit, Trash2, CheckCircle, XCircle, Shield, UserPlus, DollarSign, TrendingUp, BarChart3, Mail, User, Clock, Image as ImageIcon, UploadCloud, Loader2, Smartphone, Building2, Briefcase, Globe, FileUp, Download, ClipboardList, CheckSquare, AlertCircle, RotateCcw, MapPin } from 'lucide-react';
+import { LayoutDashboard, Calendar, Users, LogOut, ChevronRight, Search, FileDown, Plus, Edit, Trash2, CheckCircle, XCircle, Shield, UserPlus, DollarSign, TrendingUp, BarChart3, Mail, User, Clock, Image as ImageIcon, UploadCloud, Loader2, Smartphone, Building2, Briefcase, Globe, FileUp, Download, ClipboardList, CheckSquare, AlertCircle, RotateCcw, MapPin, Filter, X, Eye, EyeOff } from 'lucide-react';
 import { Activity, Registration, ActivityType, AdminUser, UserRole, Member, AttendanceRecord, AttendanceStatus } from '../types';
 
 interface AdminDashboardProps {
@@ -128,8 +128,22 @@ const Sidebar: React.FC<{ user: AdminUser; onLogout: () => void }> = ({ user, on
 };
 
 const DashboardHome: React.FC<{ activities: Activity[]; registrations: Registration[] }> = ({ activities, registrations }) => {
-  // 計算活動統計資料
-  const activityStats = activities.map(activity => {
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+
+  // 根據日期篩選活動
+  const filteredActivities = activities.filter(activity => {
+    if (startDate && activity.date < startDate) return false;
+    if (endDate && activity.date > endDate) return false;
+    return true;
+  });
+
+  // 根據篩選後的活動，找出相關的報名資料
+  const filteredActivityIds = new Set(filteredActivities.map(a => String(a.id)));
+  const filteredRegistrations = registrations.filter(r => filteredActivityIds.has(String(r.activityId)));
+
+  // 計算活動統計資料 (基於篩選後的數據)
+  const activityStats = filteredActivities.map(activity => {
     const activityRegs = registrations.filter(r => String(r.activityId) === String(activity.id));
     const checkedIn = activityRegs.filter(r => r.check_in_status === true).length; 
     const revenue = activityRegs.reduce((sum, r) => sum + (r.paid_amount || 0), 0);
@@ -144,9 +158,9 @@ const DashboardHome: React.FC<{ activities: Activity[]; registrations: Registrat
     };
   });
 
-  const activeActivities = activities.filter(a => !a.status || a.status === 'active');
-  const totalRevenue = registrations.reduce((sum, reg) => sum + (reg.paid_amount || 0), 0);
-  const checkedInCount = registrations.filter(r => r.check_in_status).length;
+  const activeActivitiesCount = filteredActivities.filter(a => !a.status || a.status === 'active').length;
+  const totalRevenue = filteredRegistrations.reduce((sum, reg) => sum + (reg.paid_amount || 0), 0);
+  const checkedInCount = filteredRegistrations.filter(r => r.check_in_status).length;
 
   const handleSingleExport = (activity: Activity) => {
     const targetRegs = registrations.filter(r => String(r.activityId) === String(activity.id));
@@ -190,12 +204,47 @@ const DashboardHome: React.FC<{ activities: Activity[]; registrations: Registrat
     document.body.removeChild(link);
   };
 
+  const clearFilter = () => {
+    setStartDate('');
+    setEndDate('');
+  };
+
   return (
     <div className="space-y-8 pb-12">
-      <header className="flex justify-between items-end">
+      <header className="flex flex-col md:flex-row md:justify-between md:items-end gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">活動數據儀表板</h1>
           <p className="text-gray-500">掌握各場活動的報名與收益狀況。</p>
+        </div>
+        
+        {/* 日期篩選器 */}
+        <div className="flex flex-wrap items-center gap-2 bg-white p-2 rounded-xl border border-gray-100 shadow-sm">
+          <div className="flex items-center gap-2 px-2">
+            <Filter size={16} className="text-gray-400" />
+            <span className="text-sm font-bold text-gray-500">日期區間</span>
+          </div>
+          <input 
+            type="date" 
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+            className="border border-gray-200 rounded-lg px-2 py-1.5 text-sm outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500"
+          />
+          <span className="text-gray-400 text-xs">至</span>
+          <input 
+            type="date" 
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+            className="border border-gray-200 rounded-lg px-2 py-1.5 text-sm outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500"
+          />
+          {(startDate || endDate) && (
+            <button 
+              onClick={clearFilter}
+              className="p-1.5 hover:bg-gray-100 rounded-full text-gray-400 hover:text-red-500 transition-colors"
+              title="清除篩選"
+            >
+              <X size={16} />
+            </button>
+          )}
         </div>
       </header>
 
@@ -205,7 +254,7 @@ const DashboardHome: React.FC<{ activities: Activity[]; registrations: Registrat
           <div className="flex justify-between items-start">
             <div>
               <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">總活動場次</p>
-              <h3 className="text-3xl font-bold text-gray-900 mt-2">{activeActivities.length}</h3>
+              <h3 className="text-3xl font-bold text-gray-900 mt-2">{activeActivitiesCount}</h3>
             </div>
             <div className="p-3 bg-red-50 text-red-600 rounded-xl"><Calendar size={24} /></div>
           </div>
@@ -214,7 +263,7 @@ const DashboardHome: React.FC<{ activities: Activity[]; registrations: Registrat
           <div className="flex justify-between items-start">
             <div>
               <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">總報名人數</p>
-              <h3 className="text-3xl font-bold text-gray-900 mt-2">{registrations.length}</h3>
+              <h3 className="text-3xl font-bold text-gray-900 mt-2">{filteredRegistrations.length}</h3>
             </div>
             <div className="p-3 bg-blue-50 text-blue-600 rounded-xl"><Users size={24} /></div>
           </div>
@@ -256,56 +305,64 @@ const DashboardHome: React.FC<{ activities: Activity[]; registrations: Registrat
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {activityStats.map(stat => (
-                  <tr key={stat.id} className="hover:bg-red-50/30 transition-colors group">
-                    <td className="px-8 py-6">
-                      <div className="font-bold text-gray-900 text-lg">{stat.title}</div>
-                      <div className="flex items-center gap-2 text-xs text-gray-400 mt-1 font-medium">
-                        <Calendar size={12} className="text-red-600" />
-                        {stat.date}
-                        <Clock size={12} className="text-red-600 ml-2" />
-                        {stat.time}
-                        <span className="mx-1">•</span>
-                        <span className="px-2 py-0.5 rounded bg-gray-100 text-gray-500">{stat.type}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-6">
-                      <div className="text-2xl font-bold text-gray-800">{stat.regCount}</div>
-                    </td>
-                    <td className="px-6 py-6">
-                      <div className="text-xl font-bold text-red-600">NT$ {stat.revenue.toLocaleString()}</div>
-                    </td>
-                    <td className="px-6 py-6">
-                      <div className="text-lg font-bold text-gray-700">
-                        {stat.checkedInCount} <span className="text-gray-300 font-normal">/</span> {stat.regCount}
-                      </div>
-                    </td>
-                    <td className="px-6 py-6">
-                      <div className={`text-xl font-black ${stat.checkInRate > 80 ? 'text-green-600' : stat.checkInRate > 0 ? 'text-red-600' : 'text-gray-300'}`}>
-                        {stat.checkInRate}%
-                      </div>
-                    </td>
-                    <td className="px-8 py-6 text-right">
-                      <div className="flex justify-end items-center gap-2">
-                        <button 
-                          onClick={() => handleSingleExport(stat)}
-                          className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-green-50 text-green-600 hover:bg-green-600 hover:text-white transition-all shadow-sm"
-                          title="匯出此活動報名表"
-                        >
-                          <FileDown size={20} />
-                        </button>
-                        <Link 
-                          to="/admin/check-in" 
-                          state={{ activityId: stat.id }}
-                          className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-gray-100 text-gray-400 hover:bg-red-600 hover:text-white transition-all shadow-sm"
-                          title="進入報到管理"
-                        >
-                          <ChevronRight size={20} />
-                        </Link>
-                      </div>
+                {activityStats.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-8 py-12 text-center text-gray-400">
+                      在此日期區間內無活動資料
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  activityStats.map(stat => (
+                    <tr key={stat.id} className="hover:bg-red-50/30 transition-colors group">
+                      <td className="px-8 py-6">
+                        <div className="font-bold text-gray-900 text-lg">{stat.title}</div>
+                        <div className="flex items-center gap-2 text-xs text-gray-400 mt-1 font-medium">
+                          <Calendar size={12} className="text-red-600" />
+                          {stat.date}
+                          <Clock size={12} className="text-red-600 ml-2" />
+                          {stat.time}
+                          <span className="mx-1">•</span>
+                          <span className="px-2 py-0.5 rounded bg-gray-100 text-gray-500">{stat.type}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-6">
+                        <div className="text-2xl font-bold text-gray-800">{stat.regCount}</div>
+                      </td>
+                      <td className="px-6 py-6">
+                        <div className="text-xl font-bold text-red-600">NT$ {stat.revenue.toLocaleString()}</div>
+                      </td>
+                      <td className="px-6 py-6">
+                        <div className="text-lg font-bold text-gray-700">
+                          {stat.checkedInCount} <span className="text-gray-300 font-normal">/</span> {stat.regCount}
+                        </div>
+                      </td>
+                      <td className="px-6 py-6">
+                        <div className={`text-xl font-black ${stat.checkInRate > 80 ? 'text-green-600' : stat.checkInRate > 0 ? 'text-red-600' : 'text-gray-300'}`}>
+                          {stat.checkInRate}%
+                        </div>
+                      </td>
+                      <td className="px-8 py-6 text-right">
+                        <div className="flex justify-end items-center gap-2">
+                          <button 
+                            onClick={() => handleSingleExport(stat)}
+                            className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-green-50 text-green-600 hover:bg-green-600 hover:text-white transition-all shadow-sm"
+                            title="匯出此活動報名表"
+                          >
+                            <FileDown size={20} />
+                          </button>
+                          <Link 
+                            to="/admin/check-in" 
+                            state={{ activityId: stat.id }}
+                            className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-gray-100 text-gray-400 hover:bg-red-600 hover:text-white transition-all shadow-sm"
+                            title="進入報到管理"
+                          >
+                            <ChevronRight size={20} />
+                          </Link>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -804,8 +861,11 @@ const MemberAttendanceManager: React.FC<{
     }
   }, [defaultActivityId]);
 
+  // 僅篩選活躍會員進行點名 (status === 'active' 或 undefined)
+  const activeMembers = members.filter(m => m.status === undefined || m.status === 'active');
+
   // 排序會員
-  const sortedMembers = [...members].sort((a, b) => {
+  const sortedMembers = [...activeMembers].sort((a, b) => {
     const valA = a.member_no !== undefined && a.member_no !== null ? String(a.member_no) : '';
     const valB = b.member_no !== undefined && b.member_no !== null ? String(b.member_no) : '';
     if (!valA && !valB) return 0;
@@ -820,19 +880,20 @@ const MemberAttendanceManager: React.FC<{
     (m.member_no && String(m.member_no).includes(searchTerm))
   );
 
-  // 計算統計數據
+  // 計算統計數據 (只統計當前列表中的活躍會員)
   const stats = React.useMemo(() => {
     const records = attendance.filter(r => String(r.activity_id) === String(selectedActivityId));
+    // 注意：這裡的統計分母應該是「應出席人數」即活躍會員總數
     return {
-      total: members.length,
-      marked: records.length,
-      present: records.filter(r => r.status === AttendanceStatus.PRESENT).length,
-      absent: records.filter(r => r.status === AttendanceStatus.ABSENT).length,
-      late: records.filter(r => r.status === AttendanceStatus.LATE).length,
-      medical: records.filter(r => r.status === AttendanceStatus.MEDICAL).length,
-      substitute: records.filter(r => r.status === AttendanceStatus.SUBSTITUTE).length,
+      total: activeMembers.length,
+      marked: records.filter(r => activeMembers.some(m => String(m.id) === String(r.member_id))).length, // 僅計算活躍會員的紀錄
+      present: records.filter(r => r.status === AttendanceStatus.PRESENT && activeMembers.some(m => String(m.id) === String(r.member_id))).length,
+      absent: records.filter(r => r.status === AttendanceStatus.ABSENT && activeMembers.some(m => String(m.id) === String(r.member_id))).length,
+      late: records.filter(r => r.status === AttendanceStatus.LATE && activeMembers.some(m => String(m.id) === String(r.member_id))).length,
+      medical: records.filter(r => r.status === AttendanceStatus.MEDICAL && activeMembers.some(m => String(m.id) === String(r.member_id))).length,
+      substitute: records.filter(r => r.status === AttendanceStatus.SUBSTITUTE && activeMembers.some(m => String(m.id) === String(r.member_id))).length,
     };
-  }, [attendance, selectedActivityId, members.length]);
+  }, [attendance, selectedActivityId, activeMembers]);
 
   const getMemberRecord = (memberId: string | number) => {
     return attendance.find(r => String(r.activity_id) === String(selectedActivityId) && String(r.member_id) === String(memberId));
@@ -844,13 +905,14 @@ const MemberAttendanceManager: React.FC<{
     return date.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', hour12: false });
   };
 
-  // 分類名單
+  // 分類名單 (僅包含活躍會員)
   const listByStatus = (status: AttendanceStatus) => {
     const records = attendance.filter(r => String(r.activity_id) === String(selectedActivityId) && r.status === status);
     return records.map(r => {
-      const member = members.find(m => String(m.id) === String(r.member_id));
+      const member = activeMembers.find(m => String(m.id) === String(r.member_id));
+      if (!member) return null;
       return { ...member, updated_at: r.updated_at };
-    }).filter(item => item.id); // 過濾掉找不到會員的資料 (理論上不該發生)
+    }).filter(item => item !== null) as any[]; 
   };
 
   const lateList = listByStatus(AttendanceStatus.LATE);
@@ -1104,7 +1166,10 @@ const MemberManager: React.FC<{
       name: formData.get('name') as string,
       company: formData.get('company') as string,
       website: formData.get('website') as string,
-      intro: formData.get('intro') as string
+      intro: formData.get('intro') as string,
+      status: formData.get('status') as 'active' | 'inactive',
+      join_date: formData.get('join_date') as string,
+      quit_date: formData.get('quit_date') as string
     };
 
     if (editingMember) onUpdateMember(memberData);
@@ -1115,13 +1180,13 @@ const MemberManager: React.FC<{
   };
 
   const confirmDelete = (member: Member) => {
-    if (window.confirm(`確定要刪除會員「${member.name} (${member.company})」嗎？`)) {
+    if (window.confirm(`確定要刪除會員「${member.name} (${member.company})」嗎？\n注意：這會永久刪除會員資料。若只是要停止會籍，建議使用「編輯」並將狀態改為「停權/離會」。`)) {
       onDeleteMember(member.id);
     }
   };
 
   const handleDownloadTemplate = () => {
-    const csvContent = '\uFEFF會員編號,產業鏈(美食/工程/健康/幸福/工商),行業別,姓名,公司名稱,會員簡介,網站連結\n001,工商,網站設計,王小明,長展科技,專注於高質感網站設計...,https://example.com';
+    const csvContent = '\uFEFF會員編號,產業鏈(美食/工程/健康/幸福/工商),行業別,姓名,公司名稱,會員簡介,網站連結,狀態(active/inactive),入會日,離會日\n001,工商,網站設計,王小明,長展科技,專注於高質感網站設計...,https://example.com,active,2024-01-01,';
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -1179,7 +1244,10 @@ const MemberManager: React.FC<{
             name: cleanVal(cols[3]),
             company: cleanVal(cols[4]),
             intro: cleanVal(cols[5]),
-            website: cleanVal(cols[6])
+            website: cleanVal(cols[6]),
+            status: cols[7] === 'inactive' ? 'inactive' : 'active',
+            join_date: cleanVal(cols[8]),
+            quit_date: cleanVal(cols[9])
           });
         }
 
@@ -1257,7 +1325,7 @@ const MemberManager: React.FC<{
             <tr className="text-xs font-bold text-gray-400 uppercase tracking-widest">
               <th className="px-6 py-4">編號</th>
               <th className="px-6 py-4">產業鏈</th>
-              <th className="px-6 py-4">行業別</th>
+              <th className="px-6 py-4">狀態</th>
               <th className="px-6 py-4">品牌/公司</th>
               <th className="px-6 py-4">姓名</th>
               <th className="px-6 py-4 text-right">操作</th>
@@ -1265,7 +1333,7 @@ const MemberManager: React.FC<{
           </thead>
           <tbody className="divide-y divide-gray-50">
             {sortedMembers.map(member => (
-              <tr key={member.id} className="hover:bg-gray-50/50 transition-colors">
+              <tr key={member.id} className={`hover:bg-gray-50/50 transition-colors ${member.status === 'inactive' ? 'opacity-60 bg-gray-50' : ''}`}>
                 <td className="px-6 py-4 font-mono text-gray-400 font-bold">{member.member_no}</td>
                 <td className="px-6 py-4">
                   <span className={`px-2 py-1 rounded text-xs font-bold ${
@@ -1278,7 +1346,14 @@ const MemberManager: React.FC<{
                     {member.industry_chain}
                   </span>
                 </td>
-                <td className="px-6 py-4 text-gray-700 font-medium">{member.industry_category}</td>
+                <td className="px-6 py-4">
+                  <span className={`flex w-fit items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                    member.status === 'inactive' ? 'bg-gray-200 text-gray-600' : 'bg-green-100 text-green-600'
+                  }`}>
+                    {member.status === 'inactive' ? <EyeOff size={12}/> : <Eye size={12}/>}
+                    {member.status === 'inactive' ? '停權/離會' : '活躍'}
+                  </span>
+                </td>
                 <td className="px-6 py-4 font-bold text-gray-900">
                   {member.company || <span className="text-gray-300 font-normal">-</span>}
                   {member.website && (
@@ -1305,9 +1380,38 @@ const MemberManager: React.FC<{
 
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-lg rounded-2xl p-8 shadow-2xl max-h-[90vh] overflow-y-auto">
+          <div className="bg-white w-full max-w-2xl rounded-2xl p-8 shadow-2xl max-h-[90vh] overflow-y-auto">
             <h2 className="text-xl font-bold mb-6">{editingMember ? '修改會員資料' : '新增會員'}</h2>
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <div className="bg-gray-50 p-4 rounded-xl space-y-4 border border-gray-100">
+                <div className="flex items-center gap-2 mb-2">
+                  <Shield size={16} className="text-red-600"/>
+                  <h3 className="font-bold text-gray-700">會籍管理</h3>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                   <div>
+                      <label className="block text-sm font-bold text-gray-700 mb-1">目前狀態</label>
+                      <select 
+                        name="status" 
+                        defaultValue={editingMember?.status || 'active'} 
+                        className="w-full border rounded-lg px-3 py-2 bg-white outline-none focus:ring-2 focus:ring-red-500 font-medium"
+                      >
+                        <option value="active">活躍 (Active)</option>
+                        <option value="inactive">停權/離會 (Inactive)</option>
+                      </select>
+                   </div>
+                   <div>
+                      <label className="block text-sm font-bold text-gray-700 mb-1">入會日期</label>
+                      <input name="join_date" type="date" defaultValue={editingMember?.join_date} className="w-full border rounded-lg px-3 py-2 bg-white outline-none focus:ring-2 focus:ring-red-500" />
+                   </div>
+                   <div>
+                      <label className="block text-sm font-bold text-gray-700 mb-1">離會日期</label>
+                      <input name="quit_date" type="date" defaultValue={editingMember?.quit_date} className="w-full border rounded-lg px-3 py-2 bg-white outline-none focus:ring-2 focus:ring-red-500" />
+                   </div>
+                </div>
+                <p className="text-xs text-gray-500 mt-2">※ 設定為「停權/離會」後，該會員將不會出現在前台列表與點名表中，但資料會保留。</p>
+              </div>
+
               <div className="grid grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-1">會員編號</label>

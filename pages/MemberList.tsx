@@ -11,8 +11,11 @@ const MemberList: React.FC<MemberListProps> = ({ members }) => {
   const [filter, setFilter] = useState<string>('all');
   const chains = ['美食', '工程', '健康', '幸福', '工商'];
 
+  // 僅顯示活躍會員
+  const activeMembers = members.filter(m => m.status === undefined || m.status === 'active');
+
   // 排序：依照會員編號 (若有) 或 ID
-  const sortedMembers = [...members].sort((a, b) => {
+  const sortedMembers = [...activeMembers].sort((a, b) => {
     const valA = a.member_no !== undefined && a.member_no !== null ? String(a.member_no) : '';
     const valB = b.member_no !== undefined && b.member_no !== null ? String(b.member_no) : '';
     

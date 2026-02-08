@@ -66,6 +66,11 @@ export interface Member {
   company: string; // 品牌/公司名稱
   website?: string; // 網站
   intro?: string; // 新增：會員簡介
+  
+  // 新增：會籍管理
+  status?: 'active' | 'inactive'; // active=活躍(顯示), inactive=停權/離會(隱藏)
+  join_date?: string; // 入會日期
+  quit_date?: string; // 離會日期
 }
 
 // 新增：出席紀錄介面
