@@ -10,6 +10,15 @@ export enum UserRole {
   SUPER_ADMIN = '總管理員'
 }
 
+// 新增：出席狀態
+export enum AttendanceStatus {
+  PRESENT = 'present',       // 出席
+  ABSENT = 'absent',         // 缺席
+  LATE = 'late',             // 遲到
+  MEDICAL = 'medical',       // 病假
+  SUBSTITUTE = 'substitute'  // 代理
+}
+
 export interface Activity {
   id: string | number;
   type: ActivityType;
@@ -57,4 +66,13 @@ export interface Member {
   company: string; // 品牌/公司名稱
   website?: string; // 網站
   intro?: string; // 新增：會員簡介
+}
+
+// 新增：出席紀錄介面
+export interface AttendanceRecord {
+  id?: string | number;
+  activity_id: string;
+  member_id: string;
+  status: AttendanceStatus;
+  updated_at?: string;
 }

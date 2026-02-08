@@ -8,7 +8,7 @@ import ActivityDetail from './pages/ActivityDetail';
 import AdminDashboard from './pages/AdminDashboard';
 import LoginPage from './pages/LoginPage';
 import MemberList from './pages/MemberList'; // 新增 import
-import { Activity, Registration, AdminUser, Member } from './types';
+import { Activity, Registration, AdminUser, Member, AttendanceRecord, AttendanceStatus } from './types';
 import { INITIAL_ACTIVITIES, INITIAL_ADMINS, INITIAL_MEMBERS } from './constants'; // 新增 import
 
 const getEnv = (key: string): string | undefined => {
@@ -85,6 +85,7 @@ const App: React.FC = () => {
   const [registrations, setRegistrations] = useState<Registration[]>([]);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [members, setMembers] = useState<Member[]>([]); // 新增 members state
+  const [attendance, setAttendance] = useState<AttendanceRecord[]>([]); // 新增 attendance state
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<AdminUser | null>(() => {
     const saved = sessionStorage.getItem('current_user');
@@ -141,6 +142,12 @@ const App: React.FC = () => {
         const initMembers = INITIAL_MEMBERS.map(({ id, ...rest }) => rest);
         const { data: inserted } = await supabase.from('members').insert(initMembers).select();
         if (inserted) setMembers(inserted);
+      }
+
+      // 獲取出席紀錄 (新增)
+      const { data: attendanceData } = await supabase.from('attendance').select('*');
+      if (attendanceData) {
+        setAttendance(attendanceData as AttendanceRecord[]);
       }
 
     } catch (err) {
@@ -336,6 +343,49 @@ const App: React.FC = () => {
     else fetchData();
   };
 
+  // 新增：處理出席紀錄更新 (Upsert)
+  const handleUpdateAttendance = async (activityId: string, memberId: string, status: AttendanceStatus) => {
+    // 樂觀更新 (Optimistic Update): 先更新前端狀態，讓 UI 立即反應
+    const now = new Date().toISOString();
+    const tempId = `temp-${Date.now()}`;
+    
+    // 更新本地 state
+    setAttendance(prev => {
+      const existingIndex = prev.findIndex(r => String(r.activity_id) === String(activityId) && String(r.member_id) === String(memberId));
+      if (existingIndex >= 0) {
+        const newArr = [...prev];
+        newArr[existingIndex] = { ...newArr[existingIndex], status, updated_at: now };
+        return newArr;
+      } else {
+        return [...prev, { id: tempId, activity_id: activityId, member_id: memberId, status, updated_at: now }];
+      }
+    });
+
+    try {
+      // 使用 upsert 寫入 Supabase (依賴 activity_id, member_id 的 unique constraint)
+      const { data, error } = await supabase
+        .from('attendance')
+        .upsert(
+          { activity_id: String(activityId), member_id: String(memberId), status, updated_at: now },
+          { onConflict: 'activity_id,member_id' }
+        )
+        .select();
+
+      if (error) {
+        console.error('Attendance update failed:', error);
+        // 如果失敗，應該要回復狀態 (這裡簡化處理：重新 fetch)
+        fetchData(); 
+      } else if (data && data[0]) {
+        // 更新成功後，用真正的 ID 替換掉 temp ID (如果需要)
+        // 這裡我們直接重新 fetch 來確保資料一致性，或也可以只更新那一筆
+        // 為了效能，可以只更新那一筆的 ID，但簡單起見，這裡不操作，等待下一次 fetch
+      }
+    } catch (err) {
+      console.error('API error:', err);
+      fetchData();
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white">
@@ -366,6 +416,7 @@ const App: React.FC = () => {
                   registrations={registrations}
                   users={users}
                   members={members} // 傳遞 members
+                  attendance={attendance} // 傳遞出席紀錄
                   onUpdateActivity={handleUpdateActivity}
                   onAddActivity={handleAddActivity}
                   onDeleteActivity={handleDeleteActivity}
@@ -377,6 +428,7 @@ const App: React.FC = () => {
                   onAddMembers={handleAddMembers} // 新增：傳遞批次匯入
                   onUpdateMember={handleUpdateMember} // 傳遞會員操作
                   onDeleteMember={handleDeleteMember} // 傳遞會員操作
+                  onUpdateAttendance={handleUpdateAttendance} // 傳遞出席更新函數
                   onUploadImage={handleUploadImage} 
                 />
               ) : (

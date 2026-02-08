@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Routes, Route, Link, useNavigate, useLocation, Navigate } from 'react-router-dom';
-import { LayoutDashboard, Calendar, Users, LogOut, ChevronRight, Search, FileDown, Plus, Edit, Trash2, CheckCircle, XCircle, Shield, UserPlus, DollarSign, TrendingUp, BarChart3, Mail, User, Clock, Image as ImageIcon, UploadCloud, Loader2, Smartphone, Building2, Briefcase, Globe, FileUp, Download } from 'lucide-react';
-import { Activity, Registration, ActivityType, AdminUser, UserRole, Member } from '../types';
+import { LayoutDashboard, Calendar, Users, LogOut, ChevronRight, Search, FileDown, Plus, Edit, Trash2, CheckCircle, XCircle, Shield, UserPlus, DollarSign, TrendingUp, BarChart3, Mail, User, Clock, Image as ImageIcon, UploadCloud, Loader2, Smartphone, Building2, Briefcase, Globe, FileUp, Download, ClipboardList, CheckSquare } from 'lucide-react';
+import { Activity, Registration, ActivityType, AdminUser, UserRole, Member, AttendanceRecord, AttendanceStatus } from '../types';
 
 interface AdminDashboardProps {
   currentUser: AdminUser;
@@ -11,6 +11,7 @@ interface AdminDashboardProps {
   registrations: Registration[];
   users: AdminUser[];
   members: Member[];
+  attendance: AttendanceRecord[]; // 新增 prop
   onUpdateActivity: (act: Activity) => void;
   onAddActivity: (act: Activity) => void;
   onDeleteActivity: (id: string | number) => void;
@@ -19,9 +20,10 @@ interface AdminDashboardProps {
   onAddUser: (user: AdminUser) => void;
   onDeleteUser: (id: string) => void;
   onAddMember: (member: Member) => void;
-  onAddMembers?: (members: Member[]) => void; // 新增：批次匯入 Prop
+  onAddMembers?: (members: Member[]) => void;
   onUpdateMember: (member: Member) => void;
   onDeleteMember: (id: string | number) => void;
+  onUpdateAttendance: (activityId: string, memberId: string, status: AttendanceStatus) => void; // 新增 prop
   onUploadImage: (file: File) => Promise<string>;
 }
 
@@ -85,7 +87,13 @@ const Sidebar: React.FC<{ user: AdminUser; onLogout: () => void }> = ({ user, on
         </Link>
         <Link to="/admin/check-in" className={`flex items-center gap-3 p-3 rounded-lg transition-colors ${location.pathname.startsWith('/admin/check-in') ? 'bg-red-600 text-white' : 'hover:bg-gray-800'}`}>
           <Users size={20} />
-          <span>報到管理</span>
+          <span>報到管理 (訪客)</span>
+        </Link>
+        
+        {/* 新增：會員報到，所有後台權限皆可看 */}
+        <Link to="/admin/attendance" className={`flex items-center gap-3 p-3 rounded-lg transition-colors ${location.pathname.startsWith('/admin/attendance') ? 'bg-red-600 text-white' : 'hover:bg-gray-800'}`}>
+          <ClipboardList size={20} />
+          <span>會員報到 (例會)</span>
         </Link>
         
         {canAccessActivities && (
@@ -117,6 +125,193 @@ const Sidebar: React.FC<{ user: AdminUser; onLogout: () => void }> = ({ user, on
     </div>
   );
 };
+
+// 新增：會員出席管理元件
+const MemberAttendanceManager: React.FC<{
+  activities: Activity[],
+  members: Member[],
+  attendance: AttendanceRecord[],
+  onUpdateAttendance: (actId: string, memId: string, status: AttendanceStatus) => void
+}> = ({ activities, members, attendance, onUpdateAttendance }) => {
+  // 只篩選出 "例會"
+  const regularActivities = activities.filter(a => a.type === ActivityType.REGULAR);
+  
+  // 找出最近的一場未過期或今天剛過的例會作為預設值
+  const defaultActivityId = React.useMemo(() => {
+    if (regularActivities.length === 0) return '';
+    const now = new Date();
+    // 簡單排序：找日期最接近今天的
+    const sorted = [...regularActivities].sort((a, b) => {
+       const da = new Date(a.date).getTime();
+       const db = new Date(b.date).getTime();
+       return Math.abs(da - now.getTime()) - Math.abs(db - now.getTime());
+    });
+    return String(sorted[0].id);
+  }, [regularActivities]);
+
+  const [selectedActivityId, setSelectedActivityId] = useState(defaultActivityId);
+  const [searchTerm, setSearchTerm] = useState('');
+
+  // 當 defaultActivityId 改變時（例如資料剛載入），更新選取狀態
+  useEffect(() => {
+    if (!selectedActivityId && defaultActivityId) {
+      setSelectedActivityId(defaultActivityId);
+    }
+  }, [defaultActivityId]);
+
+  // 排序會員
+  const sortedMembers = [...members].sort((a, b) => {
+    const valA = a.member_no !== undefined && a.member_no !== null ? String(a.member_no) : '';
+    const valB = b.member_no !== undefined && b.member_no !== null ? String(b.member_no) : '';
+    if (!valA && !valB) return 0;
+    if (!valA) return 1;
+    if (!valB) return -1;
+    return valA.localeCompare(valB, undefined, { numeric: true });
+  });
+
+  const filteredMembers = sortedMembers.filter(m => 
+    m.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    m.company.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (m.member_no && String(m.member_no).includes(searchTerm))
+  );
+
+  // 計算統計數據
+  const stats = React.useMemo(() => {
+    const records = attendance.filter(r => String(r.activity_id) === String(selectedActivityId));
+    return {
+      total: members.length,
+      marked: records.length,
+      present: records.filter(r => r.status === AttendanceStatus.PRESENT).length,
+      absent: records.filter(r => r.status === AttendanceStatus.ABSENT).length,
+      late: records.filter(r => r.status === AttendanceStatus.LATE).length,
+      medical: records.filter(r => r.status === AttendanceStatus.MEDICAL).length,
+      substitute: records.filter(r => r.status === AttendanceStatus.SUBSTITUTE).length,
+    };
+  }, [attendance, selectedActivityId, members.length]);
+
+  const getMemberStatus = (memberId: string | number) => {
+    const record = attendance.find(r => String(r.activity_id) === String(selectedActivityId) && String(r.member_id) === String(memberId));
+    return record?.status;
+  };
+
+  const statusOptions = [
+    { value: AttendanceStatus.PRESENT, label: '出席', color: 'bg-green-100 text-green-700 border-green-200 hover:bg-green-200', activeColor: 'bg-green-600 text-white border-green-600' },
+    { value: AttendanceStatus.LATE, label: '遲到', color: 'bg-yellow-100 text-yellow-700 border-yellow-200 hover:bg-yellow-200', activeColor: 'bg-yellow-500 text-white border-yellow-500' },
+    { value: AttendanceStatus.SUBSTITUTE, label: '代理', color: 'bg-purple-100 text-purple-700 border-purple-200 hover:bg-purple-200', activeColor: 'bg-purple-600 text-white border-purple-600' },
+    { value: AttendanceStatus.MEDICAL, label: '病假', color: 'bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-200', activeColor: 'bg-blue-600 text-white border-blue-600' },
+    { value: AttendanceStatus.ABSENT, label: '缺席', color: 'bg-red-100 text-red-700 border-red-200 hover:bg-red-200', activeColor: 'bg-red-600 text-white border-red-600' },
+  ];
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold">會員報到 (例會)</h1>
+          <p className="text-gray-500 text-sm">每週例會會員出席狀況記錄。</p>
+        </div>
+        <div className="w-full md:w-auto">
+          <select 
+            value={selectedActivityId} 
+            onChange={e => setSelectedActivityId(e.target.value)} 
+            className="w-full md:w-64 border rounded-xl px-4 py-3 bg-white outline-none focus:ring-2 focus:ring-red-500 font-bold"
+          >
+            {regularActivities.length === 0 && <option value="">無例會活動</option>}
+            {regularActivities.map(a => (
+              <option key={a.id} value={a.id}>{a.date} {a.title}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* 統計卡片 */}
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
+         <div className="bg-white p-3 rounded-xl border border-gray-100 shadow-sm">
+            <div className="text-xs text-gray-400 font-bold uppercase">總會員數</div>
+            <div className="text-xl font-bold text-gray-800">{stats.total}</div>
+         </div>
+         <div className="bg-green-50 p-3 rounded-xl border border-green-100">
+            <div className="text-xs text-green-600 font-bold uppercase">出席 (P)</div>
+            <div className="text-xl font-bold text-green-700">{stats.present}</div>
+         </div>
+         <div className="bg-yellow-50 p-3 rounded-xl border border-yellow-100">
+            <div className="text-xs text-yellow-600 font-bold uppercase">遲到 (L)</div>
+            <div className="text-xl font-bold text-yellow-700">{stats.late}</div>
+         </div>
+         <div className="bg-purple-50 p-3 rounded-xl border border-purple-100">
+            <div className="text-xs text-purple-600 font-bold uppercase">代理 (S)</div>
+            <div className="text-xl font-bold text-purple-700">{stats.substitute}</div>
+         </div>
+         <div className="bg-blue-50 p-3 rounded-xl border border-blue-100">
+            <div className="text-xs text-blue-600 font-bold uppercase">病假 (M)</div>
+            <div className="text-xl font-bold text-blue-700">{stats.medical}</div>
+         </div>
+         <div className="bg-red-50 p-3 rounded-xl border border-red-100">
+            <div className="text-xs text-red-600 font-bold uppercase">缺席 (A)</div>
+            <div className="text-xl font-bold text-red-700">{stats.absent}</div>
+         </div>
+      </div>
+
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="p-4 border-b border-gray-100 bg-gray-50/50 flex items-center gap-2">
+          <Search size={18} className="text-gray-400" />
+          <input 
+            type="text" 
+            placeholder="搜尋會員編號、姓名或公司..." 
+            value={searchTerm} 
+            onChange={e => setSearchTerm(e.target.value)} 
+            className="bg-transparent outline-none w-full text-sm"
+          />
+        </div>
+        
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead className="bg-gray-50 border-b border-gray-100">
+              <tr className="text-xs font-bold text-gray-400 uppercase tracking-widest">
+                <th className="px-6 py-4 w-20">No.</th>
+                <th className="px-6 py-4 w-1/4">會員資訊</th>
+                <th className="px-6 py-4">出席狀況</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {filteredMembers.map(member => {
+                 const currentStatus = getMemberStatus(member.id);
+                 return (
+                  <tr key={member.id} className="hover:bg-gray-50/50 transition-colors">
+                    <td className="px-6 py-4 font-mono text-gray-400 font-bold">{member.member_no}</td>
+                    <td className="px-6 py-4">
+                      <div className="font-bold text-gray-900">{member.name}</div>
+                      <div className="text-xs text-gray-500 mt-0.5">{member.company}</div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex flex-wrap gap-2">
+                        {statusOptions.map(opt => (
+                          <button
+                            key={opt.value}
+                            onClick={() => selectedActivityId && onUpdateAttendance(selectedActivityId, String(member.id), opt.value)}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
+                              currentStatus === opt.value ? opt.activeColor : opt.color
+                            } ${!selectedActivityId ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            disabled={!selectedActivityId}
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                    </td>
+                  </tr>
+                 );
+              })}
+            </tbody>
+          </table>
+        </div>
+        {filteredMembers.length === 0 && (
+          <div className="p-10 text-center text-gray-400">沒有找到符合的會員資料</div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 
 const MemberManager: React.FC<{ 
   members: Member[], 
@@ -1064,6 +1259,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
         <Routes>
           <Route path="/" element={<DashboardHome activities={props.activities} registrations={props.registrations} />} />
           <Route path="/check-in" element={<CheckInManager activities={props.activities} registrations={props.registrations} onUpdateRegistration={props.onUpdateRegistration} onDeleteRegistration={props.onDeleteRegistration} />} />
+          {/* 加入新的路由，所有管理員等級皆可訪問 */}
+          <Route path="/attendance" element={<MemberAttendanceManager activities={props.activities} members={props.members} attendance={props.attendance} onUpdateAttendance={props.onUpdateAttendance} />} />
+          
           {canAccessActivities && (
             <>
               <Route path="/activities" element={<ActivityManager activities={props.activities} onAddActivity={props.onAddActivity} onUpdateActivity={props.onUpdateActivity} onDeleteActivity={props.onDeleteActivity} onUploadImage={props.onUploadImage} />} />
