@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Routes, Route, Link, useNavigate, useLocation, Navigate } from 'react-router-dom';
-import { LayoutDashboard, Calendar, Users, LogOut, ChevronRight, Search, FileDown, Plus, Edit, Trash2, CheckCircle, XCircle, Shield, UserPlus, DollarSign, TrendingUp, BarChart3, Mail, User, Clock, Image as ImageIcon, UploadCloud, Loader2, Smartphone, Building2, Briefcase, Globe, FileUp, Download, ClipboardList, CheckSquare, AlertCircle } from 'lucide-react';
+import { LayoutDashboard, Calendar, Users, LogOut, ChevronRight, Search, FileDown, Plus, Edit, Trash2, CheckCircle, XCircle, Shield, UserPlus, DollarSign, TrendingUp, BarChart3, Mail, User, Clock, Image as ImageIcon, UploadCloud, Loader2, Smartphone, Building2, Briefcase, Globe, FileUp, Download, ClipboardList, CheckSquare, AlertCircle, RotateCcw, MapPin } from 'lucide-react';
 import { Activity, Registration, ActivityType, AdminUser, UserRole, Member, AttendanceRecord, AttendanceStatus } from '../types';
 
 interface AdminDashboardProps {
@@ -24,6 +24,7 @@ interface AdminDashboardProps {
   onUpdateMember: (member: Member) => void;
   onDeleteMember: (id: string | number) => void;
   onUpdateAttendance: (activityId: string, memberId: string, status: AttendanceStatus) => void; // 新增 prop
+  onDeleteAttendance: (activityId: string, memberId: string) => void; // 新增 prop
   onUploadImage: (file: File) => Promise<string>;
 }
 
@@ -126,13 +127,450 @@ const Sidebar: React.FC<{ user: AdminUser; onLogout: () => void }> = ({ user, on
   );
 };
 
+const DashboardHome: React.FC<{ activities: Activity[]; registrations: Registration[] }> = ({ activities, registrations }) => {
+  const activeActivities = activities.filter(a => !a.status || a.status === 'active');
+  const totalRevenue = registrations.reduce((sum, reg) => sum + (reg.paid_amount || 0), 0);
+  const checkedInCount = registrations.filter(r => r.check_in_status).length;
+
+  return (
+    <div className="space-y-6">
+      <h1 className="text-2xl font-bold text-gray-800">活動儀表板</h1>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+          <div className="flex justify-between items-start">
+            <div>
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">總活動場次</p>
+              <h3 className="text-3xl font-bold text-gray-900 mt-2">{activeActivities.length}</h3>
+            </div>
+            <div className="p-3 bg-red-50 text-red-600 rounded-xl"><Calendar size={24} /></div>
+          </div>
+        </div>
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+          <div className="flex justify-between items-start">
+            <div>
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">總報名人數</p>
+              <h3 className="text-3xl font-bold text-gray-900 mt-2">{registrations.length}</h3>
+            </div>
+            <div className="p-3 bg-blue-50 text-blue-600 rounded-xl"><Users size={24} /></div>
+          </div>
+        </div>
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+          <div className="flex justify-between items-start">
+            <div>
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">總報到人數</p>
+              <h3 className="text-3xl font-bold text-gray-900 mt-2">{checkedInCount}</h3>
+            </div>
+            <div className="p-3 bg-green-50 text-green-600 rounded-xl"><CheckCircle size={24} /></div>
+          </div>
+        </div>
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+           <div className="flex justify-between items-start">
+             <div>
+               <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">總營收 (已繳費)</p>
+               <h3 className="text-3xl font-bold text-gray-900 mt-2">NT$ {totalRevenue.toLocaleString()}</h3>
+             </div>
+             <div className="p-3 bg-yellow-50 text-yellow-600 rounded-xl"><DollarSign size={24} /></div>
+           </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const CheckInManager: React.FC<{ 
+  activities: Activity[]; 
+  registrations: Registration[]; 
+  onUpdateRegistration: (reg: Registration) => void; 
+  onDeleteRegistration: (id: string | number) => void;
+}> = ({ activities, registrations, onUpdateRegistration, onDeleteRegistration }) => {
+  const [selectedActivityId, setSelectedActivityId] = useState<string>(activities.length > 0 ? String(activities[0].id) : '');
+  const [searchTerm, setSearchTerm] = useState('');
+
+  // Update selectedActivityId when activities change if it's empty
+  useEffect(() => {
+    if (!selectedActivityId && activities.length > 0) {
+      setSelectedActivityId(String(activities[0].id));
+    }
+  }, [activities]);
+
+  const filteredRegistrations = registrations.filter(r => 
+    String(r.activityId) === selectedActivityId &&
+    (r.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+     r.phone.includes(searchTerm) ||
+     r.company?.toLowerCase().includes(searchTerm.toLowerCase()))
+  );
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+           <h1 className="text-2xl font-bold">報到管理 (訪客)</h1>
+           <p className="text-gray-500 text-sm">管理活動報名人員的報到狀態與繳費紀錄。</p>
+        </div>
+        <div className="w-full md:w-auto">
+          <select 
+            value={selectedActivityId} 
+            onChange={e => setSelectedActivityId(e.target.value)} 
+            className="w-full md:w-64 border rounded-xl px-4 py-3 bg-white outline-none focus:ring-2 focus:ring-red-500 font-bold"
+          >
+            {activities.map(a => (
+              <option key={a.id} value={a.id}>{a.date} {a.title}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="p-4 border-b border-gray-100 bg-gray-50/50 flex flex-col sm:flex-row justify-between items-center gap-4">
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <Search size={18} className="text-gray-400" />
+            <input 
+              type="text" 
+              placeholder="搜尋姓名、電話或公司..." 
+              value={searchTerm} 
+              onChange={e => setSearchTerm(e.target.value)} 
+              className="bg-transparent outline-none text-sm w-full sm:w-64"
+            />
+          </div>
+          <div className="flex gap-4 text-sm font-bold text-gray-500">
+             <span>報名：{filteredRegistrations.length}</span>
+             <span className="text-green-600">已報到：{filteredRegistrations.filter(r => r.check_in_status).length}</span>
+          </div>
+        </div>
+        
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead className="bg-gray-50 border-b border-gray-100">
+              <tr className="text-xs font-bold text-gray-400 uppercase tracking-widest">
+                <th className="px-6 py-4">姓名 / 公司</th>
+                <th className="px-6 py-4">聯絡資訊</th>
+                <th className="px-6 py-4">報到狀態</th>
+                <th className="px-6 py-4">繳費金額</th>
+                <th className="px-6 py-4 text-right">操作</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {filteredRegistrations.map(reg => (
+                <tr key={reg.id} className={`hover:bg-gray-50/50 transition-colors ${reg.check_in_status ? 'bg-green-50/10' : ''}`}>
+                  <td className="px-6 py-4">
+                    <div className="font-bold text-gray-900">{reg.name}</div>
+                    <div className="text-xs text-gray-500 mt-0.5">{reg.company} {reg.title && ` - ${reg.title}`}</div>
+                    {reg.referrer && <div className="text-xs text-red-400 mt-1">引薦人: {reg.referrer}</div>}
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="text-sm font-mono text-gray-600">{reg.phone}</div>
+                    <div className="text-xs text-gray-400">{reg.email}</div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <button 
+                      onClick={() => onUpdateRegistration({...reg, check_in_status: !reg.check_in_status})}
+                      className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${
+                        reg.check_in_status 
+                          ? 'bg-green-100 text-green-700 hover:bg-green-200' 
+                          : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                      }`}
+                    >
+                      {reg.check_in_status ? <CheckCircle size={14} /> : <XCircle size={14} />}
+                      {reg.check_in_status ? '已報到' : '未報到'}
+                    </button>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-2">
+                      <span className="text-gray-400 text-xs">$</span>
+                      <PaidAmountInput 
+                        value={reg.paid_amount} 
+                        onSave={(val) => onUpdateRegistration({...reg, paid_amount: val})} 
+                      />
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    <button 
+                      onClick={() => { if(window.confirm('確定要刪除此報名紀錄嗎？')) onDeleteRegistration(reg.id); }}
+                      className="text-gray-400 hover:text-red-600 p-2 hover:bg-red-50 rounded-lg transition-colors"
+                    >
+                      <Trash2 size={18} />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {filteredRegistrations.length === 0 && (
+             <div className="p-10 text-center text-gray-400">目前尚無報名資料</div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const ActivityManager: React.FC<{ 
+  activities: Activity[]; 
+  onAddActivity: (act: Activity) => void; 
+  onUpdateActivity: (act: Activity) => void; 
+  onDeleteActivity: (id: string | number) => void;
+  onUploadImage: (file: File) => Promise<string>;
+}> = ({ activities, onAddActivity, onUpdateActivity, onDeleteActivity, onUploadImage }) => {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingActivity, setEditingActivity] = useState<Activity | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  
+  // Default form state
+  const defaultFormState = {
+    title: '',
+    type: ActivityType.REGULAR,
+    date: '',
+    time: '06:30',
+    location: '台北市大安區忠孝東路四段 218 號 (阿波羅大廈)',
+    price: 500,
+    picture: 'https://images.unsplash.com/photo-1517457373958-b7bdd4587205?q=80&w=2069&auto=format&fit=crop',
+    description: ''
+  };
+
+  const [formData, setFormData] = useState(defaultFormState);
+
+  // Initialize form when opening modal
+  useEffect(() => {
+    if (editingActivity) {
+      setFormData({
+        title: editingActivity.title,
+        type: editingActivity.type,
+        date: editingActivity.date,
+        time: editingActivity.time,
+        location: editingActivity.location,
+        price: editingActivity.price,
+        picture: editingActivity.picture,
+        description: editingActivity.description
+      });
+    } else {
+      setFormData(defaultFormState);
+    }
+  }, [editingActivity, isModalOpen]);
+
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setIsUploading(true);
+      try {
+        const url = await onUploadImage(file);
+        setFormData(prev => ({ ...prev, picture: url }));
+      } catch (error) {
+        alert('圖片上傳失敗');
+      } finally {
+        setIsUploading(false);
+      }
+    }
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const activityData: Activity = {
+      id: editingActivity ? editingActivity.id : Date.now().toString(),
+      ...formData,
+      status: 'active'
+    };
+
+    if (editingActivity) {
+      onUpdateActivity(activityData);
+    } else {
+      onAddActivity(activityData);
+    }
+    setIsModalOpen(false);
+    setEditingActivity(null);
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-bold">活動管理</h1>
+        <button 
+          onClick={() => { setEditingActivity(null); setIsModalOpen(true); }}
+          className="flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors shadow-sm"
+        >
+          <Plus size={18} /> 新增活動
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {activities.map(activity => (
+          <div key={activity.id} className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden group hover:shadow-lg transition-all">
+            <div className="relative h-40">
+              <img src={activity.picture} alt={activity.title} className="w-full h-full object-cover" />
+              <div className="absolute top-2 right-2 flex gap-1">
+                <button 
+                  onClick={() => { setEditingActivity(activity); setIsModalOpen(true); }}
+                  className="p-2 bg-white/90 rounded-lg text-gray-700 hover:text-blue-600 backdrop-blur-sm"
+                >
+                  <Edit size={16} />
+                </button>
+                <button 
+                  onClick={() => { if(window.confirm('確定要刪除此活動嗎？')) onDeleteActivity(activity.id); }}
+                  className="p-2 bg-white/90 rounded-lg text-gray-700 hover:text-red-600 backdrop-blur-sm"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+              <div className="absolute bottom-2 left-2">
+                 <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${
+                    activity.type === ActivityType.REGULAR ? 'bg-red-600 text-white' : 'bg-gray-800 text-white'
+                 }`}>
+                   {activity.type}
+                 </span>
+              </div>
+            </div>
+            <div className="p-4">
+              <div className="flex items-center gap-2 text-xs text-gray-400 font-bold mb-2">
+                <Calendar size={12} /> {activity.date}
+                <Clock size={12} /> {activity.time}
+              </div>
+              <h3 className="font-bold text-gray-900 mb-2 line-clamp-1">{activity.title}</h3>
+              <div className="flex items-center gap-1 text-xs text-gray-500 mb-4">
+                <MapPin size={12} /> <span className="line-clamp-1">{activity.location}</span>
+              </div>
+              <div className="flex justify-between items-center pt-3 border-t border-gray-50">
+                 <span className="font-bold text-red-600">NT$ {activity.price}</span>
+                 <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${activity.status === 'closed' ? 'bg-gray-100 text-gray-400' : 'bg-green-50 text-green-600'}`}>
+                   {activity.status === 'closed' ? '已結束' : '進行中'}
+                 </span>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {isModalOpen && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-2xl rounded-2xl p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <h2 className="text-xl font-bold mb-6">{editingActivity ? '編輯活動' : '新增活動'}</h2>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-bold text-gray-700 mb-1">活動標題</label>
+                  <input 
+                    required 
+                    value={formData.title} 
+                    onChange={e => setFormData({...formData, title: e.target.value})}
+                    className="w-full border rounded-lg px-3 py-3 outline-none focus:ring-2 focus:ring-red-500" 
+                    placeholder="活動名稱" 
+                  />
+                </div>
+                <div>
+                   <label className="block text-sm font-bold text-gray-700 mb-1">活動類型</label>
+                   <select 
+                     value={formData.type}
+                     onChange={e => setFormData({...formData, type: e.target.value as ActivityType})}
+                     className="w-full border rounded-lg px-3 py-3 bg-white outline-none focus:ring-2 focus:ring-red-500"
+                   >
+                     <option value={ActivityType.REGULAR}>例會</option>
+                     <option value={ActivityType.SPECIAL}>精選活動</option>
+                   </select>
+                </div>
+                <div>
+                   <label className="block text-sm font-bold text-gray-700 mb-1">報名費用</label>
+                   <input 
+                    required 
+                    type="number"
+                    value={formData.price} 
+                    onChange={e => setFormData({...formData, price: parseInt(e.target.value)})}
+                    className="w-full border rounded-lg px-3 py-3 outline-none focus:ring-2 focus:ring-red-500" 
+                    placeholder="500" 
+                  />
+                </div>
+                <div>
+                   <label className="block text-sm font-bold text-gray-700 mb-1">活動日期</label>
+                   <input 
+                    required 
+                    type="date"
+                    value={formData.date} 
+                    onChange={e => setFormData({...formData, date: e.target.value})}
+                    className="w-full border rounded-lg px-3 py-3 outline-none focus:ring-2 focus:ring-red-500" 
+                  />
+                </div>
+                <div>
+                   <label className="block text-sm font-bold text-gray-700 mb-1">活動時間</label>
+                   <input 
+                    required 
+                    type="time"
+                    value={formData.time} 
+                    onChange={e => setFormData({...formData, time: e.target.value})}
+                    className="w-full border rounded-lg px-3 py-3 outline-none focus:ring-2 focus:ring-red-500" 
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-bold text-gray-700 mb-1">活動地點</label>
+                  <input 
+                    required 
+                    value={formData.location} 
+                    onChange={e => setFormData({...formData, location: e.target.value})}
+                    className="w-full border rounded-lg px-3 py-3 outline-none focus:ring-2 focus:ring-red-500" 
+                    placeholder="地址" 
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-bold text-gray-700 mb-1">活動圖片</label>
+                  <div className="flex gap-4 items-start">
+                    <div className="w-24 h-24 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0 border border-gray-200">
+                      {formData.picture ? <img src={formData.picture} alt="Preview" className="w-full h-full object-cover" /> : <ImageIcon className="w-full h-full p-6 text-gray-300" />}
+                    </div>
+                    <div className="flex-grow space-y-3">
+                       <div className="relative">
+                         <input 
+                           type="file" 
+                           accept="image/*"
+                           onChange={handleImageChange}
+                           className="hidden"
+                           id="upload-image"
+                         />
+                         <label 
+                           htmlFor="upload-image" 
+                           className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold cursor-pointer transition-colors ${isUploading ? 'bg-gray-100 text-gray-400 cursor-wait' : 'bg-red-50 text-red-600 hover:bg-red-100'}`}
+                         >
+                           {isUploading ? <Loader2 className="animate-spin" size={16} /> : <UploadCloud size={16} />}
+                           {isUploading ? '上傳中...' : '上傳圖片'}
+                         </label>
+                       </div>
+                       <input 
+                          value={formData.picture} 
+                          onChange={e => setFormData({...formData, picture: e.target.value})}
+                          className="w-full border rounded-lg px-3 py-2 text-xs text-gray-500 outline-none focus:ring-2 focus:ring-red-500" 
+                          placeholder="或貼上圖片 URL" 
+                        />
+                    </div>
+                  </div>
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-bold text-gray-700 mb-1">活動說明</label>
+                  <textarea 
+                    rows={4}
+                    value={formData.description} 
+                    onChange={e => setFormData({...formData, description: e.target.value})}
+                    className="w-full border rounded-lg px-3 py-3 outline-none focus:ring-2 focus:ring-red-500 resize-none" 
+                    placeholder="活動詳細內容..." 
+                  />
+                </div>
+              </div>
+              <div className="flex gap-4 pt-4 border-t border-gray-100 mt-4">
+                <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 border py-3 rounded-lg font-bold text-gray-500 hover:bg-gray-50 transition-colors">取消</button>
+                <button type="submit" disabled={isUploading} className="flex-1 bg-red-600 text-white py-3 rounded-lg font-bold shadow-lg shadow-red-100 hover:bg-red-700 active:scale-95 transition-all disabled:opacity-50">
+                   {editingActivity ? '更新活動' : '建立活動'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // 新增：會員出席管理元件
 const MemberAttendanceManager: React.FC<{
   activities: Activity[],
   members: Member[],
   attendance: AttendanceRecord[],
-  onUpdateAttendance: (actId: string, memId: string, status: AttendanceStatus) => void
-}> = ({ activities, members, attendance, onUpdateAttendance }) => {
+  onUpdateAttendance: (actId: string, memId: string, status: AttendanceStatus) => void,
+  onDeleteAttendance: (actId: string, memId: string) => void
+}> = ({ activities, members, attendance, onUpdateAttendance, onDeleteAttendance }) => {
   // 只篩選出 "例會"
   const regularActivities = activities.filter(a => a.type === ActivityType.REGULAR);
   
@@ -270,7 +708,7 @@ const MemberAttendanceManager: React.FC<{
          </div>
       </div>
 
-      {/* 異常狀況清單列表 (移到此處) */}
+      {/* 異常狀況清單列表 */}
       <div>
         <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
           <AlertCircle size={20} className="text-red-600" />
@@ -391,7 +829,7 @@ const MemberAttendanceManager: React.FC<{
                       <div className="text-xs text-gray-500 mt-0.5">{member.company}</div>
                     </td>
                     <td className="px-6 py-4">
-                      <div className="flex flex-wrap gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         {statusOptions.map(opt => (
                           <button
                             key={opt.value}
@@ -404,6 +842,18 @@ const MemberAttendanceManager: React.FC<{
                             {opt.label}
                           </button>
                         ))}
+                        
+                        {/* 恢復(重置)按鈕：只有當有狀態時才顯示 */}
+                        {currentStatus && selectedActivityId && (
+                           <button
+                             onClick={() => onDeleteAttendance(selectedActivityId, String(member.id))}
+                             className="ml-2 px-2 py-1.5 rounded-lg text-xs font-bold border border-gray-200 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-all flex items-center gap-1"
+                             title="清除狀態 (重置)"
+                           >
+                             <RotateCcw size={14} />
+                             <span className="hidden sm:inline">重置</span>
+                           </button>
+                        )}
                       </div>
                     </td>
                     <td className="px-6 py-4 text-right">
@@ -713,504 +1163,6 @@ const MemberManager: React.FC<{
   );
 };
 
-const DashboardHome: React.FC<{ activities: Activity[], registrations: Registration[] }> = ({ activities, registrations }) => {
-  const activityStats = activities.map(activity => {
-    const activityRegs = registrations.filter(r => String(r.activityId) === String(activity.id));
-    const checkedIn = activityRegs.filter(r => r.check_in_status === true).length; 
-    const revenue = activityRegs.reduce((sum, r) => sum + (r.paid_amount || 0), 0);
-    const rate = activityRegs.length > 0 ? Math.round((checkedIn / activityRegs.length) * 100) : 0;
-    
-    return {
-      ...activity,
-      regCount: activityRegs.length,
-      checkedInCount: checkedIn,
-      checkInRate: rate,
-      revenue
-    };
-  });
-
-  const handleSingleExport = (activity: Activity) => {
-    const targetRegs = registrations.filter(r => String(r.activityId) === String(activity.id));
-    if (targetRegs.length === 0) {
-      alert(`「${activity.title}」目前尚無報名資料，無法匯出。`);
-      return;
-    }
-    let csvContent = '\uFEFF';
-    const headers = ['活動名稱', '日期', '姓名', '電話', 'Email', '公司', '職稱', '引薦人', '繳費金額', '報到狀態', '報名時間'];
-    csvContent += headers.join(',') + '\n';
-    targetRegs.forEach(reg => {
-      const checkIn = reg.check_in_status ? '已報到' : '未報到';
-      const paid = reg.paid_amount || 0;
-      const regTime = new Date(reg.created_at).toLocaleString('zh-TW');
-      const escape = (text: string | undefined) => {
-        if (!text) return '""';
-        return `"${text.replace(/"/g, '""')}"`;
-      };
-      const row = [
-        escape(activity.title),
-        escape(activity.date),
-        escape(reg.name),
-        escape(reg.phone),
-        escape(reg.email),
-        escape(reg.company),
-        escape(reg.title),
-        escape(reg.referrer),
-        paid,
-        escape(checkIn),
-        escape(regTime)
-      ];
-      csvContent += row.join(',') + '\n';
-    });
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', `${activity.date}_${activity.title}_報名名單.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  return (
-    <div className="space-y-8 pb-12">
-      <header className="flex justify-between items-end">
-        <div>
-          <h1 className="text-2xl font-bold">活動數據儀表板</h1>
-          <p className="text-gray-500">掌握各場活動的報名與收益狀況。</p>
-        </div>
-        <div className="hidden md:block">
-          <div className="flex items-center gap-2 text-sm text-gray-400 bg-white px-4 py-2 rounded-lg border border-gray-100">
-            <BarChart3 size={16} />
-            最後更新：{new Date().toLocaleTimeString()}
-          </div>
-        </div>
-      </header>
-
-      <section className="space-y-6">
-        <div className="bg-white rounded-3xl border border-gray-100 shadow-xl overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
-              <thead className="bg-gray-50/50 border-b border-gray-100">
-                <tr className="text-xs font-bold text-gray-500 uppercase tracking-wider">
-                  <th className="px-8 py-6 w-1/3">活動名稱 / 時間</th>
-                  <th className="px-6 py-6">報名人數</th>
-                  <th className="px-6 py-6">實收金額</th>
-                  <th className="px-6 py-6">報到進度</th>
-                  <th className="px-6 py-6">報到率</th>
-                  <th className="px-8 py-6 text-right">操作</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {activityStats.map(stat => (
-                  <tr key={stat.id} className="hover:bg-red-50/30 transition-colors group">
-                    <td className="px-8 py-6">
-                      <div className="font-bold text-gray-900 text-lg">{stat.title}</div>
-                      <div className="flex items-center gap-2 text-xs text-gray-400 mt-1 font-medium">
-                        <Calendar size={12} className="text-red-600" />
-                        {stat.date}
-                        <Clock size={12} className="text-red-600 ml-2" />
-                        {stat.time}
-                        <span className="mx-1">•</span>
-                        <span className="px-2 py-0.5 rounded bg-gray-100 text-gray-500">{stat.type}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-6">
-                      <div className="text-2xl font-bold text-gray-800">{stat.regCount}</div>
-                    </td>
-                    <td className="px-6 py-6">
-                      <div className="text-xl font-bold text-red-600">NT$ {stat.revenue.toLocaleString()}</div>
-                    </td>
-                    <td className="px-6 py-6">
-                      <div className="text-lg font-bold text-gray-700">
-                        {stat.checkedInCount} <span className="text-gray-300 font-normal">/</span> {stat.regCount}
-                      </div>
-                    </td>
-                    <td className="px-6 py-6">
-                      <div className={`text-xl font-black ${stat.checkInRate > 80 ? 'text-green-600' : stat.checkInRate > 0 ? 'text-red-600' : 'text-gray-300'}`}>
-                        {stat.checkInRate}%
-                      </div>
-                    </td>
-                    <td className="px-8 py-6 text-right">
-                      <div className="flex justify-end items-center gap-2">
-                        <button 
-                          onClick={() => handleSingleExport(stat)}
-                          className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-green-50 text-green-600 hover:bg-green-600 hover:text-white transition-all shadow-sm"
-                          title="匯出此活動報名表"
-                        >
-                          <FileDown size={20} />
-                        </button>
-                        <Link 
-                          to="/admin/check-in" 
-                          state={{ activityId: stat.id }}
-                          className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-gray-100 text-gray-400 hover:bg-red-600 hover:text-white transition-all shadow-sm"
-                          title="進入報到管理"
-                        >
-                          <ChevronRight size={20} />
-                        </Link>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </section>
-    </div>
-  );
-};
-
-const ActivityManager: React.FC<{ 
-  activities: Activity[], 
-  onAddActivity: (a: Activity) => void, 
-  onUpdateActivity: (a: Activity) => void, 
-  onDeleteActivity: (id: string | number) => void,
-  onUploadImage: (file: File) => Promise<string>
-}> = ({ activities, onAddActivity, onUpdateActivity, onDeleteActivity, onUploadImage }) => {
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingActivity, setEditingActivity] = useState<Activity | null>(null);
-  
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string>('');
-  const [isUploading, setIsUploading] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (editingActivity) {
-      setPreviewUrl(editingActivity.picture);
-    } else {
-      setPreviewUrl('https://images.unsplash.com/photo-1517457373958-b7bdd4587205?q=80&w=2069&auto=format&fit=crop');
-    }
-    setSelectedFile(null);
-  }, [editingActivity, isModalOpen]);
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      setSelectedFile(file);
-      setPreviewUrl(URL.createObjectURL(file));
-    }
-  };
-  
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const formData = new FormData(e.currentTarget);
-    setIsUploading(true);
-
-    try {
-      let finalPictureUrl = previewUrl; 
-      if (selectedFile) {
-        finalPictureUrl = await onUploadImage(selectedFile);
-      }
-
-      const activityData: Activity = {
-        id: editingActivity?.id || '', 
-        type: formData.get('type') as ActivityType,
-        title: formData.get('title') as string,
-        date: formData.get('date') as string,
-        time: formData.get('time') as string,
-        location: formData.get('location') as string,
-        price: Number(formData.get('price')),
-        picture: finalPictureUrl, 
-        description: formData.get('description') as string,
-        status: 'active'
-      };
-
-      if (editingActivity) onUpdateActivity(activityData);
-      else onAddActivity(activityData);
-
-      setIsModalOpen(false);
-      setEditingActivity(null);
-    } catch (error: any) {
-      console.error(error);
-      alert('儲存失敗：' + error.message);
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
-  const confirmDelete = (act: Activity) => {
-    if (window.confirm(`確定要刪除活動「${act.title}」嗎？\n此動作將同時刪除該活動的所有報名資料且無法復原。`)) {
-      onDeleteActivity(act.id);
-    }
-  };
-
-  return (
-    <div className="space-y-6 text-gray-900">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">活動管理</h1>
-        <button onClick={() => { setEditingActivity(null); setIsModalOpen(true); }} className="flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded-lg">
-          <Plus size={18} /> 新增活動
-        </button>
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {activities.map(act => (
-          <div key={act.id} className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden flex">
-            <img src={act.picture} className="w-32 object-cover" alt={act.title} />
-            <div className="p-4 flex-grow">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-gray-100 text-gray-500 uppercase">{act.type}</span>
-                <div className="flex items-center gap-2">
-                  <button onClick={() => { setEditingActivity(act); setIsModalOpen(true); }} className="text-gray-400 hover:text-red-600 p-1.5 hover:bg-red-50 rounded-md transition-colors"><Edit size={16} /></button>
-                  <button onClick={() => confirmDelete(act)} className="text-gray-400 hover:text-red-600 p-1.5 hover:bg-red-50 rounded-md transition-colors"><Trash2 size={16} /></button>
-                </div>
-              </div>
-              <h3 className="font-bold line-clamp-1">{act.title}</h3>
-              <p className="text-xs text-gray-400 mt-1 flex items-center gap-1 font-medium">
-                <Calendar size={12} className="text-red-600" /> {act.date} 
-                <Clock size={12} className="ml-1 text-red-600" /> {act.time}
-              </p>
-            </div>
-          </div>
-        ))}
-      </div>
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-xl rounded-2xl p-6 shadow-2xl">
-            <h2 className="text-xl font-bold mb-4">{editingActivity ? '修改活動' : '新增活動'}</h2>
-            <form onSubmit={handleSubmit} className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1">活動類型</label>
-                <select name="type" defaultValue={editingActivity?.type} className="w-full border rounded-lg px-3 py-2 bg-white outline-none focus:ring-2 focus:ring-red-500">
-                  <option value={ActivityType.REGULAR}>例會</option>
-                  <option value={ActivityType.SPECIAL}>精選活動</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1">活動標題</label>
-                <input name="title" required defaultValue={editingActivity?.title} className="w-full border rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-red-500" placeholder="活動標題" />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">日期</label>
-                  <input type="date" name="date" required defaultValue={editingActivity?.date} className="w-full border rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-red-500" />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1 flex items-center gap-1">
-                    <Clock size={14} className="text-red-600" /> 時間 (24小時制)
-                  </label>
-                  <input 
-                    type="text" 
-                    name="time" 
-                    required 
-                    defaultValue={editingActivity?.time} 
-                    className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-red-500 outline-none" 
-                    placeholder="HH:mm (例如 18:30)"
-                    pattern="([01]?[0-9]|2[0-3]):[0-5][0-9]"
-                    title="請使用 24 小時制格式 (HH:mm)，例如 06:30 或 18:30"
-                  />
-                  <p className="text-[10px] text-gray-400 mt-1 font-bold italic">※ 例如 18:30</p>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">費用 (NT$)</label>
-                  <input name="price" type="number" required defaultValue={editingActivity?.price} className="w-full border rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-red-500" placeholder="費用" />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">活動地點</label>
-                  <input name="location" required defaultValue={editingActivity?.location} className="w-full border rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-red-500" placeholder="活動地點" />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1 flex items-center gap-1">
-                  <ImageIcon size={14} className="text-red-600" /> 封面圖片 (上傳或輸入網址)
-                </label>
-                <div 
-                  className="relative group cursor-pointer border-2 border-dashed border-gray-300 rounded-xl p-2 hover:border-red-500 transition-colors bg-gray-50 flex flex-col items-center justify-center min-h-[160px]"
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  {previewUrl ? (
-                    <div className="relative w-full h-full">
-                      <img src={previewUrl} alt="Preview" className="w-full h-40 object-cover rounded-lg" />
-                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-lg">
-                        <span className="text-white font-bold flex items-center gap-2"><UploadCloud size={20}/> 更換圖片</span>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="text-gray-400 flex flex-col items-center">
-                      <UploadCloud size={32} className="mb-2" />
-                      <span className="text-sm">點擊選擇圖片</span>
-                    </div>
-                  )}
-                  <input 
-                    type="file" 
-                    ref={fileInputRef}
-                    className="hidden" 
-                    accept="image/*"
-                    onChange={handleFileChange}
-                  />
-                </div>
-                <div className="mt-2">
-                  <input 
-                    type="text"
-                    value={previewUrl}
-                    onChange={(e) => {
-                      setPreviewUrl(e.target.value);
-                      setSelectedFile(null); 
-                    }}
-                    placeholder="或在此直接貼上圖片網址..."
-                    className="w-full text-xs text-gray-500 border border-gray-200 rounded px-2 py-1.5 bg-gray-50 focus:bg-white outline-none focus:ring-1 focus:ring-red-500"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1">活動描述</label>
-                <textarea name="description" rows={4} required defaultValue={editingActivity?.description} className="w-full border rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-red-500" placeholder="活動描述"></textarea>
-              </div>
-              <div className="flex gap-4 pt-4">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 border py-3 rounded-lg font-bold text-gray-500 hover:bg-gray-50 transition-colors">取消</button>
-                <button 
-                  type="submit" 
-                  disabled={isUploading}
-                  className="flex-1 bg-red-600 text-white py-3 rounded-lg font-bold shadow-lg shadow-red-100 hover:bg-red-700 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                >
-                  {isUploading ? <><Loader2 className="animate-spin" size={20} /> 處理中...</> : '儲存活動'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
-const CheckInManager: React.FC<{ activities: Activity[], registrations: Registration[], onUpdateRegistration: (r: Registration) => void, onDeleteRegistration: (id: string | number) => void }> = ({ activities, registrations, onUpdateRegistration, onDeleteRegistration }) => {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedActivity, setSelectedActivity] = useState('all');
-  const filteredRegistrations = registrations.filter(r => {
-    const matchesSearch = r.name.toLowerCase().includes(searchTerm.toLowerCase()) || r.phone.includes(searchTerm);
-    const matchesActivity = selectedActivity === 'all' || String(r.activityId) === String(selectedActivity);
-    return matchesSearch && matchesActivity;
-  });
-
-  const confirmDelete = (reg: Registration) => {
-    if (window.confirm(`確定要刪除「${reg.name}」的報名紀錄嗎？\n此動作無法復原且會影響活動統計。`)) {
-      onDeleteRegistration(reg.id);
-    }
-  };
-
-  const handleExport = () => {
-    if (filteredRegistrations.length === 0) {
-      alert('目前列表無資料可匯出');
-      return;
-    }
-    let csvContent = '\uFEFF';
-    const headers = ['活動名稱', '日期', '姓名', '電話', 'Email', '公司', '職稱', '引薦人', '繳費金額', '報到狀態', '報名時間'];
-    csvContent += headers.join(',') + '\n';
-
-    filteredRegistrations.forEach(reg => {
-      const activity = activities.find(a => String(a.id) === String(reg.activityId));
-      const actTitle = activity ? activity.title : '未知活動';
-      const actDate = activity ? activity.date : '';
-      const checkIn = reg.check_in_status ? '已報到' : '未報到';
-      const paid = reg.paid_amount || 0;
-      const regTime = new Date(reg.created_at).toLocaleString('zh-TW');
-
-      const escape = (text: string | undefined) => {
-        if (!text) return '""';
-        return `"${text.replace(/"/g, '""')}"`;
-      };
-
-      const row = [
-        escape(actTitle),
-        escape(actDate),
-        escape(reg.name),
-        escape(reg.phone),
-        escape(reg.email),
-        escape(reg.company),
-        escape(reg.title),
-        escape(reg.referrer),
-        paid,
-        escape(checkIn),
-        escape(regTime)
-      ];
-      csvContent += row.join(',') + '\n';
-    });
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    
-    let filename = '活動報名名單.csv';
-    if (selectedActivity !== 'all') {
-      const act = activities.find(a => String(a.id) === String(selectedActivity));
-      if (act) {
-        filename = `${act.date}_${act.title}_報名名單.csv`;
-      }
-    } else {
-      const dateStr = new Date().toISOString().split('T')[0];
-      filename = `所有活動報名名單_${dateStr}.csv`;
-    }
-    
-    link.href = url;
-    link.setAttribute('download', filename);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  return (
-    <div className="space-y-6 text-gray-900">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">報到管理</h1>
-        <button onClick={handleExport} className="bg-green-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-all hover:bg-green-700 active:scale-95"><FileDown size={18}/> 匯出報名表</button>
-      </div>
-      <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-          <input type="text" placeholder="搜尋姓名或電話..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-red-500 outline-none" />
-          <select value={selectedActivity} onChange={e => setSelectedActivity(e.target.value)} className="border rounded-lg px-4 py-2 bg-white outline-none focus:ring-2 focus:ring-red-500">
-            <option value="all">所有活動</option>
-            {activities.map(a => <option key={a.id} value={a.id}>{a.title} ({a.date})</option>)}
-          </select>
-        </div>
-        <table className="w-full text-left">
-          <thead className="border-b text-sm font-bold text-gray-400 uppercase">
-            <tr>
-              <th className="pb-4">姓名 / 公司</th>
-              <th className="pb-4">引薦人</th>
-              <th className="pb-4">繳費</th>
-              <th className="pb-4">狀態</th>
-              <th className="pb-4 text-right">操作</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y">
-            {filteredRegistrations.map(reg => (
-              <tr key={reg.id} className="hover:bg-gray-50 transition-colors">
-                <td className="py-4">
-                  <div className="font-bold">{reg.name}</div>
-                  <div className="text-xs text-gray-400">{reg.company}</div>
-                </td>
-                <td className="py-4 text-sm text-gray-500">
-                  {reg.referrer || '-'}
-                </td>
-                <td className="py-4">
-                  <PaidAmountInput 
-                    value={reg.paid_amount || 0} 
-                    onSave={(val) => onUpdateRegistration({...reg, paid_amount: val})} 
-                  />
-                </td>
-                <td className="py-4">
-                  <button onClick={() => onUpdateRegistration({...reg, check_in_status: !reg.check_in_status})} className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${reg.check_in_status ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}>
-                    {reg.check_in_status ? '已報到' : '未報到'}
-                  </button>
-                </td>
-                <td className="py-4 text-right">
-                  <button onClick={() => confirmDelete(reg)} className="text-gray-300 hover:text-red-600 transition-colors p-1.5 hover:bg-red-50 rounded-md">
-                    <Trash2 size={18}/>
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-};
-
 const UserManager: React.FC<{ 
   users: AdminUser[], 
   onAddUser: (u: AdminUser) => void, 
@@ -1340,7 +1292,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
           <Route path="/" element={<DashboardHome activities={props.activities} registrations={props.registrations} />} />
           <Route path="/check-in" element={<CheckInManager activities={props.activities} registrations={props.registrations} onUpdateRegistration={props.onUpdateRegistration} onDeleteRegistration={props.onDeleteRegistration} />} />
           {/* 加入新的路由，所有管理員等級皆可訪問 */}
-          <Route path="/attendance" element={<MemberAttendanceManager activities={props.activities} members={props.members} attendance={props.attendance} onUpdateAttendance={props.onUpdateAttendance} />} />
+          <Route path="/attendance" element={<MemberAttendanceManager activities={props.activities} members={props.members} attendance={props.attendance} onUpdateAttendance={props.onUpdateAttendance} onDeleteAttendance={props.onDeleteAttendance} />} />
           
           {canAccessActivities && (
             <>

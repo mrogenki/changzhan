@@ -375,14 +375,31 @@ const App: React.FC = () => {
         console.error('Attendance update failed:', error);
         // 如果失敗，應該要回復狀態 (這裡簡化處理：重新 fetch)
         fetchData(); 
-      } else if (data && data[0]) {
-        // 更新成功後，用真正的 ID 替換掉 temp ID (如果需要)
-        // 這裡我們直接重新 fetch 來確保資料一致性，或也可以只更新那一筆
-        // 為了效能，可以只更新那一筆的 ID，但簡單起見，這裡不操作，等待下一次 fetch
-      }
+      } 
     } catch (err) {
       console.error('API error:', err);
       fetchData();
+    }
+  };
+
+  // 新增：刪除出席紀錄 (重置/恢復)
+  const handleDeleteAttendance = async (activityId: string, memberId: string) => {
+    // 樂觀更新：先從本地 state 移除
+    setAttendance(prev => prev.filter(r => !(String(r.activity_id) === String(activityId) && String(r.member_id) === String(memberId))));
+
+    try {
+       const { error } = await supabase
+         .from('attendance')
+         .delete()
+         .match({ activity_id: String(activityId), member_id: String(memberId) });
+
+       if (error) {
+         console.error('Delete attendance failed:', error);
+         fetchData(); // 失敗則還原
+       }
+    } catch (err) {
+       console.error('API error:', err);
+       fetchData();
     }
   };
 
@@ -429,6 +446,7 @@ const App: React.FC = () => {
                   onUpdateMember={handleUpdateMember} // 傳遞會員操作
                   onDeleteMember={handleDeleteMember} // 傳遞會員操作
                   onUpdateAttendance={handleUpdateAttendance} // 傳遞出席更新函數
+                  onDeleteAttendance={handleDeleteAttendance} // 新增：傳遞出席刪除函數
                   onUploadImage={handleUploadImage} 
                 />
               ) : (
