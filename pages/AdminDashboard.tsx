@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Routes, Route, Link, useNavigate, useLocation, Navigate } from 'react-router-dom';
-import { LayoutDashboard, Calendar, Users, LogOut, ChevronRight, Search, FileDown, Plus, Edit, Trash2, CheckCircle, XCircle, Shield, UserPlus, DollarSign, TrendingUp, BarChart3, Mail, User, Clock, Image as ImageIcon, UploadCloud, Loader2, Smartphone, Building2, Briefcase, Globe, FileUp, Download, ClipboardList, CheckSquare } from 'lucide-react';
+import { LayoutDashboard, Calendar, Users, LogOut, ChevronRight, Search, FileDown, Plus, Edit, Trash2, CheckCircle, XCircle, Shield, UserPlus, DollarSign, TrendingUp, BarChart3, Mail, User, Clock, Image as ImageIcon, UploadCloud, Loader2, Smartphone, Building2, Briefcase, Globe, FileUp, Download, ClipboardList, CheckSquare, AlertCircle } from 'lucide-react';
 import { Activity, Registration, ActivityType, AdminUser, UserRole, Member, AttendanceRecord, AttendanceStatus } from '../types';
 
 interface AdminDashboardProps {
@@ -189,10 +189,29 @@ const MemberAttendanceManager: React.FC<{
     };
   }, [attendance, selectedActivityId, members.length]);
 
-  const getMemberStatus = (memberId: string | number) => {
-    const record = attendance.find(r => String(r.activity_id) === String(selectedActivityId) && String(r.member_id) === String(memberId));
-    return record?.status;
+  const getMemberRecord = (memberId: string | number) => {
+    return attendance.find(r => String(r.activity_id) === String(selectedActivityId) && String(r.member_id) === String(memberId));
   };
+
+  const formatTime = (isoString?: string) => {
+    if (!isoString) return '';
+    const date = new Date(isoString);
+    return date.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', hour12: false });
+  };
+
+  // 分類名單
+  const listByStatus = (status: AttendanceStatus) => {
+    const records = attendance.filter(r => String(r.activity_id) === String(selectedActivityId) && r.status === status);
+    return records.map(r => {
+      const member = members.find(m => String(m.id) === String(r.member_id));
+      return { ...member, updated_at: r.updated_at };
+    }).filter(item => item.id); // 過濾掉找不到會員的資料 (理論上不該發生)
+  };
+
+  const lateList = listByStatus(AttendanceStatus.LATE);
+  const substituteList = listByStatus(AttendanceStatus.SUBSTITUTE);
+  const medicalList = listByStatus(AttendanceStatus.MEDICAL);
+  const absentList = listByStatus(AttendanceStatus.ABSENT);
 
   const statusOptions = [
     { value: AttendanceStatus.PRESENT, label: '出席', color: 'bg-green-100 text-green-700 border-green-200 hover:bg-green-200', activeColor: 'bg-green-600 text-white border-green-600' },
@@ -203,7 +222,7 @@ const MemberAttendanceManager: React.FC<{
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-10">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold">會員報到 (例會)</h1>
@@ -251,6 +270,91 @@ const MemberAttendanceManager: React.FC<{
          </div>
       </div>
 
+      {/* 異常狀況清單列表 (移到此處) */}
+      <div>
+        <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
+          <AlertCircle size={20} className="text-red-600" />
+          異常狀況與代理名單列表
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+           {/* 遲到名單 */}
+           <div className="bg-white rounded-xl border border-yellow-200 shadow-sm overflow-hidden">
+             <div className="bg-yellow-50 px-4 py-3 border-b border-yellow-100 flex justify-between items-center">
+               <h3 className="font-bold text-yellow-800 flex items-center gap-2"><Clock size={16}/> 遲到 ({lateList.length})</h3>
+             </div>
+             <div className="p-4 max-h-60 overflow-y-auto">
+                {lateList.length === 0 ? <p className="text-gray-400 text-sm">無遲到人員</p> : (
+                  <ul className="space-y-2">
+                    {lateList.map((m: any) => (
+                      <li key={m.id} className="text-sm flex justify-between">
+                        <span>{m.name} <span className="text-gray-400 text-xs">({m.company})</span></span>
+                        <span className="font-mono text-gray-400 text-xs">{formatTime(m.updated_at)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+             </div>
+           </div>
+
+           {/* 代理名單 */}
+           <div className="bg-white rounded-xl border border-purple-200 shadow-sm overflow-hidden">
+             <div className="bg-purple-50 px-4 py-3 border-b border-purple-100 flex justify-between items-center">
+               <h3 className="font-bold text-purple-800 flex items-center gap-2"><User size={16}/> 代理 ({substituteList.length})</h3>
+             </div>
+             <div className="p-4 max-h-60 overflow-y-auto">
+                {substituteList.length === 0 ? <p className="text-gray-400 text-sm">無代理人員</p> : (
+                  <ul className="space-y-2">
+                    {substituteList.map((m: any) => (
+                      <li key={m.id} className="text-sm border-b border-dashed border-purple-100 last:border-0 pb-1 mb-1 last:mb-0 last:pb-0">
+                        <div className="font-bold text-gray-700">{m.name}</div>
+                        <div className="text-xs text-gray-400">{m.company}</div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+             </div>
+           </div>
+
+           {/* 病假名單 */}
+           <div className="bg-white rounded-xl border border-blue-200 shadow-sm overflow-hidden">
+             <div className="bg-blue-50 px-4 py-3 border-b border-blue-100 flex justify-between items-center">
+               <h3 className="font-bold text-blue-800 flex items-center gap-2"><ClipboardList size={16}/> 病假 ({medicalList.length})</h3>
+             </div>
+             <div className="p-4 max-h-60 overflow-y-auto">
+                {medicalList.length === 0 ? <p className="text-gray-400 text-sm">無病假人員</p> : (
+                  <ul className="space-y-2">
+                    {medicalList.map((m: any) => (
+                      <li key={m.id} className="text-sm flex justify-between">
+                         <span>{m.name}</span>
+                         <span className="text-gray-400 text-xs">{m.company}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+             </div>
+           </div>
+
+           {/* 缺席名單 */}
+           <div className="bg-white rounded-xl border border-red-200 shadow-sm overflow-hidden">
+             <div className="bg-red-50 px-4 py-3 border-b border-red-100 flex justify-between items-center">
+               <h3 className="font-bold text-red-800 flex items-center gap-2"><XCircle size={16}/> 缺席 ({absentList.length})</h3>
+             </div>
+             <div className="p-4 max-h-60 overflow-y-auto">
+                {absentList.length === 0 ? <p className="text-gray-400 text-sm">無缺席人員</p> : (
+                  <ul className="space-y-2">
+                    {absentList.map((m: any) => (
+                      <li key={m.id} className="text-sm flex justify-between">
+                         <span className="text-red-600">{m.name}</span>
+                         <span className="text-gray-400 text-xs">{m.company}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+             </div>
+           </div>
+        </div>
+      </div>
+
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
         <div className="p-4 border-b border-gray-100 bg-gray-50/50 flex items-center gap-2">
           <Search size={18} className="text-gray-400" />
@@ -263,20 +367,24 @@ const MemberAttendanceManager: React.FC<{
           />
         </div>
         
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
-            <thead className="bg-gray-50 border-b border-gray-100">
+        <div className="overflow-x-auto max-h-[600px]">
+          <table className="w-full text-left relative">
+            <thead className="bg-gray-50 border-b border-gray-100 sticky top-0 z-10">
               <tr className="text-xs font-bold text-gray-400 uppercase tracking-widest">
                 <th className="px-6 py-4 w-20">No.</th>
                 <th className="px-6 py-4 w-1/4">會員資訊</th>
                 <th className="px-6 py-4">出席狀況</th>
+                <th className="px-6 py-4 w-32 text-right">時間</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {filteredMembers.map(member => {
-                 const currentStatus = getMemberStatus(member.id);
+                 const record = getMemberRecord(member.id);
+                 const currentStatus = record?.status;
+                 const updatedAt = record?.updated_at;
+                 
                  return (
-                  <tr key={member.id} className="hover:bg-gray-50/50 transition-colors">
+                  <tr key={member.id} className={`hover:bg-gray-50/50 transition-colors ${currentStatus ? 'bg-gray-50/30' : ''}`}>
                     <td className="px-6 py-4 font-mono text-gray-400 font-bold">{member.member_no}</td>
                     <td className="px-6 py-4">
                       <div className="font-bold text-gray-900">{member.name}</div>
@@ -290,13 +398,21 @@ const MemberAttendanceManager: React.FC<{
                             onClick={() => selectedActivityId && onUpdateAttendance(selectedActivityId, String(member.id), opt.value)}
                             className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
                               currentStatus === opt.value ? opt.activeColor : opt.color
-                            } ${!selectedActivityId ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            } ${!selectedActivityId ? 'opacity-50 cursor-not-allowed' : ''} ${currentStatus === opt.value ? 'shadow-md scale-105' : 'opacity-70 hover:opacity-100'}`}
                             disabled={!selectedActivityId}
                           >
                             {opt.label}
                           </button>
                         ))}
                       </div>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                       {currentStatus && updatedAt && (
+                         <div className="flex items-center justify-end gap-1 text-xs text-gray-400 font-mono">
+                           <Clock size={12} />
+                           {formatTime(updatedAt)}
+                         </div>
+                       )}
                     </td>
                   </tr>
                  );
@@ -588,160 +704,6 @@ const MemberManager: React.FC<{
               <div className="flex gap-4 pt-4">
                 <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 border py-3 rounded-lg font-bold text-gray-500 hover:bg-gray-50 transition-colors">取消</button>
                 <button type="submit" className="flex-1 bg-red-600 text-white py-3 rounded-lg font-bold shadow-lg shadow-red-100 hover:bg-red-700 active:scale-95 transition-all">確認儲存</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
-// ... UserManager, DashboardHome, ActivityManager, CheckInManager components remain mostly the same ...
-// ... I will only include the AdminDashboard component structure to wire up the new route ...
-
-const UserManager: React.FC<{ users: AdminUser[], onAddUser: (u: AdminUser) => void, onDeleteUser: (id: string) => void, currentUser: AdminUser }> = ({ users, onAddUser, onDeleteUser, currentUser }) => {
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [formData, setFormData] = useState({ name: '', phone: '', password: '', role: UserRole.STAFF });
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const newUser: AdminUser = {
-      id: '', 
-      ...formData
-    };
-    onAddUser(newUser);
-    setIsModalOpen(false);
-    setFormData({ name: '', phone: '', password: '', role: UserRole.STAFF });
-  };
-
-  const confirmDelete = (user: AdminUser) => {
-    if (window.confirm(`確定要移除管理員「${user.name}」嗎？\n移除後此帳號將立即失去系統存取權限。`)) {
-      onDeleteUser(user.id);
-    }
-  };
-
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">人員權限管理</h1>
-          <p className="text-gray-500 text-sm">管理能存取此後台系統的管理人員。</p>
-        </div>
-        <button onClick={() => setIsModalOpen(true)} className="flex items-center gap-2 bg-red-600 text-white px-5 py-2.5 rounded-xl hover:bg-red-700 transition-all shadow-md active:scale-95">
-          <UserPlus size={18} />
-          新增管理員
-        </button>
-      </div>
-
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-        <table className="w-full text-left">
-          <thead className="bg-gray-50 border-b border-gray-100">
-            <tr className="text-xs font-bold text-gray-400 uppercase tracking-widest">
-              <th className="px-6 py-4">人員名稱</th>
-              <th className="px-6 py-4">手機號碼</th>
-              <th className="px-6 py-4">權限等級</th>
-              <th className="px-6 py-4 text-right">操作</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-50">
-            {users.map(user => (
-              <tr key={user.id} className="hover:bg-gray-50/50 transition-colors">
-                <td className="px-6 py-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-full bg-red-50 text-red-600 flex items-center justify-center font-bold">
-                      {user.name.charAt(0)}
-                    </div>
-                    <span className="font-bold text-gray-900">{user.name}</span>
-                  </div>
-                </td>
-                <td className="px-6 py-4 text-gray-500 text-sm">{user.phone}</td>
-                <td className="px-6 py-4">
-                  <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter ${
-                    user.role === UserRole.SUPER_ADMIN ? 'bg-purple-100 text-purple-700' :
-                    user.role === UserRole.MANAGER ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'
-                  }`}>
-                    {user.role}
-                  </span>
-                </td>
-                <td className="px-6 py-4 text-right">
-                  {String(user.id) !== String(currentUser.id) ? (
-                    <button 
-                      onClick={() => confirmDelete(user)} 
-                      className="text-gray-300 hover:text-red-600 p-2 transition-colors hover:bg-red-50 rounded-lg"
-                      title="刪除此管理員"
-                    >
-                      <Trash2 size={18} />
-                    </button>
-                  ) : (
-                    <span className="text-[10px] text-gray-300 font-bold px-3 py-1 bg-gray-50 rounded-lg border border-gray-100 uppercase tracking-widest">當前帳號</span>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-md rounded-2xl overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-200">
-            <div className="p-6 border-b flex justify-between items-center bg-gray-50">
-              <h2 className="text-xl font-bold text-gray-900">新增管理人員</h2>
-              <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600"><XCircle /></button>
-            </div>
-            <form onSubmit={handleSubmit} className="p-8 space-y-5">
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2 flex items-center gap-2">
-                  <User size={14} className="text-red-600" /> 姓名
-                </label>
-                <input 
-                  required 
-                  className="w-full border-gray-200 border rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-red-500 transition-all"
-                  placeholder="輸入管理員真實姓名"
-                  value={formData.name}
-                  onChange={e => setFormData({...formData, name: e.target.value})}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2 flex items-center gap-2">
-                  <Smartphone size={14} className="text-red-600" /> 手機號碼 (登入帳號)
-                </label>
-                <input 
-                  type="tel" 
-                  required 
-                  className="w-full border-gray-200 border rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-red-500 transition-all"
-                  placeholder="09xx-xxx-xxx"
-                  value={formData.phone}
-                  onChange={e => setFormData({...formData, phone: e.target.value})}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">登入密碼</label>
-                <input 
-                  type="password" 
-                  required 
-                  className="w-full border-gray-200 border rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-red-500 transition-all"
-                  placeholder="請設定初始密碼"
-                  value={formData.password}
-                  onChange={e => setFormData({...formData, password: e.target.value})}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">權限設定</label>
-                <select 
-                  className="w-full border-gray-200 border rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-red-500 bg-white"
-                  value={formData.role}
-                  onChange={e => setFormData({...formData, role: e.target.value as UserRole})}
-                >
-                  <option value={UserRole.STAFF}>工作人員 (僅限報到)</option>
-                  <option value={UserRole.MANAGER}>管理員 (報到+活動編輯)</option>
-                  <option value={UserRole.SUPER_ADMIN}>總管理員 (完整權限)</option>
-                </select>
-              </div>
-              <div className="flex gap-4 pt-6">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 border border-gray-200 py-3 rounded-xl font-bold text-gray-500 hover:bg-gray-50">取消</button>
-                <button type="submit" className="flex-1 bg-red-600 text-white py-3 rounded-xl font-bold shadow-lg shadow-red-100 hover:bg-red-700 active:scale-95 transition-all">確認新增</button>
               </div>
             </form>
           </div>
@@ -1245,6 +1207,124 @@ const CheckInManager: React.FC<{ activities: Activity[], registrations: Registra
           </tbody>
         </table>
       </div>
+    </div>
+  );
+};
+
+const UserManager: React.FC<{ 
+  users: AdminUser[], 
+  onAddUser: (u: AdminUser) => void, 
+  onDeleteUser: (id: string) => void,
+  currentUser: AdminUser
+}> = ({ users, onAddUser, onDeleteUser, currentUser }) => {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const newUser: AdminUser = {
+      id: Date.now().toString(),
+      name: formData.get('name') as string,
+      phone: formData.get('phone') as string,
+      password: formData.get('password') as string,
+      role: formData.get('role') as UserRole
+    };
+    onAddUser(newUser);
+    setIsModalOpen(false);
+  };
+
+  const confirmDelete = (user: AdminUser) => {
+    if (user.id === currentUser.id) {
+        alert('無法刪除自己');
+        return;
+    }
+    if (window.confirm(`確定要刪除管理員「${user.name}」嗎？`)) {
+      onDeleteUser(user.id);
+    }
+  };
+
+  return (
+    <div className="space-y-6 text-gray-900">
+        <div className="flex items-center justify-between">
+            <h1 className="text-2xl font-bold">人員權限管理</h1>
+            <button onClick={() => setIsModalOpen(true)} className="flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors shadow-sm">
+                <UserPlus size={18} /> 新增人員
+            </button>
+        </div>
+        
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+            <table className="w-full text-left">
+                <thead className="bg-gray-50 border-b border-gray-100">
+                    <tr className="text-xs font-bold text-gray-400 uppercase tracking-widest">
+                        <th className="px-6 py-4">姓名</th>
+                        <th className="px-6 py-4">電話</th>
+                        <th className="px-6 py-4">權限角色</th>
+                        <th className="px-6 py-4 text-right">操作</th>
+                    </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                    {users.map(user => (
+                        <tr key={user.id} className="hover:bg-gray-50/50 transition-colors">
+                            <td className="px-6 py-4 font-bold text-gray-900">
+                                {user.name} 
+                                {user.id === currentUser.id && <span className="text-[10px] bg-red-100 text-red-600 px-2 py-0.5 rounded ml-2 uppercase font-bold tracking-wider">You</span>}
+                            </td>
+                            <td className="px-6 py-4 font-mono text-gray-500">{user.phone}</td>
+                            <td className="px-6 py-4">
+                                <span className={`px-2 py-1 rounded text-xs font-bold ${
+                                    user.role === UserRole.SUPER_ADMIN ? 'bg-purple-100 text-purple-600' :
+                                    user.role === UserRole.MANAGER ? 'bg-blue-100 text-blue-600' :
+                                    'bg-gray-100 text-gray-600'
+                                }`}>
+                                    {user.role}
+                                </span>
+                            </td>
+                            <td className="px-6 py-4 text-right">
+                                {user.role !== UserRole.SUPER_ADMIN && user.id !== currentUser.id && (
+                                    <button onClick={() => confirmDelete(user)} className="text-gray-400 hover:text-red-600 p-2 hover:bg-red-50 rounded-lg transition-colors">
+                                        <Trash2 size={18} />
+                                    </button>
+                                )}
+                            </td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+        </div>
+
+        {isModalOpen && (
+            <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                <div className="bg-white w-full max-w-md rounded-2xl p-6 shadow-2xl">
+                    <h2 className="text-xl font-bold mb-6">新增管理人員</h2>
+                    <form onSubmit={handleSubmit} className="space-y-4">
+                        <div>
+                            <label className="block text-sm font-bold text-gray-700 mb-1">姓名</label>
+                            <input name="name" required className="w-full border rounded-lg px-3 py-3 outline-none focus:ring-2 focus:ring-red-500" placeholder="姓名" />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-bold text-gray-700 mb-1">手機號碼 (登入帳號)</label>
+                            <input name="phone" required className="w-full border rounded-lg px-3 py-3 outline-none focus:ring-2 focus:ring-red-500" placeholder="09xx-xxx-xxx" />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-bold text-gray-700 mb-1">密碼</label>
+                            <input name="password" type="password" required className="w-full border rounded-lg px-3 py-3 outline-none focus:ring-2 focus:ring-red-500" placeholder="設定密碼" />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-bold text-gray-700 mb-1">權限角色</label>
+                            <select name="role" className="w-full border rounded-lg px-3 py-3 bg-white outline-none focus:ring-2 focus:ring-red-500">
+                                <option value={UserRole.STAFF}>工作人員 (僅查看報到)</option>
+                                <option value={UserRole.MANAGER}>管理員 (可管理活動與會員)</option>
+                                <option value={UserRole.SUPER_ADMIN}>總管理員 (完全權限)</option>
+                            </select>
+                        </div>
+                        <div className="flex gap-4 pt-4">
+                            <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 border py-3 rounded-lg font-bold text-gray-500 hover:bg-gray-50 transition-colors">取消</button>
+                            <button type="submit" className="flex-1 bg-red-600 text-white py-3 rounded-lg font-bold shadow-lg shadow-red-100 hover:bg-red-700 active:scale-95 transition-all">確認新增</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        )}
     </div>
   );
 };
