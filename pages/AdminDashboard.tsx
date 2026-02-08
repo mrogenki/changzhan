@@ -11,7 +11,7 @@ interface AdminDashboardProps {
   registrations: Registration[];
   users: AdminUser[];
   members: Member[];
-  attendance: AttendanceRecord[]; // 新增 prop
+  attendance: AttendanceRecord[]; 
   onUpdateActivity: (act: Activity) => void;
   onAddActivity: (act: Activity) => void;
   onDeleteActivity: (id: string | number) => void;
@@ -23,8 +23,8 @@ interface AdminDashboardProps {
   onAddMembers?: (members: Member[]) => void;
   onUpdateMember: (member: Member) => void;
   onDeleteMember: (id: string | number) => void;
-  onUpdateAttendance: (activityId: string, memberId: string, status: AttendanceStatus) => void; // 新增 prop
-  onDeleteAttendance: (activityId: string, memberId: string) => void; // 新增 prop
+  onUpdateAttendance: (activityId: string, memberId: string, status: AttendanceStatus) => void; 
+  onDeleteAttendance: (activityId: string, memberId: string) => void; 
   onUploadImage: (file: File) => Promise<string>;
 }
 
@@ -128,13 +128,78 @@ const Sidebar: React.FC<{ user: AdminUser; onLogout: () => void }> = ({ user, on
 };
 
 const DashboardHome: React.FC<{ activities: Activity[]; registrations: Registration[] }> = ({ activities, registrations }) => {
+  // 計算活動統計資料
+  const activityStats = activities.map(activity => {
+    const activityRegs = registrations.filter(r => String(r.activityId) === String(activity.id));
+    const checkedIn = activityRegs.filter(r => r.check_in_status === true).length; 
+    const revenue = activityRegs.reduce((sum, r) => sum + (r.paid_amount || 0), 0);
+    const rate = activityRegs.length > 0 ? Math.round((checkedIn / activityRegs.length) * 100) : 0;
+    
+    return {
+      ...activity,
+      regCount: activityRegs.length,
+      checkedInCount: checkedIn,
+      checkInRate: rate,
+      revenue
+    };
+  });
+
   const activeActivities = activities.filter(a => !a.status || a.status === 'active');
   const totalRevenue = registrations.reduce((sum, reg) => sum + (reg.paid_amount || 0), 0);
   const checkedInCount = registrations.filter(r => r.check_in_status).length;
 
+  const handleSingleExport = (activity: Activity) => {
+    const targetRegs = registrations.filter(r => String(r.activityId) === String(activity.id));
+    if (targetRegs.length === 0) {
+      alert(`「${activity.title}」目前尚無報名資料，無法匯出。`);
+      return;
+    }
+    let csvContent = '\uFEFF';
+    const headers = ['活動名稱', '日期', '姓名', '電話', 'Email', '公司', '職稱', '引薦人', '繳費金額', '報到狀態', '報名時間'];
+    csvContent += headers.join(',') + '\n';
+    targetRegs.forEach(reg => {
+      const checkIn = reg.check_in_status ? '已報到' : '未報到';
+      const paid = reg.paid_amount || 0;
+      const regTime = new Date(reg.created_at).toLocaleString('zh-TW');
+      const escape = (text: string | undefined) => {
+        if (!text) return '""';
+        return `"${text.replace(/"/g, '""')}"`;
+      };
+      const row = [
+        escape(activity.title),
+        escape(activity.date),
+        escape(reg.name),
+        escape(reg.phone),
+        escape(reg.email),
+        escape(reg.company),
+        escape(reg.title),
+        escape(reg.referrer),
+        paid,
+        escape(checkIn),
+        escape(regTime)
+      ];
+      csvContent += row.join(',') + '\n';
+    });
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `${activity.date}_${activity.title}_報名名單.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-gray-800">活動儀表板</h1>
+    <div className="space-y-8 pb-12">
+      <header className="flex justify-between items-end">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-800">活動數據儀表板</h1>
+          <p className="text-gray-500">掌握各場活動的報名與收益狀況。</p>
+        </div>
+      </header>
+
+      {/* 總覽卡片 */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
           <div className="flex justify-between items-start">
@@ -173,6 +238,79 @@ const DashboardHome: React.FC<{ activities: Activity[]; registrations: Registrat
            </div>
         </div>
       </div>
+
+      {/* 活動列表與詳細數據 */}
+      <section className="space-y-6">
+        <h2 className="text-xl font-bold text-gray-800">各活動報名狀況</h2>
+        <div className="bg-white rounded-3xl border border-gray-100 shadow-xl overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead className="bg-gray-50/50 border-b border-gray-100">
+                <tr className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+                  <th className="px-8 py-6 w-1/3">活動名稱 / 時間</th>
+                  <th className="px-6 py-6">報名人數</th>
+                  <th className="px-6 py-6">實收金額</th>
+                  <th className="px-6 py-6">報到進度</th>
+                  <th className="px-6 py-6">報到率</th>
+                  <th className="px-8 py-6 text-right">操作</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {activityStats.map(stat => (
+                  <tr key={stat.id} className="hover:bg-red-50/30 transition-colors group">
+                    <td className="px-8 py-6">
+                      <div className="font-bold text-gray-900 text-lg">{stat.title}</div>
+                      <div className="flex items-center gap-2 text-xs text-gray-400 mt-1 font-medium">
+                        <Calendar size={12} className="text-red-600" />
+                        {stat.date}
+                        <Clock size={12} className="text-red-600 ml-2" />
+                        {stat.time}
+                        <span className="mx-1">•</span>
+                        <span className="px-2 py-0.5 rounded bg-gray-100 text-gray-500">{stat.type}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-6">
+                      <div className="text-2xl font-bold text-gray-800">{stat.regCount}</div>
+                    </td>
+                    <td className="px-6 py-6">
+                      <div className="text-xl font-bold text-red-600">NT$ {stat.revenue.toLocaleString()}</div>
+                    </td>
+                    <td className="px-6 py-6">
+                      <div className="text-lg font-bold text-gray-700">
+                        {stat.checkedInCount} <span className="text-gray-300 font-normal">/</span> {stat.regCount}
+                      </div>
+                    </td>
+                    <td className="px-6 py-6">
+                      <div className={`text-xl font-black ${stat.checkInRate > 80 ? 'text-green-600' : stat.checkInRate > 0 ? 'text-red-600' : 'text-gray-300'}`}>
+                        {stat.checkInRate}%
+                      </div>
+                    </td>
+                    <td className="px-8 py-6 text-right">
+                      <div className="flex justify-end items-center gap-2">
+                        <button 
+                          onClick={() => handleSingleExport(stat)}
+                          className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-green-50 text-green-600 hover:bg-green-600 hover:text-white transition-all shadow-sm"
+                          title="匯出此活動報名表"
+                        >
+                          <FileDown size={20} />
+                        </button>
+                        <Link 
+                          to="/admin/check-in" 
+                          state={{ activityId: stat.id }}
+                          className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-gray-100 text-gray-400 hover:bg-red-600 hover:text-white transition-all shadow-sm"
+                          title="進入報到管理"
+                        >
+                          <ChevronRight size={20} />
+                        </Link>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
     </div>
   );
 };
@@ -193,12 +331,73 @@ const CheckInManager: React.FC<{
     }
   }, [activities]);
 
-  const filteredRegistrations = registrations.filter(r => 
-    String(r.activityId) === selectedActivityId &&
-    (r.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-     r.phone.includes(searchTerm) ||
-     r.company?.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  const filteredRegistrations = registrations.filter(r => {
+    const matchesActivity = selectedActivityId === 'all' || String(r.activityId) === selectedActivityId;
+    const matchesSearch = r.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                          r.phone.includes(searchTerm) ||
+                          r.company?.toLowerCase().includes(searchTerm.toLowerCase());
+    return matchesActivity && matchesSearch;
+  });
+
+  const handleExport = () => {
+    if (filteredRegistrations.length === 0) {
+      alert('目前列表無資料可匯出');
+      return;
+    }
+    let csvContent = '\uFEFF';
+    const headers = ['活動名稱', '日期', '姓名', '電話', 'Email', '公司', '職稱', '引薦人', '繳費金額', '報到狀態', '報名時間'];
+    csvContent += headers.join(',') + '\n';
+
+    filteredRegistrations.forEach(reg => {
+      const activity = activities.find(a => String(a.id) === String(reg.activityId));
+      const actTitle = activity ? activity.title : '未知活動';
+      const actDate = activity ? activity.date : '';
+      const checkIn = reg.check_in_status ? '已報到' : '未報到';
+      const paid = reg.paid_amount || 0;
+      const regTime = new Date(reg.created_at).toLocaleString('zh-TW');
+
+      const escape = (text: string | undefined) => {
+        if (!text) return '""';
+        return `"${text.replace(/"/g, '""')}"`;
+      };
+
+      const row = [
+        escape(actTitle),
+        escape(actDate),
+        escape(reg.name),
+        escape(reg.phone),
+        escape(reg.email),
+        escape(reg.company),
+        escape(reg.title),
+        escape(reg.referrer),
+        paid,
+        escape(checkIn),
+        escape(regTime)
+      ];
+      csvContent += row.join(',') + '\n';
+    });
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    
+    let filename = '活動報名名單.csv';
+    if (selectedActivityId !== 'all') {
+      const act = activities.find(a => String(a.id) === String(selectedActivityId));
+      if (act) {
+        filename = `${act.date}_${act.title}_報名名單.csv`;
+      }
+    } else {
+      const dateStr = new Date().toISOString().split('T')[0];
+      filename = `所有活動報名名單_${dateStr}.csv`;
+    }
+    
+    link.href = url;
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   return (
     <div className="space-y-6">
@@ -207,12 +406,20 @@ const CheckInManager: React.FC<{
            <h1 className="text-2xl font-bold">報到管理 (訪客)</h1>
            <p className="text-gray-500 text-sm">管理活動報名人員的報到狀態與繳費紀錄。</p>
         </div>
-        <div className="w-full md:w-auto">
+        
+        <div className="flex items-center gap-2 w-full md:w-auto">
+          <button 
+            onClick={handleExport} 
+            className="flex items-center gap-2 bg-green-600 text-white px-4 py-3 rounded-xl hover:bg-green-700 transition-all shadow-sm active:scale-95 whitespace-nowrap"
+          >
+            <FileDown size={18}/> 匯出報名表
+          </button>
           <select 
             value={selectedActivityId} 
             onChange={e => setSelectedActivityId(e.target.value)} 
             className="w-full md:w-64 border rounded-xl px-4 py-3 bg-white outline-none focus:ring-2 focus:ring-red-500 font-bold"
           >
+            <option value="all">所有活動</option>
             {activities.map(a => (
               <option key={a.id} value={a.id}>{a.date} {a.title}</option>
             ))}
@@ -724,9 +931,8 @@ const MemberAttendanceManager: React.FC<{
                 {lateList.length === 0 ? <p className="text-gray-400 text-sm">無遲到人員</p> : (
                   <ul className="space-y-2">
                     {lateList.map((m: any) => (
-                      <li key={m.id} className="text-sm flex justify-between">
-                        <span>{m.name} <span className="text-gray-400 text-xs">({m.company})</span></span>
-                        <span className="font-mono text-gray-400 text-xs">{formatTime(m.updated_at)}</span>
+                      <li key={m.id} className="text-sm font-bold text-gray-700 py-1 border-b border-yellow-100 last:border-0">
+                        {m.name}
                       </li>
                     ))}
                   </ul>
@@ -743,9 +949,8 @@ const MemberAttendanceManager: React.FC<{
                 {substituteList.length === 0 ? <p className="text-gray-400 text-sm">無代理人員</p> : (
                   <ul className="space-y-2">
                     {substituteList.map((m: any) => (
-                      <li key={m.id} className="text-sm border-b border-dashed border-purple-100 last:border-0 pb-1 mb-1 last:mb-0 last:pb-0">
-                        <div className="font-bold text-gray-700">{m.name}</div>
-                        <div className="text-xs text-gray-400">{m.company}</div>
+                      <li key={m.id} className="text-sm font-bold text-gray-700 py-1 border-b border-purple-100 last:border-0">
+                        {m.name}
                       </li>
                     ))}
                   </ul>
@@ -762,9 +967,8 @@ const MemberAttendanceManager: React.FC<{
                 {medicalList.length === 0 ? <p className="text-gray-400 text-sm">無病假人員</p> : (
                   <ul className="space-y-2">
                     {medicalList.map((m: any) => (
-                      <li key={m.id} className="text-sm flex justify-between">
-                         <span>{m.name}</span>
-                         <span className="text-gray-400 text-xs">{m.company}</span>
+                      <li key={m.id} className="text-sm font-bold text-gray-700 py-1 border-b border-blue-100 last:border-0">
+                         {m.name}
                       </li>
                     ))}
                   </ul>
@@ -781,9 +985,8 @@ const MemberAttendanceManager: React.FC<{
                 {absentList.length === 0 ? <p className="text-gray-400 text-sm">無缺席人員</p> : (
                   <ul className="space-y-2">
                     {absentList.map((m: any) => (
-                      <li key={m.id} className="text-sm flex justify-between">
-                         <span className="text-red-600">{m.name}</span>
-                         <span className="text-gray-400 text-xs">{m.company}</span>
+                      <li key={m.id} className="text-sm font-bold text-red-600 py-1 border-b border-red-100 last:border-0">
+                         {m.name}
                       </li>
                     ))}
                   </ul>
