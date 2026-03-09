@@ -70,7 +70,8 @@ export interface Member {
   // 新增：會籍管理
   status?: 'active' | 'inactive'; // active=活躍(顯示), inactive=停權/離會(隱藏)
   join_date?: string; // 入會日期
-  quit_date?: string; // 離會日期
+  end_date?: string; // 會籍到期日
+  birthday?: string; // 新增：生日
 }
 
 // 新增：出席紀錄介面
