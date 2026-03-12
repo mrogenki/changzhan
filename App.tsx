@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
+import { HashRouter as Router, Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
 import { Menu, X, Loader2 } from 'lucide-react';
 import { createClient } from '@supabase/supabase-js';
 import Home from './pages/Home';
@@ -95,69 +95,70 @@ const App: React.FC = () => {
   // 修改：加入參數控制是否顯示 Loading 遮罩
   // 預設為 false (靜默更新)，只有初始化時傳入 true
   const fetchData = async (isInitialLoad = false) => {
-    console.log('fetchData started, isInitialLoad:', isInitialLoad);
     if (isInitialLoad) setLoading(true);
-    
-    const timeout = (ms: number) => new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), ms));
-
     try {
-      console.log('Fetching activities...');
-      
-      // 1. 優先獲取活動資料 (首頁最重要)
-      const { data: actData } = await Promise.race([
-        supabase.from('activities').select('*').order('date', { ascending: true }).order('time', { ascending: true }),
-        timeout(3000)
-      ]) as any;
-      
-      if (actData) {
+      // 獲取活動
+      const { data: actData } = await supabase.from('activities').select('*').order('date', { ascending: true }).order('time', { ascending: true });
+      if (actData && actData.length > 0) {
+        // 資料庫沒有 status 欄位，手動補上預設值，避免前端錯誤
         const mappedActs = actData.map((a: any) => ({
           ...a,
           status: a.status || 'active'
         }));
         setActivities(mappedActs);
+      } else if (actData && actData.length === 0) {
+        // 只有在資料庫真的完全沒資料時才初始化一次
+        const initActs = INITIAL_ACTIVITIES.map(({ id, status, ...rest }) => rest);
+        const { data: inserted } = await supabase.from('activities').insert(initActs).select();
+        if (inserted) {
+          const mappedInserted = inserted.map((a: any) => ({
+            ...a,
+            status: a.status || 'active'
+          }));
+          setActivities(mappedInserted);
+        }
       }
+
+      // 獲取報名
+      const { data: regData } = await supabase.from('registrations').select('*').order('created_at', { ascending: false });
+      if (regData) setRegistrations(regData);
       
-      // 2. 拿到活動後就先關閉 Loading，讓使用者看到內容
-      if (isInitialLoad) {
-        console.log('Activities loaded, turning off initial loading');
-        setLoading(false);
+      // 獲取管理員
+      const { data: userData, error: userError } = await supabase.from('admins').select('*');
+      if (userData && userData.length > 0) {
+        setUsers(userData);
+      } else if (!userError && userData && userData.length === 0) {
+        const initAdmins = INITIAL_ADMINS.map(({ id, ...rest }) => rest);
+        const { data: inserted } = await supabase.from('admins').insert(initAdmins).select();
+        if (inserted) setUsers(inserted);
       }
 
-      // 3. 背景繼續抓取其他次要資料
-      console.log('Fetching secondary data in background...');
-      
-      const [regRes, userRes, memberRes, attendanceRes] = await Promise.allSettled([
-        supabase.from('registrations').select('*').order('created_at', { ascending: false }),
-        supabase.from('admins').select('*'),
-        supabase.from('members').select('*'),
-        supabase.from('attendance').select('*')
-      ]);
+      // 獲取會員 (新增)
+      const { data: memberData, error: memberError } = await supabase.from('members').select('*');
+      if (memberData && memberData.length > 0) {
+        setMembers(memberData);
+      } else if (!memberError && memberData && memberData.length === 0) {
+        // 資料庫無資料時初始化
+        const initMembers = INITIAL_MEMBERS.map(({ id, ...rest }) => rest);
+        const { data: inserted } = await supabase.from('members').insert(initMembers).select();
+        if (inserted) setMembers(inserted);
+      }
 
-      if (regRes.status === 'fulfilled' && regRes.value.data) setRegistrations(regRes.value.data);
-      if (userRes.status === 'fulfilled' && userRes.value.data) setUsers(userRes.value.data);
-      if (memberRes.status === 'fulfilled' && memberRes.value.data) setMembers(memberRes.value.data);
-      if (attendanceRes.status === 'fulfilled' && attendanceRes.value.data) setAttendance(attendanceRes.value.data as AttendanceRecord[]);
-
-      console.log('All data fetching attempts completed');
+      // 獲取出席紀錄 (新增)
+      const { data: attendanceData } = await supabase.from('attendance').select('*');
+      if (attendanceData) {
+        setAttendance(attendanceData as AttendanceRecord[]);
+      }
 
     } catch (err) {
-      console.error('Critical fetch error:', err);
+      console.error('Fetch error:', err);
     } finally {
       if (isInitialLoad) setLoading(false);
     }
   };
 
   useEffect(() => {
-    console.log('App mounted, calling fetchData');
-    fetchData(true); 
-    
-    // 安全機制：如果 4 秒後還在轉圈圈，強制關閉 Loading 遮罩
-    const safetyTimer = setTimeout(() => {
-      console.log('Safety timer triggered, forcing loading to false');
-      setLoading(false);
-    }, 4000);
-    
-    return () => clearTimeout(safetyTimer);
+    fetchData(true); // 首次載入顯示 Loading
   }, []);
 
   const handleLogin = (user: AdminUser) => {
