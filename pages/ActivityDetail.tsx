@@ -62,10 +62,11 @@ const ActivityDetail: React.FC<ActivityDetailProps> = ({ activities, registratio
 
   const handleShare = async () => {
     const shareUrl = window.location.href;
-    const shareText = `【長展分會活動推薦】\n活動：${activity.title}\n日期：${activity.date}\n時間：${activity.time}\n地點：${activity.location}\n\n立即點擊連結報名：\n${shareUrl}`;
+    const shareText = `【長展分會活動推薦】\n活動：${activity.title}\n日期：${activity.date}\n時間：${activity.time}\n地點：${activity.location}\n\n立即點擊連結報名：`;
 
     if (navigator.share) {
       try {
+        // navigator.share 會自動處理 url，若 text 中也包含 url 會導致重複出現
         await navigator.share({
           title: activity.title,
           text: shareText,
@@ -75,8 +76,10 @@ const ActivityDetail: React.FC<ActivityDetailProps> = ({ activities, registratio
         console.log('Share failed', err);
       }
     } else {
+      // 不支援原生分享時，複製到剪貼簿的內容需包含連結
+      const fullCopyText = `${shareText}\n${shareUrl}`;
       try {
-        await navigator.clipboard.writeText(shareText);
+        await navigator.clipboard.writeText(fullCopyText);
         setShowCopyTooltip(true);
         setTimeout(() => setShowCopyTooltip(false), 2000);
       } catch (err) {

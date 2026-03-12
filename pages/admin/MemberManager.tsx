@@ -1,20 +1,19 @@
 
-import React, { useState, useRef } from 'react';
-import { Download, FileUp, UserPlus, Edit, Trash2, Shield, Eye, EyeOff, Globe, CalendarDays, FileDown } from 'lucide-react';
+import React, { useState } from 'react';
+import { Download, UserPlus, Edit, Trash2, Shield, Eye, EyeOff, Globe, CalendarDays, FileDown, Bell, AlertTriangle, X } from 'lucide-react';
 import { Member } from '../../types';
 
 interface MemberManagerProps {
   members: Member[];
   onAddMember: (m: Member) => void;
-  onAddMembers?: (m: Member[]) => void;
   onUpdateMember: (m: Member) => void;
   onDeleteMember: (id: string | number) => void;
 }
 
-const MemberManager: React.FC<MemberManagerProps> = ({ members, onAddMember, onAddMembers, onUpdateMember, onDeleteMember }) => {
+const MemberManager: React.FC<MemberManagerProps> = ({ members, onAddMember, onUpdateMember, onDeleteMember }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [editingMember, setEditingMember] = useState<Member | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -47,17 +46,19 @@ const MemberManager: React.FC<MemberManagerProps> = ({ members, onAddMember, onA
     }
   };
 
-  const handleDownloadTemplate = () => {
-    const csvContent = '\uFEFF會員編號,產業鏈(美食/工程/健康/幸福/工商),行業別,姓名,公司名稱,會員簡介,網站連結,狀態(active/inactive),入會日,會籍到期日,生日\n001,工商,網站設計,王小明,長展科技,專注於高質感網站設計...,https://example.com,active,2024-01-01,2025-01-01,1990-01-01';
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', '會員匯入範本.csv');
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  const getExpiringMembers = () => {
+    const now = new Date();
+    const ninetyDaysFromNow = new Date();
+    ninetyDaysFromNow.setDate(now.getDate() + 90);
+
+    return members.filter(m => {
+      if (!m.end_date || m.status === 'inactive') return false;
+      const endDate = new Date(m.end_date);
+      return endDate >= now && endDate <= ninetyDaysFromNow;
+    }).sort((a, b) => new Date(a.end_date!).getTime() - new Date(b.end_date!).getTime());
   };
+
+  const expiringMembers = getExpiringMembers();
 
   const handleExportMembers = () => {
     if (members.length === 0) {
@@ -106,77 +107,6 @@ const MemberManager: React.FC<MemberManagerProps> = ({ members, onAddMember, onA
     document.body.removeChild(link);
   };
 
-  const handleImportCSV = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      try {
-        const text = event.target?.result as string;
-        if (!text) {
-          alert('檔案內容為空');
-          return;
-        }
-        
-        const lines = text.split(/\r\n|\n|\r/);
-        const newMembers: Member[] = [];
-        
-        let startIndex = 0;
-        if (lines.length > 0 && (lines[0].includes('會員') || lines[0].includes('編號'))) {
-          startIndex = 1;
-        }
-        
-        for (let i = startIndex; i < lines.length; i++) {
-          const line = lines[i].trim();
-          if (!line) continue;
-          
-          const cols = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(s => s.trim().replace(/^"|"$/g, '').replace(/""/g, '"'));
-          
-          if (cols.length < 4) {
-             console.warn(`Line ${i+1} skipped due to insufficient columns:`, line);
-             continue;
-          }
-
-          const cleanVal = (val: string) => (val === '-' || !val) ? '' : val;
-
-          newMembers.push({
-            id: Date.now() + i,
-            member_no: cleanVal(cols[0]),
-            industry_chain: (['美食', '工程', '健康', '幸福', '工商'].includes(cols[1]) ? cols[1] : '工商') as any,
-            industry_category: cleanVal(cols[2]),
-            name: cleanVal(cols[3]),
-            company: cleanVal(cols[4]),
-            intro: cleanVal(cols[5]),
-            website: cleanVal(cols[6]),
-            status: cols[7] === 'inactive' ? 'inactive' : 'active',
-            join_date: cleanVal(cols[8]),
-            end_date: cleanVal(cols[9]),
-            birthday: cleanVal(cols[10])
-          });
-        }
-
-        if (newMembers.length > 0) {
-          if (window.confirm(`解析成功！共發現 ${newMembers.length} 筆資料。\n確定要匯入嗎？`)) {
-            if (onAddMembers) {
-              onAddMembers(newMembers);
-            } else {
-              alert('系統錯誤：找不到匯入函式 (onAddMembers is undefined)');
-            }
-          }
-        } else {
-          alert(`解析失敗。讀取到 ${lines.length} 行，但無法識別有效資料。\n原因可能是：\n1. 檔案格式不正確 (需為逗號分隔 CSV)\n2. 沒有有效資料行\n3. 編碼問題 (請嘗試另存為 UTF-8 編碼)`);
-        }
-      } catch (err) {
-        console.error(err);
-        alert('讀取檔案發生錯誤，請檢查檔案是否損毀。');
-      } finally {
-        if (fileInputRef.current) fileInputRef.current.value = '';
-      }
-    };
-    reader.readAsText(file);
-  };
-
   const sortedMembers = [...members].sort((a, b) => {
     const valA = a.member_no !== undefined && a.member_no !== null ? String(a.member_no) : '';
     const valB = b.member_no !== undefined && b.member_no !== null ? String(b.member_no) : '';
@@ -192,11 +122,17 @@ const MemberManager: React.FC<MemberManagerProps> = ({ members, onAddMember, onA
         <h1 className="text-2xl font-bold">會員資料管理</h1>
         <div className="flex gap-2">
           <button 
-            onClick={handleDownloadTemplate} 
-            className="flex items-center gap-2 bg-gray-100 text-gray-600 px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors border border-gray-200"
-            title="下載 CSV 範本"
+            onClick={() => setIsNotificationOpen(true)}
+            className="relative flex items-center gap-2 bg-white text-gray-600 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors border border-gray-200 shadow-sm"
+            title="會員狀態通知"
           >
-            <Download size={18} /> <span className="hidden sm:inline">下載範本</span>
+            <Bell size={18} className={expiringMembers.length > 0 ? "text-red-500 animate-bounce" : ""} />
+            <span className="hidden sm:inline">狀態通知</span>
+            {expiringMembers.length > 0 && (
+              <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full border-2 border-white">
+                {expiringMembers.length}
+              </span>
+            )}
           </button>
            <button 
             onClick={handleExportMembers} 
@@ -205,21 +141,6 @@ const MemberManager: React.FC<MemberManagerProps> = ({ members, onAddMember, onA
           >
             <FileDown size={18} /> <span className="hidden sm:inline">匯出 Excel</span>
           </button>
-          <div className="relative">
-            <button 
-              onClick={() => fileInputRef.current?.click()} 
-              className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors shadow-sm"
-            >
-              <FileUp size={18} /> 匯入 CSV
-            </button>
-            <input 
-              ref={fileInputRef}
-              type="file" 
-              accept=".csv" 
-              className="hidden" 
-              onChange={handleImportCSV} 
-            />
-          </div>
           <button onClick={() => { setEditingMember(null); setIsModalOpen(true); }} className="flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors shadow-sm">
             <UserPlus size={18} /> 新增會員
           </button>
@@ -382,6 +303,68 @@ const MemberManager: React.FC<MemberManagerProps> = ({ members, onAddMember, onA
                 <button type="submit" className="flex-1 bg-red-600 text-white py-3 rounded-lg font-bold shadow-lg shadow-red-100 hover:bg-red-700 active:scale-95 transition-all">確認儲存</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {isNotificationOpen && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-lg rounded-2xl p-8 shadow-2xl max-h-[80vh] flex flex-col">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-2">
+                <Bell className="text-red-600" size={24} />
+                <h2 className="text-xl font-bold">會員狀態通知</h2>
+              </div>
+              <button 
+                onClick={() => setIsNotificationOpen(false)}
+                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="bg-red-50 p-4 rounded-xl flex items-start gap-3 mb-6 border border-red-100">
+              <AlertTriangle className="text-red-600 shrink-0" size={20} />
+              <p className="text-sm text-red-800 font-medium">
+                以下會員的會籍將在 <span className="font-bold underline">90 天內</span> 到期，請提醒會員進行續約。
+              </p>
+            </div>
+
+            <div className="flex-1 overflow-y-auto space-y-3 pr-2 custom-scrollbar">
+              {expiringMembers.length > 0 ? (
+                expiringMembers.map(member => {
+                  const daysLeft = Math.ceil((new Date(member.end_date!).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+                  return (
+                    <div key={member.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-100 hover:border-red-200 transition-all">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center font-bold text-gray-400 border border-gray-100">
+                          {member.member_no}
+                        </div>
+                        <div>
+                          <p className="font-bold text-gray-900">{member.name}</p>
+                          <p className="text-xs text-gray-500">{member.company}</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-bold text-red-600">{member.end_date}</p>
+                        <p className="text-[10px] text-gray-400 font-medium">剩餘 {daysLeft} 天</p>
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="py-12 text-center">
+                  <p className="text-gray-400">目前沒有即將到期的會員</p>
+                </div>
+              )}
+            </div>
+
+            <button 
+              onClick={() => setIsNotificationOpen(false)}
+              className="w-full mt-6 bg-gray-900 text-white py-3 rounded-xl font-bold hover:bg-gray-800 transition-all"
+            >
+              關閉視窗
+            </button>
           </div>
         </div>
       )}
