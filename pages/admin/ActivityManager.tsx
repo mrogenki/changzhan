@@ -15,7 +15,20 @@ const ActivityManager: React.FC<ActivityManagerProps> = ({ activities, onAddActi
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingActivity, setEditingActivity] = useState<Activity | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [activeTab, setActiveTab] = useState<'upcoming' | 'past'>('upcoming');
   
+  const today = new Date().toISOString().split('T')[0];
+
+  const upcomingActivities = activities
+    .filter(a => a.date >= today)
+    .sort((a, b) => a.date.localeCompare(b.date));
+  
+  const pastActivities = activities
+    .filter(a => a.date < today)
+    .sort((a, b) => b.date.localeCompare(a.date));
+
+  const displayActivities = activeTab === 'upcoming' ? upcomingActivities : pastActivities;
+
   const defaultFormState = {
     title: '',
     type: ActivityType.REGULAR,
@@ -90,51 +103,80 @@ const ActivityManager: React.FC<ActivityManagerProps> = ({ activities, onAddActi
         </button>
       </div>
 
+      <div className="flex border-b border-gray-200">
+        <button
+          onClick={() => setActiveTab('upcoming')}
+          className={`px-6 py-3 font-bold text-sm transition-all border-b-2 ${
+            activeTab === 'upcoming' 
+              ? 'border-red-600 text-red-600' 
+              : 'border-transparent text-gray-400 hover:text-gray-600'
+          }`}
+        >
+          近期活動 ({upcomingActivities.length})
+        </button>
+        <button
+          onClick={() => setActiveTab('past')}
+          className={`px-6 py-3 font-bold text-sm transition-all border-b-2 ${
+            activeTab === 'past' 
+              ? 'border-red-600 text-red-600' 
+              : 'border-transparent text-gray-400 hover:text-gray-600'
+          }`}
+        >
+          過往活動 ({pastActivities.length})
+        </button>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {activities.map(activity => (
-          <div key={activity.id} className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden group hover:shadow-lg transition-all">
-            <div className="relative h-40">
-              <img src={activity.picture} alt={activity.title} className="w-full h-full object-cover" />
-              <div className="absolute top-2 right-2 flex gap-1">
-                <button 
-                  onClick={() => { setEditingActivity(activity); setIsModalOpen(true); }}
-                  className="p-2 bg-white/90 rounded-lg text-gray-700 hover:text-blue-600 backdrop-blur-sm"
-                >
-                  <Edit size={16} />
-                </button>
-                <button 
-                  onClick={() => { if(window.confirm('確定要刪除此活動嗎？')) onDeleteActivity(activity.id); }}
-                  className="p-2 bg-white/90 rounded-lg text-gray-700 hover:text-red-600 backdrop-blur-sm"
-                >
-                  <Trash2 size={16} />
-                </button>
+        {displayActivities.length > 0 ? (
+          displayActivities.map(activity => (
+            <div key={activity.id} className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden group hover:shadow-lg transition-all">
+              <div className="relative h-40">
+                <img src={activity.picture} alt={activity.title} className="w-full h-full object-cover" />
+                <div className="absolute top-2 right-2 flex gap-1">
+                  <button 
+                    onClick={() => { setEditingActivity(activity); setIsModalOpen(true); }}
+                    className="p-2 bg-white/90 rounded-lg text-gray-700 hover:text-blue-600 backdrop-blur-sm"
+                  >
+                    <Edit size={16} />
+                  </button>
+                  <button 
+                    onClick={() => { if(window.confirm('確定要刪除此活動嗎？')) onDeleteActivity(activity.id); }}
+                    className="p-2 bg-white/90 rounded-lg text-gray-700 hover:text-red-600 backdrop-blur-sm"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+                <div className="absolute bottom-2 left-2">
+                   <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${
+                      activity.type === ActivityType.REGULAR ? 'bg-red-600 text-white' : 'bg-gray-800 text-white'
+                   }`}>
+                     {activity.type}
+                   </span>
+                </div>
               </div>
-              <div className="absolute bottom-2 left-2">
-                 <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${
-                    activity.type === ActivityType.REGULAR ? 'bg-red-600 text-white' : 'bg-gray-800 text-white'
-                 }`}>
-                   {activity.type}
-                 </span>
+              <div className="p-4">
+                <div className="flex items-center gap-2 text-xs text-gray-400 font-bold mb-2">
+                  <Calendar size={12} /> {activity.date}
+                  <Clock size={12} /> {activity.time}
+                </div>
+                <h3 className="font-bold text-gray-900 mb-2 line-clamp-1">{activity.title}</h3>
+                <div className="flex items-center gap-1 text-xs text-gray-500 mb-4">
+                  <MapPin size={12} /> <span className="line-clamp-1">{activity.location}</span>
+                </div>
+                <div className="flex justify-between items-center pt-3 border-t border-gray-50">
+                   <span className="font-bold text-red-600">NT$ {activity.price}</span>
+                   <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${activity.date < today ? 'bg-gray-100 text-gray-400' : 'bg-green-50 text-green-600'}`}>
+                     {activity.date < today ? '已結束' : '進行中'}
+                   </span>
+                </div>
               </div>
             </div>
-            <div className="p-4">
-              <div className="flex items-center gap-2 text-xs text-gray-400 font-bold mb-2">
-                <Calendar size={12} /> {activity.date}
-                <Clock size={12} /> {activity.time}
-              </div>
-              <h3 className="font-bold text-gray-900 mb-2 line-clamp-1">{activity.title}</h3>
-              <div className="flex items-center gap-1 text-xs text-gray-500 mb-4">
-                <MapPin size={12} /> <span className="line-clamp-1">{activity.location}</span>
-              </div>
-              <div className="flex justify-between items-center pt-3 border-t border-gray-50">
-                 <span className="font-bold text-red-600">NT$ {activity.price}</span>
-                 <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${activity.status === 'closed' ? 'bg-gray-100 text-gray-400' : 'bg-green-50 text-green-600'}`}>
-                   {activity.status === 'closed' ? '已結束' : '進行中'}
-                 </span>
-              </div>
-            </div>
+          ))
+        ) : (
+          <div className="col-span-full py-20 text-center bg-white rounded-2xl border border-dashed border-gray-200">
+            <p className="text-gray-400 font-bold">目前沒有{activeTab === 'upcoming' ? '近期' : '過往'}活動</p>
           </div>
-        ))}
+        )}
       </div>
 
       {isModalOpen && (
