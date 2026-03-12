@@ -130,7 +130,7 @@ const ActivityManager: React.FC<ActivityManagerProps> = ({ activities, onAddActi
         {displayActivities.length > 0 ? (
           displayActivities.map(activity => (
             <div key={activity.id} className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden group hover:shadow-lg transition-all">
-              <div className="relative h-40">
+              <div className="relative aspect-video">
                 <img src={activity.picture} alt={activity.title} className="w-full h-full object-cover" />
                 <div className="absolute top-2 right-2 flex gap-1">
                   <button 

@@ -200,8 +200,12 @@ const ActivityDetail: React.FC<ActivityDetailProps> = ({ activities, registratio
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
         <div className="lg:col-span-2 space-y-8">
-          <div className="rounded-2xl overflow-hidden shadow-sm">
-            <img src={activity.picture} alt={activity.title} className="w-full h-[400px] object-cover" />
+          <div className="relative w-full aspect-video rounded-2xl overflow-hidden shadow-sm">
+            <img 
+              src={activity.picture} 
+              alt={activity.title} 
+              className="absolute inset-0 w-full h-full object-cover" 
+            />
           </div>
           
           <div>
