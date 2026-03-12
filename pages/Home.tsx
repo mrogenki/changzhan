@@ -1,8 +1,15 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Calendar, MapPin, DollarSign, ChevronRight, Clock } from 'lucide-react';
+import { Calendar, MapPin, DollarSign, ChevronRight, Clock, ChevronLeft } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { clsx, type ClassValue } from 'clsx';
+import { twMerge } from 'tailwind-merge';
 import { Activity, ActivityType } from '../types';
+
+function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
 
 interface HomeProps {
   activities: Activity[];
@@ -44,29 +51,196 @@ const ActivityCard: React.FC<{ activity: Activity }> = ({ activity }) => (
   </Link>
 );
 
-const Home: React.FC<HomeProps> = ({ activities }) => {
-  const now = new Date();
+const HeroCarousel: React.FC<{ activities: Activity[] }> = ({ activities }) => {
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [direction, setDirection] = useState(0);
 
-  const filterUpcoming = (a: Activity) => {
-    // 結合日期與時間進行比較
-    const activityFullDate = new Date(`${a.date.replace(/-/g, '/')} ${a.time}`);
-    // 如果 status 不存在 (undefined)，默認為 active
-    const isActive = a.status === 'active' || !a.status;
-    return isActive && activityFullDate > now;
+  useEffect(() => {
+    if (activities.length <= 1) return;
+    const timer = setInterval(() => {
+      setDirection(1);
+      setCurrentIndex((prev) => (prev + 1) % activities.length);
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [activities.length]);
+
+  const slideVariants = {
+    enter: (direction: number) => ({
+      x: direction > 0 ? '100%' : '-100%',
+      opacity: 0
+    }),
+    center: {
+      zIndex: 1,
+      x: 0,
+      opacity: 1
+    },
+    exit: (direction: number) => ({
+      zIndex: 0,
+      x: direction < 0 ? '100%' : '-100%',
+      opacity: 0
+    })
   };
 
-  const regularMeetings = activities.filter(a => a.type === ActivityType.REGULAR && filterUpcoming(a));
-  const specialEvents = activities.filter(a => a.type === ActivityType.SPECIAL && filterUpcoming(a));
+  const paginate = (newDirection: number) => {
+    setDirection(newDirection);
+    setCurrentIndex((prev) => (prev + newDirection + activities.length) % activities.length);
+  };
 
-  return (
-    <div className="pb-20">
-      {/* Hero Section */}
+  if (activities.length === 0) {
+    return (
       <section className="bg-red-600 text-white py-20 px-4">
         <div className="max-w-7xl mx-auto">
           <h1 className="text-4xl md:text-5xl font-extrabold mb-6">連結、成長、共好</h1>
           <p className="text-xl text-red-100 max-w-2xl">長展分會提供最專業的商務媒合與人脈交流活動，讓您的事業在這裡展翅高飛。</p>
         </div>
       </section>
+    );
+  }
+
+  const currentActivity = activities[currentIndex];
+
+  return (
+    <section className="relative w-full overflow-hidden bg-gray-900">
+      <div className="max-w-7xl mx-auto">
+        <div className="relative aspect-video w-full">
+          <AnimatePresence initial={false} custom={direction}>
+            <motion.div
+              key={currentIndex}
+              custom={direction}
+              variants={slideVariants}
+              initial="enter"
+              animate="center"
+              exit="exit"
+              transition={{
+                x: { type: "spring", stiffness: 300, damping: 30 },
+                opacity: { duration: 0.2 }
+              }}
+              className="absolute inset-0"
+            >
+              <div className="relative w-full h-full">
+                <img 
+                  src={currentActivity.picture} 
+                  alt={currentActivity.title}
+                  className="w-full h-full object-cover opacity-60"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex flex-col justify-end p-8 md:p-16">
+                  <div className="max-w-3xl space-y-4">
+                    <motion.span 
+                      initial={{ y: 20, opacity: 0 }}
+                      animate={{ y: 0, opacity: 1 }}
+                      transition={{ delay: 0.2 }}
+                      className="inline-block px-3 py-1 bg-red-600 text-white text-xs font-bold rounded-full uppercase tracking-widest"
+                    >
+                      {currentActivity.type}
+                    </motion.span>
+                    <motion.h2 
+                      initial={{ y: 20, opacity: 0 }}
+                      animate={{ y: 0, opacity: 1 }}
+                      transition={{ delay: 0.3 }}
+                      className="text-3xl md:text-5xl lg:text-6xl font-black text-white leading-tight"
+                    >
+                      {currentActivity.title}
+                    </motion.h2>
+                    <motion.div 
+                      initial={{ y: 20, opacity: 0 }}
+                      animate={{ y: 0, opacity: 1 }}
+                      transition={{ delay: 0.4 }}
+                      className="flex flex-wrap gap-4 text-gray-200 text-sm md:text-base font-medium"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Calendar size={18} className="text-red-500" />
+                        <span>{currentActivity.date}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Clock size={18} className="text-red-500" />
+                        <span>{currentActivity.time}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <MapPin size={18} className="text-red-500" />
+                        <span className="line-clamp-1">{currentActivity.location}</span>
+                      </div>
+                    </motion.div>
+                    <motion.div
+                      initial={{ y: 20, opacity: 0 }}
+                      animate={{ y: 0, opacity: 1 }}
+                      transition={{ delay: 0.5 }}
+                      className="pt-4"
+                    >
+                      <Link 
+                        to={`/activity/${currentActivity.id}`}
+                        className="inline-flex items-center gap-2 bg-white text-black px-8 py-3 rounded-full font-bold hover:bg-red-600 hover:text-white transition-all transform hover:scale-105 active:scale-95 shadow-xl"
+                      >
+                        立即報名 <ChevronRight size={20} />
+                      </Link>
+                    </motion.div>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </AnimatePresence>
+
+          {/* Navigation Controls */}
+          {activities.length > 1 && (
+            <>
+              <button
+                onClick={() => paginate(-1)}
+                className="absolute left-4 top-1/2 -translate-y-1/2 z-10 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white backdrop-blur-md transition-all"
+              >
+                <ChevronLeft size={24} />
+              </button>
+              <button
+                onClick={() => paginate(1)}
+                className="absolute right-4 top-1/2 -translate-y-1/2 z-10 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white backdrop-blur-md transition-all"
+              >
+                <ChevronRight size={24} />
+              </button>
+              
+              {/* Dots */}
+              <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10 flex gap-2">
+                {activities.map((_, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => {
+                      setDirection(idx > currentIndex ? 1 : -1);
+                      setCurrentIndex(idx);
+                    }}
+                    className={cn(
+                      "w-2 h-2 rounded-full transition-all",
+                      idx === currentIndex ? "bg-red-600 w-8" : "bg-white/40 hover:bg-white/60"
+                    )}
+                  />
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+};
+
+const Home: React.FC<HomeProps> = ({ activities }) => {
+  const now = new Date();
+
+  const filterUpcoming = (a: Activity) => {
+    const activityFullDate = new Date(`${a.date.replace(/-/g, '/')} ${a.time}`);
+    const isActive = a.status === 'active' || !a.status;
+    return isActive && activityFullDate > now;
+  };
+
+  const upcomingActivities = activities.filter(filterUpcoming);
+  const regularMeetings = upcomingActivities.filter(a => a.type === ActivityType.REGULAR);
+  const specialEvents = upcomingActivities.filter(a => a.type === ActivityType.SPECIAL);
+
+  // 用於輪播的活動 (取最近的 5 個)
+  const carouselActivities = [...upcomingActivities]
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+    .slice(0, 5);
+
+  return (
+    <div className="pb-20">
+      {/* Hero Carousel */}
+      <HeroCarousel activities={carouselActivities} />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="space-y-16">
