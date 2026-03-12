@@ -422,7 +422,7 @@ const App: React.FC = () => {
           <Routes>
             <Route path="/" element={<Home activities={activities} />} />
             <Route path="/members" element={<MemberList members={members} />} /> {/* 新增路由 */}
-            <Route path="/activity/:id" element={<ActivityDetail activities={activities} onRegister={handleRegister} registrations={registrations} />} />
+            <Route path="/activity/:id" element={<ActivityDetail activities={activities} onRegister={handleRegister} registrations={registrations} members={members} />} />
             <Route path="/admin/login" element={currentUser ? <Navigate to="/admin" /> : <LoginPage users={users} onLogin={handleLogin} />} />
             <Route path="/admin/*" element={
               currentUser ? (

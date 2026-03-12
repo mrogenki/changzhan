@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Calendar, MapPin, DollarSign, ArrowLeft, CheckCircle2, Share2, CopyCheck, Clock, Loader2 } from 'lucide-react';
+import { Calendar, MapPin, DollarSign, ArrowLeft, CheckCircle2, Share2, CopyCheck, Clock, Loader2, Search, User } from 'lucide-react';
 import emailjs from '@emailjs/browser';
-import { Activity, Registration } from '../types';
+import { Activity, Registration, Member } from '../types';
 
 // TODO: 請替換為您 EmailJS 後台的實際資訊
 // 1. 前往 https://www.emailjs.com/ 註冊
@@ -17,10 +17,11 @@ const EMAILJS_PUBLIC_KEY: string = 'ajJknYqtnk3p1_WmI';
 interface ActivityDetailProps {
   activities: Activity[];
   registrations: Registration[];
+  members: Member[];
   onRegister: (reg: Registration) => Promise<boolean>; // 更新型別
 }
 
-const ActivityDetail: React.FC<ActivityDetailProps> = ({ activities, registrations, onRegister }) => {
+const ActivityDetail: React.FC<ActivityDetailProps> = ({ activities, registrations, members, onRegister }) => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const activity = activities.find(a => String(a.id) === id);
@@ -37,6 +38,21 @@ const ActivityDetail: React.FC<ActivityDetailProps> = ({ activities, registratio
     title: '',
     referrer: ''
   });
+
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+
+  const filteredMembers = members.filter(m => 
+    m.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (m.company && m.company.toLowerCase().includes(searchTerm.toLowerCase()))
+  );
+
+  const displayOptions = [
+    ...(searchTerm === '' || 'BNI長展分會'.toLowerCase().includes(searchTerm.toLowerCase()) 
+      ? [{ id: 'special-bni', name: 'BNI長展分會', company: '網路資訊 / 無特定引薦人', isSpecial: true }] 
+      : []),
+    ...filteredMembers
+  ];
 
   if (!activity) {
     return <div className="p-20 text-center">活動不存在</div>;
@@ -118,8 +134,7 @@ const ActivityDetail: React.FC<ActivityDetailProps> = ({ activities, registratio
       email: formData.email,
       company: formData.company,
       title: formData.title,
-      // referrer 是選填
-      ...(formData.referrer ? { referrer: formData.referrer } : {}),
+      referrer: formData.referrer,
       created_at: new Date().toISOString()
     };
 
@@ -293,15 +308,77 @@ const ActivityDetail: React.FC<ActivityDetailProps> = ({ activities, registratio
                   placeholder="您的目前職位"
                 />
               </div>
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">引薦人 (選填)</label>
-                <input 
-                  type="text" 
-                  value={formData.referrer}
-                  onChange={e => setFormData({...formData, referrer: e.target.value})}
-                  className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all outline-none"
-                  placeholder="引薦您的分會成員姓名"
-                />
+              <div className="relative">
+                <label className="block text-sm font-bold text-gray-700 mb-2">引薦人</label>
+                <div className="relative">
+                  <input 
+                    required
+                    type="text" 
+                    value={formData.referrer}
+                    onChange={e => {
+                      setFormData({...formData, referrer: e.target.value});
+                      setSearchTerm(e.target.value);
+                      setIsDropdownOpen(true);
+                    }}
+                    onFocus={() => setIsDropdownOpen(true)}
+                    className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all outline-none"
+                    placeholder="搜尋或選擇引薦人 (若無請選 BNI長展分會)"
+                  />
+                  <div className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400">
+                    <Search size={18} />
+                  </div>
+                </div>
+
+                {isDropdownOpen && (searchTerm || isDropdownOpen) && (
+                  <div className="absolute z-10 w-full mt-2 bg-white border border-gray-100 rounded-xl shadow-2xl max-h-60 overflow-y-auto animate-in fade-in slide-in-from-top-2 duration-200">
+                    {displayOptions.length > 0 ? (
+                      displayOptions.map(member => (
+                        <button
+                          key={member.id}
+                          type="button"
+                          onClick={() => {
+                            setFormData({...formData, referrer: member.name});
+                            setSearchTerm('');
+                            setIsDropdownOpen(false);
+                          }}
+                          className={`w-full px-4 py-3 text-left hover:bg-red-50 flex items-center justify-between transition-colors border-b border-gray-50 last:border-0 ${member.isSpecial ? 'bg-red-50/30' : ''}`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center ${member.isSpecial ? 'bg-red-600 text-white' : 'bg-red-100 text-red-600'}`}>
+                              <User size={14} />
+                            </div>
+                            <div>
+                              <p className="font-bold text-gray-800">{member.name}</p>
+                              <p className="text-xs text-gray-400">{member.company || '長展分會成員'}</p>
+                            </div>
+                          </div>
+                          <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${member.isSpecial ? 'bg-red-600 text-white' : 'bg-gray-100 text-gray-500'}`}>
+                            {member.isSpecial ? '官方選項' : '分會成員'}
+                          </span>
+                        </button>
+                      ))
+                    ) : (
+                      <div className="px-4 py-6 text-center">
+                        <p className="text-gray-400 text-sm">找不到相符的成員</p>
+                        <button 
+                          type="button"
+                          onClick={() => setIsDropdownOpen(false)}
+                          className="text-red-600 text-xs font-bold mt-2 hover:underline"
+                        >
+                          直接使用輸入的姓名
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+                
+                {/* 點擊外部關閉下拉選單 */}
+                {isDropdownOpen && (
+                  <div 
+                    className="fixed inset-0 z-0" 
+                    onClick={() => setIsDropdownOpen(false)}
+                  />
+                )}
               </div>
               
               <button 
