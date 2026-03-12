@@ -5,8 +5,8 @@ export const INITIAL_ACTIVITIES: Activity[] = [
   {
     id: '1',
     type: ActivityType.REGULAR,
-    title: '長展分會週二早晨例會',
-    date: '2024-06-18',
+    title: '長展分會週二早晨會員專屬活動',
+    date: '2026-06-16',
     time: '06:30',
     location: '台北市大安區忠孝東路四段 218 號 (阿波羅大廈)',
     price: 500,

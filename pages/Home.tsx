@@ -244,14 +244,17 @@ const Home: React.FC<HomeProps> = ({ activities }) => {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="space-y-16">
-          {/* Regular Meetings */}
+          {/* Regular Meetings (Member Exclusive) */}
           {regularMeetings.length > 0 && (
             <div>
               <div className="flex items-center justify-between mb-8">
-                <h2 className="text-2xl font-bold flex items-center gap-2">
-                  <span className="w-2 h-8 bg-red-600 rounded-full"></span>
-                  即將舉行的例會
-                </h2>
+                <div className="flex flex-col">
+                  <h2 className="text-2xl font-bold flex items-center gap-2">
+                    <span className="w-2 h-8 bg-red-600 rounded-full"></span>
+                    會員專屬活動
+                  </h2>
+                  <p className="text-gray-500 text-sm mt-1 ml-4">（會員專屬的活動例如培訓課程等）</p>
+                </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                 {regularMeetings.map(activity => (
@@ -261,14 +264,17 @@ const Home: React.FC<HomeProps> = ({ activities }) => {
             </div>
           )}
 
-          {/* Special Events */}
+          {/* Special Events (Recent Activities) */}
           {specialEvents.length > 0 && (
             <div>
               <div className="flex items-center justify-between mb-8">
-                <h2 className="text-2xl font-bold flex items-center gap-2">
-                  <span className="w-2 h-8 bg-gray-800 rounded-full"></span>
-                  近期精選活動
-                </h2>
+                <div className="flex flex-col">
+                  <h2 className="text-2xl font-bold flex items-center gap-2">
+                    <span className="w-2 h-8 bg-gray-800 rounded-full"></span>
+                    一般活動
+                  </h2>
+                  <p className="text-gray-500 text-sm mt-1 ml-4">（公開型的活動，可以邀請來賓一同參與）</p>
+                </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                 {specialEvents.map(activity => (

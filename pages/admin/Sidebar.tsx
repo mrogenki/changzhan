@@ -40,7 +40,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
         
         <Link to="/admin/attendance" className={`flex items-center gap-3 p-3 rounded-lg transition-colors ${location.pathname.startsWith('/admin/attendance') ? 'bg-red-600 text-white' : 'hover:bg-gray-800'}`}>
           <ClipboardList size={20} />
-          <span>會員報到 (例會)</span>
+          <span>會員報到 (會員專屬)</span>
         </Link>
         
         {canAccessActivities && (

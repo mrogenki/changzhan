@@ -1,7 +1,7 @@
 
 export enum ActivityType {
-  REGULAR = '例會',
-  SPECIAL = '精選活動'
+  REGULAR = '會員專屬',
+  SPECIAL = '一般活動'
 }
 
 export enum UserRole {

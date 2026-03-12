@@ -100,8 +100,8 @@ const AttendanceManager: React.FC<AttendanceManagerProps> = ({ activities, membe
     <div className="space-y-6 pb-10">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold">會員報到 (例會)</h1>
-          <p className="text-gray-500 text-sm">每週例會會員出席狀況記錄。</p>
+          <h1 className="text-2xl font-bold">會員報到 (會員專屬)</h1>
+          <p className="text-gray-500 text-sm">會員專屬活動出席狀況記錄。</p>
         </div>
         <div className="w-full md:w-auto">
           <select 
@@ -109,7 +109,7 @@ const AttendanceManager: React.FC<AttendanceManagerProps> = ({ activities, membe
             onChange={e => setSelectedActivityId(e.target.value)} 
             className="w-full md:w-64 border rounded-xl px-4 py-3 bg-white outline-none focus:ring-2 focus:ring-red-500 font-bold"
           >
-            {regularActivities.length === 0 && <option value="">無例會活動</option>}
+            {regularActivities.length === 0 && <option value="">無會員專屬活動</option>}
             {regularActivities.map(a => (
               <option key={a.id} value={a.id}>{a.date} {a.title}</option>
             ))}

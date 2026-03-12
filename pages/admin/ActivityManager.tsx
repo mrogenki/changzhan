@@ -112,7 +112,7 @@ const ActivityManager: React.FC<ActivityManagerProps> = ({ activities, onAddActi
               : 'border-transparent text-gray-400 hover:text-gray-600'
           }`}
         >
-          近期活動 ({upcomingActivities.length})
+          即將舉行 ({upcomingActivities.length})
         </button>
         <button
           onClick={() => setActiveTab('past')}
@@ -202,8 +202,8 @@ const ActivityManager: React.FC<ActivityManagerProps> = ({ activities, onAddActi
                      onChange={e => setFormData({...formData, type: e.target.value as ActivityType})}
                      className="w-full border rounded-lg px-3 py-3 bg-white outline-none focus:ring-2 focus:ring-red-500"
                    >
-                     <option value={ActivityType.REGULAR}>例會</option>
-                     <option value={ActivityType.SPECIAL}>精選活動</option>
+                     <option value={ActivityType.REGULAR}>會員專屬</option>
+                     <option value={ActivityType.SPECIAL}>一般活動</option>
                    </select>
                 </div>
                 <div>
