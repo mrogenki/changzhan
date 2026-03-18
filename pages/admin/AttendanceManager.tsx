@@ -12,18 +12,18 @@ interface AttendanceManagerProps {
 }
 
 const AttendanceManager: React.FC<AttendanceManagerProps> = ({ activities, members, attendance, onUpdateAttendance, onDeleteAttendance }) => {
-  const regularActivities = activities.filter(a => a.type === ActivityType.REGULAR);
+  const allActivities = activities;
   
   const defaultActivityId = React.useMemo(() => {
-    if (regularActivities.length === 0) return '';
+    if (allActivities.length === 0) return '';
     const now = new Date();
-    const sorted = [...regularActivities].sort((a, b) => {
+    const sorted = [...allActivities].sort((a, b) => {
        const da = new Date(a.date).getTime();
        const db = new Date(b.date).getTime();
        return Math.abs(da - now.getTime()) - Math.abs(db - now.getTime());
     });
     return String(sorted[0].id);
-  }, [regularActivities]);
+  }, [allActivities]);
 
   const [selectedActivityId, setSelectedActivityId] = useState(defaultActivityId);
   const [searchTerm, setSearchTerm] = useState('');
@@ -100,8 +100,8 @@ const AttendanceManager: React.FC<AttendanceManagerProps> = ({ activities, membe
     <div className="space-y-6 pb-10">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold">會員報到 (會員專屬)</h1>
-          <p className="text-gray-500 text-sm">會員專屬活動出席狀況記錄。</p>
+          <h1 className="text-2xl font-bold">會員報到</h1>
+          <p className="text-gray-500 text-sm">所有活動的會員出席狀況記錄。</p>
         </div>
         <div className="w-full md:w-auto">
           <select 
@@ -109,8 +109,8 @@ const AttendanceManager: React.FC<AttendanceManagerProps> = ({ activities, membe
             onChange={e => setSelectedActivityId(e.target.value)} 
             className="w-full md:w-64 border rounded-xl px-4 py-3 bg-white outline-none focus:ring-2 focus:ring-red-500 font-bold"
           >
-            {regularActivities.length === 0 && <option value="">無會員專屬活動</option>}
-            {regularActivities.map(a => (
+            {allActivities.length === 0 && <option value="">無活動資料</option>}
+            {allActivities.map(a => (
               <option key={a.id} value={a.id}>{a.date} {a.title}</option>
             ))}
           </select>
