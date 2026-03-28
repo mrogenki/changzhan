@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Plus, Edit, Trash2, Image as ImageIcon, Calendar, Tag, Loader2, UploadCloud } from 'lucide-react';
+import { Plus, Edit, Trash2, Image as ImageIcon, Calendar, Tag, Loader2, UploadCloud, X } from 'lucide-react';
 import { Milestone, MilestoneType } from '../../types';
 
 interface MilestoneManagerProps {
@@ -22,6 +22,7 @@ const MilestoneManager: React.FC<MilestoneManagerProps> = ({
   const [editingMilestone, setEditingMilestone] = useState<Milestone | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [milestoneImage, setMilestoneImage] = useState('');
+  const [milestoneImages, setMilestoneImages] = useState<string[]>([]);
 
   const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -39,6 +40,30 @@ const MilestoneManager: React.FC<MilestoneManagerProps> = ({
     }
   };
 
+  const handleAddMoreImages = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      setIsUploading(true);
+      try {
+        const newUrls = [];
+        for (let i = 0; i < files.length; i++) {
+          const url = await onUploadImage(files[i]);
+          newUrls.push(url);
+        }
+        setMilestoneImages(prev => [...prev, ...newUrls]);
+      } catch (error: any) {
+        console.error('Upload error:', error);
+        alert('部分圖片上傳失敗: ' + (error.message || '請檢查 Supabase Storage 權限設定'));
+      } finally {
+        setIsUploading(false);
+      }
+    }
+  };
+
+  const removeImage = (index: number) => {
+    setMilestoneImages(prev => prev.filter((_, i) => i !== index));
+  };
+
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
@@ -47,6 +72,7 @@ const MilestoneManager: React.FC<MilestoneManagerProps> = ({
       title: formData.get('title') as string,
       date: formData.get('date') as string,
       image_url: milestoneImage,
+      images: milestoneImages,
       description: formData.get('description') as string,
     };
 
@@ -58,15 +84,18 @@ const MilestoneManager: React.FC<MilestoneManagerProps> = ({
     setIsModalOpen(false);
     setEditingMilestone(null);
     setMilestoneImage('');
+    setMilestoneImages([]);
   };
 
   const handleOpenModal = (milestone?: Milestone) => {
     if (milestone) {
       setEditingMilestone(milestone);
       setMilestoneImage(milestone.image_url);
+      setMilestoneImages(milestone.images || []);
     } else {
       setEditingMilestone(null);
       setMilestoneImage('');
+      setMilestoneImages([]);
     }
     setIsModalOpen(true);
   };
@@ -178,7 +207,7 @@ const MilestoneManager: React.FC<MilestoneManagerProps> = ({
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">圖片</label>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">封面圖片</label>
                   <div className="flex gap-4 items-start">
                     <div className="w-24 h-24 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0 border border-gray-200">
                       {milestoneImage ? (
@@ -203,10 +232,45 @@ const MilestoneManager: React.FC<MilestoneManagerProps> = ({
                           className="flex items-center justify-center gap-2 w-full py-2 border-2 border-dashed border-gray-200 rounded-lg text-sm text-gray-500 hover:border-red-300 hover:text-red-600 cursor-pointer transition-all"
                         >
                           {isUploading ? <Loader2 className="animate-spin" size={16} /> : <UploadCloud size={16} />}
-                          {isUploading ? '上傳中...' : '選擇圖片'}
+                          {isUploading ? '上傳中...' : '更換封面圖片'}
                         </label>
                       </div>
-                      <p className="text-[10px] text-gray-400 mt-2">建議尺寸: 16:9 (例如 1280x720)</p>
+                      <p className="text-[10px] text-gray-400 mt-2">這將作為大事記列表的主圖</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">更多照片 (點進去可看)</label>
+                  <div className="grid grid-cols-4 gap-2 mb-2">
+                    {milestoneImages.map((img, idx) => (
+                      <div key={idx} className="relative aspect-square bg-gray-100 rounded-lg overflow-hidden border border-gray-200 group">
+                        <img src={img} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                        <button
+                          type="button"
+                          onClick={() => removeImage(idx)}
+                          className="absolute top-1 right-1 p-1 bg-red-600 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <X size={10} />
+                        </button>
+                      </div>
+                    ))}
+                    <div className="relative aspect-square">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        onChange={handleAddMoreImages}
+                        className="hidden"
+                        id="milestone-more-images-upload"
+                      />
+                      <label
+                        htmlFor="milestone-more-images-upload"
+                        className="flex flex-col items-center justify-center w-full h-full border-2 border-dashed border-gray-200 rounded-lg text-gray-400 hover:border-red-300 hover:text-red-600 cursor-pointer transition-all"
+                      >
+                        <Plus size={20} />
+                        <span className="text-[10px] mt-1">新增</span>
+                      </label>
                     </div>
                   </div>
                 </div>

@@ -45,6 +45,7 @@ export interface Milestone {
   title: string;
   date: string;
   image_url: string;
+  images?: string[]; // 新增：多張照片
   description: string;
   created_at?: string;
 }
