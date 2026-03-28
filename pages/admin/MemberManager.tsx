@@ -127,8 +127,9 @@ const MemberManager: React.FC<MemberManagerProps> = ({ members, onAddMember, onU
       try {
         const url = await onUploadImage(file);
         setMemberPicture(url);
-      } catch (error) {
-        alert('圖片上傳失敗');
+      } catch (error: any) {
+        console.error('Upload error:', error);
+        alert('圖片上傳失敗: ' + (error.message || '請檢查 Supabase Storage 權限設定'));
       } finally {
         setIsUploading(false);
       }

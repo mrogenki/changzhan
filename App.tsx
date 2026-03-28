@@ -39,7 +39,7 @@ const Header: React.FC = () => {
           <div className="flex items-center">
             <Link to="/" className="flex-shrink-0 flex items-center gap-2">
               <div className="w-8 h-8 bg-red-600 rounded-md flex items-center justify-center text-white font-bold">長</div>
-              <span className="text-xl font-bold tracking-tight">長展分會活動報名</span>
+              <span className="text-xl font-bold tracking-tight">長展分會</span>
             </Link>
           </div>
           <div className="hidden sm:flex items-center space-x-8">
@@ -77,7 +77,7 @@ const Footer: React.FC = () => {
           <div className="w-6 h-6 bg-red-600 rounded-md flex items-center justify-center text-white text-xs font-bold">長</div>
           <span className="font-bold text-gray-800 tracking-wider">BNI 長展分會</span>
         </div>
-        <p className="text-gray-400 text-xs">&copy; 2026 長展分會活動報名系統. All rights reserved.</p>
+        <p className="text-gray-400 text-xs">&copy; 2026 長展分會. All rights reserved.</p>
       </div>
     </footer>
   );

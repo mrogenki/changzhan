@@ -30,8 +30,9 @@ const MilestoneManager: React.FC<MilestoneManagerProps> = ({
       try {
         const url = await onUploadImage(file);
         setMilestoneImage(url);
-      } catch (error) {
-        alert('圖片上傳失敗');
+      } catch (error: any) {
+        console.error('Upload error:', error);
+        alert('圖片上傳失敗: ' + (error.message || '請檢查 Supabase Storage 權限設定'));
       } finally {
         setIsUploading(false);
       }
