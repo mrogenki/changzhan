@@ -208,6 +208,7 @@ const ActivityDetail: React.FC<ActivityDetailProps> = ({ activities, registratio
               src={activity.picture} 
               alt={activity.title} 
               className="absolute inset-0 w-full h-full object-cover" 
+              referrerPolicy="no-referrer"
             />
           </div>
           

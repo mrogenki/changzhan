@@ -8,7 +8,8 @@ import ActivityDetail from './pages/ActivityDetail';
 import AdminDashboard from './pages/AdminDashboard';
 import LoginPage from './pages/LoginPage';
 import MemberList from './pages/MemberList'; // 新增 import
-import { Activity, ActivityType, Registration, AdminUser, Member, AttendanceRecord, AttendanceStatus } from './types';
+import Milestones from './pages/Milestones';
+import { Activity, ActivityType, Registration, AdminUser, Member, AttendanceRecord, AttendanceStatus, FinanceRecord, Milestone } from './types';
 import { INITIAL_ACTIVITIES, INITIAL_ADMINS, INITIAL_MEMBERS } from './constants'; // 新增 import
 
 const getEnv = (key: string): string | undefined => {
@@ -44,6 +45,7 @@ const Header: React.FC = () => {
           <div className="hidden sm:flex items-center space-x-8">
             <Link to="/" className="text-gray-700 hover:text-red-600 transition-colors font-medium">活動首頁</Link>
             <Link to="/members" className="text-gray-700 hover:text-red-600 transition-colors font-medium">會員列表</Link>
+            <Link to="/milestones" className="text-gray-700 hover:text-red-600 transition-colors font-medium">長展大事記</Link>
             <Link to="/admin" className="text-gray-500 hover:text-gray-900 flex items-center gap-1 border border-gray-200 px-3 py-1 rounded-full text-sm font-bold">後台管理</Link>
           </div>
           <div className="sm:hidden flex items-center">
@@ -57,6 +59,7 @@ const Header: React.FC = () => {
         <div className="sm:hidden bg-white border-t px-4 py-3 space-y-3 shadow-lg">
           <Link to="/" onClick={() => setIsOpen(false)} className="block text-gray-700 font-bold">活動首頁</Link>
           <Link to="/members" onClick={() => setIsOpen(false)} className="block text-gray-700 font-bold">會員列表</Link>
+          <Link to="/milestones" onClick={() => setIsOpen(false)} className="block text-gray-700 font-bold">長展大事記</Link>
           <Link to="/admin" onClick={() => setIsOpen(false)} className="block text-gray-500 text-sm font-bold">後台管理</Link>
         </div>
       )}
@@ -86,6 +89,8 @@ const App: React.FC = () => {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [members, setMembers] = useState<Member[]>([]); // 新增 members state
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]); // 新增 attendance state
+  const [financeRecords, setFinanceRecords] = useState<FinanceRecord[]>([]); // 新增 financeRecords state
+  const [milestones, setMilestones] = useState<Milestone[]>([]); // 新增 milestones state
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<AdminUser | null>(() => {
     const saved = sessionStorage.getItem('current_user');
@@ -168,6 +173,18 @@ const App: React.FC = () => {
         setAttendance(attendanceData as AttendanceRecord[]);
       }
 
+      // 獲取收支紀錄 (新增)
+      const { data: financeData } = await supabase.from('finance_records').select('*').order('date', { ascending: false });
+      if (financeData) {
+        setFinanceRecords(financeData as FinanceRecord[]);
+      }
+
+      // 獲取大事記 (新增)
+      const { data: milestoneData } = await supabase.from('milestones').select('*').order('date', { ascending: false });
+      if (milestoneData) {
+        setMilestones(milestoneData as Milestone[]);
+      }
+
     } catch (err) {
       console.error('Fetch error:', err);
     } finally {
@@ -204,7 +221,6 @@ const App: React.FC = () => {
         });
 
       if (uploadError) {
-        console.warn('Supabase Storage 上傳失敗，嘗試轉為壓縮 Base64', uploadError.message);
         throw uploadError; 
       }
 
@@ -215,44 +231,8 @@ const App: React.FC = () => {
       return data.publicUrl;
 
     } catch (error: any) {
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
-        reader.onload = (event) => {
-          const img = new Image();
-          img.src = event.target?.result as string;
-          img.onload = () => {
-            const canvas = document.createElement('canvas');
-            let width = img.width;
-            let height = img.height;
-            const MAX_WIDTH = 1024;
-            const MAX_HEIGHT = 1024;
-            if (width > height) {
-              if (width > MAX_WIDTH) {
-                height *= MAX_WIDTH / width;
-                width = MAX_WIDTH;
-              }
-            } else {
-              if (height > MAX_HEIGHT) {
-                width *= MAX_HEIGHT / height;
-                height = MAX_HEIGHT;
-              }
-            }
-            canvas.width = width;
-            canvas.height = height;
-            const ctx = canvas.getContext('2d');
-            if (!ctx) {
-                reject(new Error('瀏覽器不支援 Canvas 處理'));
-                return;
-            }
-            ctx.drawImage(img, 0, 0, width, height);
-            const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
-            resolve(dataUrl);
-          };
-          img.onerror = () => reject(new Error('圖片處理失敗'));
-        };
-        reader.onerror = () => reject(new Error('檔案讀取失敗'));
-      });
+      console.error('圖片上傳失敗:', error);
+      throw error;
     }
   };
 
@@ -398,6 +378,46 @@ const App: React.FC = () => {
     }
   };
 
+  // 新增：收支管理相關功能
+  const handleAddFinanceRecord = async (newRecord: FinanceRecord) => {
+    const { id, ...recordData } = newRecord as any;
+    const { error } = await supabase.from('finance_records').insert([recordData]);
+    if (error) alert('新增收支紀錄失敗：' + error.message);
+    else fetchData();
+  };
+
+  const handleUpdateFinanceRecord = async (updated: FinanceRecord) => {
+    const { error } = await supabase.from('finance_records').update(updated).eq('id', updated.id);
+    if (error) alert('更新收支紀錄失敗：' + error.message);
+    else fetchData();
+  };
+
+  const handleDeleteFinanceRecord = async (id: string | number) => {
+    const { error } = await supabase.from('finance_records').delete().eq('id', id);
+    if (error) alert('刪除收支紀錄失敗：' + error.message);
+    else fetchData();
+  };
+
+  // 大事記管理相關功能 (新增)
+  const handleAddMilestone = async (newMilestone: Milestone) => {
+    const { id, ...milestoneData } = newMilestone as any;
+    const { error } = await supabase.from('milestones').insert([milestoneData]);
+    if (error) alert('新增大事記失敗：' + error.message);
+    else fetchData();
+  };
+
+  const handleUpdateMilestone = async (updated: Milestone) => {
+    const { error } = await supabase.from('milestones').update(updated).eq('id', updated.id);
+    if (error) alert('更新大事記失敗：' + error.message);
+    else fetchData();
+  };
+
+  const handleDeleteMilestone = async (id: string | number) => {
+    const { error } = await supabase.from('milestones').delete().eq('id', id);
+    if (error) alert('刪除大事記失敗：' + error.message);
+    else fetchData();
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white">
@@ -417,6 +437,7 @@ const App: React.FC = () => {
           <Routes>
             <Route path="/" element={<Home activities={activities} />} />
             <Route path="/members" element={<MemberList members={members} />} /> {/* 新增路由 */}
+            <Route path="/milestones" element={<Milestones milestones={milestones} />} />
             <Route path="/activity/:id" element={<ActivityDetail activities={activities} onRegister={handleRegister} registrations={registrations} members={members} />} />
             <Route path="/admin/login" element={currentUser ? <Navigate to="/admin" /> : <LoginPage users={users} onLogin={handleLogin} />} />
             <Route path="/admin/*" element={
@@ -441,6 +462,14 @@ const App: React.FC = () => {
                   onDeleteMember={handleDeleteMember} // 傳遞會員操作
                   onUpdateAttendance={handleUpdateAttendance} // 傳遞出席更新函數
                   onDeleteAttendance={handleDeleteAttendance} // 新增：傳遞出席刪除函數
+                  onAddFinanceRecord={handleAddFinanceRecord} // 傳遞收支操作
+                  onUpdateFinanceRecord={handleUpdateFinanceRecord} // 傳遞收支操作
+                  onDeleteFinanceRecord={handleDeleteFinanceRecord} // 傳遞收支操作
+                  financeRecords={financeRecords} // 傳遞收支資料
+                  milestones={milestones} // 傳遞大事記資料
+                  onAddMilestone={handleAddMilestone} // 傳遞大事記操作
+                  onUpdateMilestone={handleUpdateMilestone} // 傳遞大事記操作
+                  onDeleteMilestone={handleDeleteMilestone} // 傳遞大事記操作
                   onUploadImage={handleUploadImage} 
                 />
               ) : (

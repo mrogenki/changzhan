@@ -131,7 +131,7 @@ const ActivityManager: React.FC<ActivityManagerProps> = ({ activities, onAddActi
           displayActivities.map(activity => (
             <div key={activity.id} className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden group hover:shadow-lg transition-all">
               <div className="relative aspect-video">
-                <img src={activity.picture} alt={activity.title} className="w-full h-full object-cover" />
+                <img src={activity.picture} alt={activity.title} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                 <div className="absolute top-2 right-2 flex gap-1">
                   <button 
                     onClick={() => { setEditingActivity(activity); setIsModalOpen(true); }}
@@ -251,7 +251,7 @@ const ActivityManager: React.FC<ActivityManagerProps> = ({ activities, onAddActi
                   <label className="block text-sm font-bold text-gray-700 mb-1">活動圖片</label>
                   <div className="flex gap-4 items-start">
                     <div className="w-24 h-24 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0 border border-gray-200">
-                      {formData.picture ? <img src={formData.picture} alt="Preview" className="w-full h-full object-cover" /> : <ImageIcon className="w-full h-full p-6 text-gray-300" />}
+                      {formData.picture ? <img src={formData.picture} alt="Preview" className="w-full h-full object-cover" referrerPolicy="no-referrer" /> : <ImageIcon className="w-full h-full p-6 text-gray-300" />}
                     </div>
                     <div className="flex-grow space-y-3">
                        <div className="relative">

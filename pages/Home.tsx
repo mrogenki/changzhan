@@ -18,7 +18,7 @@ interface HomeProps {
 const ActivityCard: React.FC<{ activity: Activity }> = ({ activity }) => (
   <Link to={`/activity/${activity.id}`} className="group bg-white rounded-xl border border-gray-100 overflow-hidden hover:shadow-xl transition-all duration-300">
     <div className="relative aspect-video overflow-hidden">
-      <img src={activity.picture} alt={activity.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+      <img src={activity.picture} alt={activity.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" referrerPolicy="no-referrer" />
       <div className="absolute top-4 left-4">
         <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${activity.type === ActivityType.REGULAR ? 'bg-red-600 text-white' : 'bg-gray-800 text-white'}`}>
           {activity.type}

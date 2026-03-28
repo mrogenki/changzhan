@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { Activity, Registration, AdminUser, UserRole, Member, AttendanceRecord, AttendanceStatus } from '../types';
+import { Activity, Registration, AdminUser, UserRole, Member, AttendanceRecord, AttendanceStatus, FinanceRecord, Milestone } from '../types';
 import Sidebar from './admin/Sidebar';
 import DashboardHome from './admin/DashboardHome';
 import CheckInManager from './admin/CheckInManager';
@@ -9,6 +9,8 @@ import AttendanceManager from './admin/AttendanceManager';
 import ActivityManager from './admin/ActivityManager';
 import MemberManager from './admin/MemberManager';
 import UserManager from './admin/UserManager';
+import FinanceManager from './admin/FinanceManager';
+import MilestoneManager from './admin/MilestoneManager';
 
 interface AdminDashboardProps {
   currentUser: AdminUser;
@@ -30,6 +32,14 @@ interface AdminDashboardProps {
   onDeleteMember: (id: string | number) => void;
   onUpdateAttendance: (activityId: string, memberId: string, status: AttendanceStatus) => void; 
   onDeleteAttendance: (activityId: string, memberId: string) => void; 
+  onAddFinanceRecord: (record: FinanceRecord) => void;
+  onUpdateFinanceRecord: (record: FinanceRecord) => void;
+  onDeleteFinanceRecord: (id: string | number) => void;
+  financeRecords: FinanceRecord[];
+  milestones: Milestone[];
+  onAddMilestone: (milestone: Milestone) => void;
+  onUpdateMilestone: (milestone: Milestone) => void;
+  onDeleteMilestone: (id: string | number) => void;
   onUploadImage: (file: File) => Promise<string>;
 }
 
@@ -45,6 +55,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
           <Route path="/" element={<DashboardHome activities={props.activities} registrations={props.registrations} />} />
           <Route path="/check-in" element={<CheckInManager activities={props.activities} registrations={props.registrations} onUpdateRegistration={props.onUpdateRegistration} onDeleteRegistration={props.onDeleteRegistration} />} />
           <Route path="/attendance" element={<AttendanceManager activities={props.activities} members={props.members} attendance={props.attendance} onUpdateAttendance={props.onUpdateAttendance} onDeleteAttendance={props.onDeleteAttendance} />} />
+          <Route path="/finance" element={<FinanceManager activities={props.activities} financeRecords={props.financeRecords} onAddFinanceRecord={props.onAddFinanceRecord} onUpdateFinanceRecord={props.onUpdateFinanceRecord} onDeleteFinanceRecord={props.onDeleteFinanceRecord} />} />
+          <Route path="/milestones" element={<MilestoneManager milestones={props.milestones} onAddMilestone={props.onAddMilestone} onUpdateMilestone={props.onUpdateMilestone} onDeleteMilestone={props.onDeleteMilestone} onUploadImage={props.onUploadImage} />} />
           
           {canAccessActivities && (
             <>
@@ -55,6 +67,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
                   onAddMember={props.onAddMember} 
                   onUpdateMember={props.onUpdateMember} 
                   onDeleteMember={props.onDeleteMember} 
+                  onUploadImage={props.onUploadImage}
                 />
               } />
             </>

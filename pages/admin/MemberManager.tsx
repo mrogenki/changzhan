@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Download, UserPlus, Edit, Trash2, Shield, Eye, EyeOff, Globe, CalendarDays, FileDown, Bell, AlertTriangle, X } from 'lucide-react';
+import { Download, UserPlus, Edit, Trash2, Shield, Eye, EyeOff, Globe, CalendarDays, FileDown, Bell, AlertTriangle, X, UploadCloud, Loader2, Image as ImageIcon } from 'lucide-react';
 import { Member } from '../../types';
 
 interface MemberManagerProps {
@@ -8,12 +8,15 @@ interface MemberManagerProps {
   onAddMember: (m: Member) => void;
   onUpdateMember: (m: Member) => void;
   onDeleteMember: (id: string | number) => void;
+  onUploadImage: (file: File) => Promise<string>;
 }
 
-const MemberManager: React.FC<MemberManagerProps> = ({ members, onAddMember, onUpdateMember, onDeleteMember }) => {
+const MemberManager: React.FC<MemberManagerProps> = ({ members, onAddMember, onUpdateMember, onDeleteMember, onUploadImage }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [editingMember, setEditingMember] = useState<Member | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [memberPicture, setMemberPicture] = useState<string>('');
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -30,7 +33,8 @@ const MemberManager: React.FC<MemberManagerProps> = ({ members, onAddMember, onU
       status: formData.get('status') as 'active' | 'inactive',
       join_date: formData.get('join_date') as string,
       end_date: formData.get('end_date') as string,
-      birthday: formData.get('birthday') as string
+      birthday: formData.get('birthday') as string,
+      picture: memberPicture
     };
 
     if (editingMember) onUpdateMember(memberData);
@@ -116,6 +120,32 @@ const MemberManager: React.FC<MemberManagerProps> = ({ members, onAddMember, onU
     return valA.localeCompare(valB, undefined, { numeric: true });
   });
 
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setIsUploading(true);
+      try {
+        const url = await onUploadImage(file);
+        setMemberPicture(url);
+      } catch (error) {
+        alert('圖片上傳失敗');
+      } finally {
+        setIsUploading(false);
+      }
+    }
+  };
+
+  const handleOpenModal = (member?: Member) => {
+    if (member) {
+      setEditingMember(member);
+      setMemberPicture(member.picture || '');
+    } else {
+      setEditingMember(null);
+      setMemberPicture('');
+    }
+    setIsModalOpen(true);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -141,7 +171,7 @@ const MemberManager: React.FC<MemberManagerProps> = ({ members, onAddMember, onU
           >
             <FileDown size={18} /> <span className="hidden sm:inline">匯出 Excel</span>
           </button>
-          <button onClick={() => { setEditingMember(null); setIsModalOpen(true); }} className="flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors shadow-sm">
+          <button onClick={() => handleOpenModal()} className="flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors shadow-sm">
             <UserPlus size={18} /> 新增會員
           </button>
         </div>
@@ -151,6 +181,7 @@ const MemberManager: React.FC<MemberManagerProps> = ({ members, onAddMember, onU
         <table className="w-full text-left">
           <thead className="bg-gray-50 border-b border-gray-100">
             <tr className="text-xs font-bold text-gray-400 uppercase tracking-widest">
+              <th className="px-6 py-4">照片</th>
               <th className="px-6 py-4">編號</th>
               <th className="px-6 py-4">產業鏈</th>
               <th className="px-6 py-4">狀態</th>
@@ -162,6 +193,17 @@ const MemberManager: React.FC<MemberManagerProps> = ({ members, onAddMember, onU
           <tbody className="divide-y divide-gray-50">
             {sortedMembers.map(member => (
               <tr key={member.id} className={`hover:bg-gray-50/50 transition-colors ${member.status === 'inactive' ? 'opacity-60 bg-gray-50' : ''}`}>
+                <td className="px-6 py-4">
+                  <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-100 border border-gray-100">
+                    {member.picture ? (
+                      <img src={member.picture} alt={member.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-gray-300">
+                        <ImageIcon size={16} />
+                      </div>
+                    )}
+                  </div>
+                </td>
                 <td className="px-6 py-4 font-mono text-gray-400 font-bold">{member.member_no}</td>
                 <td className="px-6 py-4">
                   <span className={`px-2 py-1 rounded text-xs font-bold ${
@@ -201,7 +243,7 @@ const MemberManager: React.FC<MemberManagerProps> = ({ members, onAddMember, onU
                 <td className="px-6 py-4 text-gray-700">{member.name}</td>
                 <td className="px-6 py-4 text-right">
                   <div className="flex justify-end gap-2">
-                    <button onClick={() => { setEditingMember(member); setIsModalOpen(true); }} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"><Edit size={16} /></button>
+                    <button onClick={() => handleOpenModal(member)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"><Edit size={16} /></button>
                     <button onClick={() => confirmDelete(member)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"><Trash2 size={16} /></button>
                   </div>
                 </td>
@@ -250,6 +292,38 @@ const MemberManager: React.FC<MemberManagerProps> = ({ members, onAddMember, onU
                    </div>
                 </div>
                 <p className="text-xs text-gray-500 mt-2">※ 設定為「停權/離會」後，該會員將不會出現在前台列表與點名表中，但資料會保留。</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">會員照片 / Logo</label>
+                <div className="flex gap-4 items-center">
+                  <div className="w-20 h-20 bg-gray-100 rounded-full overflow-hidden border border-gray-200 flex-shrink-0">
+                    {memberPicture ? (
+                      <img src={memberPicture} alt="Preview" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-gray-300">
+                        <ImageIcon size={24} />
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-grow">
+                    <input 
+                      type="file" 
+                      accept="image/*"
+                      onChange={handleImageChange}
+                      className="hidden"
+                      id="member-image-upload"
+                    />
+                    <label 
+                      htmlFor="member-image-upload" 
+                      className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold cursor-pointer transition-colors ${isUploading ? 'bg-gray-100 text-gray-400 cursor-wait' : 'bg-red-50 text-red-600 hover:bg-red-100'}`}
+                    >
+                      {isUploading ? <Loader2 className="animate-spin" size={16} /> : <UploadCloud size={16} />}
+                      {isUploading ? '上傳中...' : '上傳照片'}
+                    </label>
+                    <p className="text-[10px] text-gray-400 mt-1">建議尺寸: 400x400px，支援 JPG, PNG</p>
+                  </div>
+                </div>
               </div>
 
               <div className="grid grid-cols-3 gap-4">

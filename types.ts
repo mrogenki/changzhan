@@ -19,6 +19,47 @@ export enum AttendanceStatus {
   SUBSTITUTE = 'substitute'  // 代理
 }
 
+export enum FinanceType {
+  INCOME = 'income',
+  EXPENSE = 'expense'
+}
+
+export enum FinanceCategory {
+  ACTIVITY_FEE = '活動費用',
+  MEMBER_FEE = '會費',
+  VENUE_FEE = '場地費',
+  MEAL_FEE = '餐飲費',
+  MARKETING = '行銷推廣',
+  OTHER = '其他'
+}
+
+export enum MilestoneType {
+  ACTIVITY = '活動剪影',
+  AWARD = '得獎紀錄',
+  OTHER = '其他'
+}
+
+export interface Milestone {
+  id: string | number;
+  type: MilestoneType;
+  title: string;
+  date: string;
+  image_url: string;
+  description: string;
+  created_at?: string;
+}
+
+export interface FinanceRecord {
+  id: string | number;
+  type: FinanceType;
+  category: FinanceCategory | string;
+  amount: number;
+  date: string;
+  description: string;
+  activity_id?: string | number;
+  created_at?: string;
+}
+
 export interface Activity {
   id: string | number;
   type: ActivityType;
@@ -72,6 +113,7 @@ export interface Member {
   join_date?: string; // 入會日期
   end_date?: string; // 會籍到期日
   birthday?: string; // 新增：生日
+  picture?: string; // 新增：會員照片/Logo
 }
 
 // 新增：出席紀錄介面

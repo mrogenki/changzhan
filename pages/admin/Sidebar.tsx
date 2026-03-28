@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Calendar, Users, LogOut, ClipboardList, Building2, Shield } from 'lucide-react';
+import { LayoutDashboard, Calendar, Users, LogOut, ClipboardList, Building2, Shield, Banknote, Award } from 'lucide-react';
 import { AdminUser, UserRole } from '../../types';
 
 interface SidebarProps {
@@ -41,6 +41,16 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
         <Link to="/admin/attendance" className={`flex items-center gap-3 p-3 rounded-lg transition-colors ${location.pathname.startsWith('/admin/attendance') ? 'bg-red-600 text-white' : 'hover:bg-gray-800'}`}>
           <ClipboardList size={20} />
           <span>會員報到 (會員專屬)</span>
+        </Link>
+
+        <Link to="/admin/finance" className={`flex items-center gap-3 p-3 rounded-lg transition-colors ${location.pathname.startsWith('/admin/finance') ? 'bg-red-600 text-white' : 'hover:bg-gray-800'}`}>
+          <Banknote size={20} />
+          <span>收支管理</span>
+        </Link>
+
+        <Link to="/admin/milestones" className={`flex items-center gap-3 p-3 rounded-lg transition-colors ${location.pathname.startsWith('/admin/milestones') ? 'bg-red-600 text-white' : 'hover:bg-gray-800'}`}>
+          <Award size={20} />
+          <span>大事記管理</span>
         </Link>
         
         {canAccessActivities && (

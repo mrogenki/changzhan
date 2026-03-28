@@ -128,15 +128,27 @@ const MemberList: React.FC<MemberListProps> = ({ members }) => {
                   )}
                 </div>
                 
-                <div className="flex-grow">
-                  <h3 className={`text-xl font-bold text-gray-900 mb-3 transition-colors ${style.hoverText}`}>{member.company}</h3>
-                  
-                  <div className="flex items-center gap-2 text-gray-700 font-medium mb-3">
-                    <User size={16} className="opacity-50" />
-                    {member.name}
-                  </div>
-
-                  {/* 顯示簡介 */}
+                  <div className="flex-grow">
+                    <div className="flex items-center gap-4 mb-4">
+                      <div className="w-16 h-16 rounded-full overflow-hidden bg-white border border-black/5 flex-shrink-0 shadow-sm">
+                        {member.picture ? (
+                          <img src={member.picture} alt={member.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-gray-300 bg-gray-50">
+                            <User size={24} />
+                          </div>
+                        )}
+                      </div>
+                      <div>
+                        <h3 className={`text-xl font-bold text-gray-900 transition-colors ${style.hoverText}`}>{member.company}</h3>
+                        <div className="flex items-center gap-2 text-gray-700 font-medium">
+                          <User size={14} className="opacity-50" />
+                          {member.name}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* 顯示簡介 */}
                   {member.intro && (
                     <p className="text-sm text-gray-500 mb-4 line-clamp-3 leading-relaxed">
                       {member.intro}
