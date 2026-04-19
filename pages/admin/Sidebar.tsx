@@ -1,7 +1,6 @@
-
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Calendar, Users, LogOut, ClipboardList, Building2, Shield, Banknote, Award } from 'lucide-react';
+import { LayoutDashboard, Calendar, Users, LogOut, ClipboardList, Building2, Shield, Banknote, Award, Cake, CalendarClock } from 'lucide-react';
 import { AdminUser, UserRole } from '../../types';
 
 interface SidebarProps {
@@ -62,6 +61,14 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
             <Link to="/admin/members" className={`flex items-center gap-3 p-3 rounded-lg transition-colors ${location.pathname.startsWith('/admin/members') ? 'bg-red-600 text-white' : 'hover:bg-gray-800'}`}>
               <Building2 size={20} />
               <span>會員管理</span>
+            </Link>
+            <Link to="/admin/birthdays" className={`flex items-center gap-3 p-3 rounded-lg transition-colors ${location.pathname.startsWith('/admin/birthdays') ? 'bg-red-600 text-white' : 'hover:bg-gray-800'}`}>
+              <Cake size={20} />
+              <span>會員生日管理</span>
+            </Link>
+            <Link to="/admin/membership-expiry" className={`flex items-center gap-3 p-3 rounded-lg transition-colors ${location.pathname.startsWith('/admin/membership-expiry') ? 'bg-red-600 text-white' : 'hover:bg-gray-800'}`}>
+              <CalendarClock size={20} />
+              <span>會員會籍管理</span>
             </Link>
           </>
         )}
