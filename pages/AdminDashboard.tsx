@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { Activity, Registration, AdminUser, UserRole, Member, AttendanceRecord, AttendanceStatus, FinanceRecord, Milestone } from '../types';
@@ -11,6 +10,8 @@ import MemberManager from './admin/MemberManager';
 import UserManager from './admin/UserManager';
 import FinanceManager from './admin/FinanceManager';
 import MilestoneManager from './admin/MilestoneManager';
+import BirthdayManager from './admin/BirthdayManager';
+import MembershipExpiryManager from './admin/MembershipExpiryManager';
 
 interface AdminDashboardProps {
   currentUser: AdminUser;
@@ -70,6 +71,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
                   onUploadImage={props.onUploadImage}
                 />
               } />
+              <Route path="/birthdays" element={<BirthdayManager members={props.members} />} />
+              <Route path="/membership-expiry" element={<MembershipExpiryManager members={props.members} />} />
             </>
           )}
           
