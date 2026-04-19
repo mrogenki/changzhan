@@ -1,4 +1,3 @@
-
 export enum ActivityType {
   REGULAR = '會員專屬',
   SPECIAL = '一般活動'
@@ -115,6 +114,14 @@ export interface Member {
   end_date?: string; // 會籍到期日
   birthday?: string; // 新增：生日
   picture?: string; // 新增：會員照片/Logo
+
+  // 新增：公司與聯絡資訊
+  company_title?: string; // 公司抬頭 (發票用)
+  tax_id?: string;        // 統一編號
+  mobile_phone?: string;  // 手機號碼
+  landline?: string;      // 室內電話
+  address?: string;       // 地址
+  group_name?: string;    // 組別 (e.g. 第1組、三尊)
 }
 
 // 新增：出席紀錄介面
