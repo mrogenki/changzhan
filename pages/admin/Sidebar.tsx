@@ -16,10 +16,10 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
   const canAccessUsers = user.role === UserRole.SUPER_ADMIN;
 
   return (
-    <div className="w-64 bg-gray-900 text-gray-400 flex flex-col min-h-screen">
+    <div className="w-64 flex-shrink-0 bg-gray-900 text-gray-400 flex flex-col min-h-screen">
       <div className="p-6 border-b border-gray-800">
         <Link to="/" className="flex items-center gap-3 text-white">
-          <div className="w-8 h-8 bg-red-600 rounded-md flex items-center justify-center text-white font-bold">長</div>
+          <div className="w-8 h-8 bg-red-600 rounded-md flex items-center justify-center text-white font-bold flex-shrink-0">長</div>
           <span className="font-bold tracking-tight">管理系統</span>
         </Link>
         <div className="mt-4 px-3 py-2 rounded bg-gray-800 border border-gray-700">
