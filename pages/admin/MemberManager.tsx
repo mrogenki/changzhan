@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Download, UserPlus, Edit, Trash2, Shield, Eye, EyeOff, Globe, CalendarDays, FileDown, Bell, AlertTriangle, X, UploadCloud, Loader2, Image as ImageIcon } from 'lucide-react';
 import { Member } from '../../types';
@@ -34,7 +33,14 @@ const MemberManager: React.FC<MemberManagerProps> = ({ members, onAddMember, onU
       join_date: formData.get('join_date') as string,
       end_date: formData.get('end_date') as string,
       birthday: formData.get('birthday') as string,
-      picture: memberPicture
+      picture: memberPicture,
+      // 新增欄位
+      company_title: formData.get('company_title') as string,
+      tax_id: formData.get('tax_id') as string,
+      mobile_phone: formData.get('mobile_phone') as string,
+      landline: formData.get('landline') as string,
+      address: formData.get('address') as string,
+      group_name: formData.get('group_name') as string,
     };
 
     if (editingMember) onUpdateMember(memberData);
@@ -71,7 +77,7 @@ const MemberManager: React.FC<MemberManagerProps> = ({ members, onAddMember, onU
     }
     
     // 定義標題
-    const headers = ['會員編號', '產業鏈', '行業別', '姓名', '公司名稱', '會員簡介', '網站連結', '狀態', '入會日期', '會籍到期日', '生日'];
+    const headers = ['會員編號', '組別', '產業鏈', '行業別', '姓名', '公司名稱', '公司抬頭', '統一編號', '手機號碼', '室內電話', '地址', '會員簡介', '網站連結', '狀態', '入會日期', '會籍到期日', '生日'];
     
     // 加入 BOM 以讓 Excel 正確識別 UTF-8
     let csvContent = '\uFEFF'; 
@@ -85,10 +91,16 @@ const MemberManager: React.FC<MemberManagerProps> = ({ members, onAddMember, onU
 
       const row = [
         escape(m.member_no),
+        escape(m.group_name),
         escape(m.industry_chain),
         escape(m.industry_category),
         escape(m.name),
         escape(m.company),
+        escape(m.company_title),
+        escape(m.tax_id),
+        escape(m.mobile_phone),
+        escape(m.landline),
+        escape(m.address),
         escape(m.intro),
         escape(m.website),
         escape(m.status === 'inactive' ? '停權/離會' : '活躍'),
@@ -327,10 +339,14 @@ const MemberManager: React.FC<MemberManagerProps> = ({ members, onAddMember, onU
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-4 gap-4">
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-1">會員編號</label>
                   <input name="member_no" required defaultValue={editingMember?.member_no} className="w-full border rounded-lg px-3 py-3 outline-none focus:ring-2 focus:ring-red-500 font-mono" placeholder="001" />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">組別</label>
+                  <input name="group_name" defaultValue={editingMember?.group_name} className="w-full border rounded-lg px-3 py-3 outline-none focus:ring-2 focus:ring-red-500" placeholder="例如：第1組" />
                 </div>
                 <div className="col-span-2">
                   <label className="block text-sm font-bold text-gray-700 mb-1">產業鏈</label>
@@ -358,6 +374,37 @@ const MemberManager: React.FC<MemberManagerProps> = ({ members, onAddMember, onU
                 <label className="block text-sm font-bold text-gray-700 mb-1">品牌 / 公司名稱</label>
                 <input name="company" required defaultValue={editingMember?.company} className="w-full border rounded-lg px-3 py-3 outline-none focus:ring-2 focus:ring-red-500" placeholder="公司名稱" />
               </div>
+
+              {/* 新增：開立發票用的公司抬頭與統編 */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">公司抬頭 (選填)</label>
+                  <input name="company_title" defaultValue={editingMember?.company_title} className="w-full border rounded-lg px-3 py-3 outline-none focus:ring-2 focus:ring-red-500" placeholder="開立發票用公司全名" />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">統一編號 (選填)</label>
+                  <input name="tax_id" defaultValue={editingMember?.tax_id} maxLength={8} inputMode="numeric" className="w-full border rounded-lg px-3 py-3 outline-none focus:ring-2 focus:ring-red-500 font-mono" placeholder="8 碼數字" />
+                </div>
+              </div>
+
+              {/* 新增：聯絡電話 */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">手機號碼 (選填)</label>
+                  <input name="mobile_phone" type="tel" defaultValue={editingMember?.mobile_phone} className="w-full border rounded-lg px-3 py-3 outline-none focus:ring-2 focus:ring-red-500" placeholder="09xx-xxx-xxx" />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">室內電話 (選填)</label>
+                  <input name="landline" type="tel" defaultValue={editingMember?.landline} className="w-full border rounded-lg px-3 py-3 outline-none focus:ring-2 focus:ring-red-500" placeholder="02-xxxx-xxxx" />
+                </div>
+              </div>
+
+              {/* 新增：地址 */}
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">地址 (選填)</label>
+                <input name="address" defaultValue={editingMember?.address} className="w-full border rounded-lg px-3 py-3 outline-none focus:ring-2 focus:ring-red-500" placeholder="公司 / 聯絡地址" />
+              </div>
+
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-1">會員簡介 (選填)</label>
                 <textarea 
