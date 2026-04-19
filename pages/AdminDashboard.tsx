@@ -51,7 +51,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
   return (
     <div className="flex bg-gray-50 min-h-screen">
       <Sidebar user={props.currentUser} onLogout={props.onLogout} />
-      <div className="flex-grow p-8">
+      <div className="flex-grow min-w-0 p-8">
         <Routes>
           <Route path="/" element={<DashboardHome activities={props.activities} registrations={props.registrations} />} />
           <Route path="/check-in" element={<CheckInManager activities={props.activities} registrations={props.registrations} onUpdateRegistration={props.onUpdateRegistration} onDeleteRegistration={props.onDeleteRegistration} />} />
