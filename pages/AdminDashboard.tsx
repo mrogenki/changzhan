@@ -20,7 +20,7 @@ interface AdminDashboardProps {
   registrations: Registration[];
   users: AdminUser[];
   members: Member[];
-  attendance: AttendanceRecord[]; 
+  attendance: AttendanceRecord[];
   onUpdateActivity: (act: Activity) => void;
   onAddActivity: (act: Activity) => void;
   onDeleteActivity: (id: string | number) => void;
@@ -31,8 +31,9 @@ interface AdminDashboardProps {
   onAddMember: (member: Member) => void;
   onUpdateMember: (member: Member) => void;
   onDeleteMember: (id: string | number) => void;
-  onUpdateAttendance: (activityId: string, memberId: string, status: AttendanceStatus) => void; 
-  onDeleteAttendance: (activityId: string, memberId: string) => void; 
+  onUpdateAttendance: (activityId: string, memberId: string, status: AttendanceStatus) => void;
+  onDeleteAttendance: (activityId: string, memberId: string) => void;
+  onRefreshAttendance: () => Promise<void>;
   onAddFinanceRecord: (record: FinanceRecord) => void;
   onUpdateFinanceRecord: (record: FinanceRecord) => void;
   onDeleteFinanceRecord: (id: string | number) => void;
@@ -55,19 +56,19 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
         <Routes>
           <Route path="/" element={<DashboardHome activities={props.activities} registrations={props.registrations} />} />
           <Route path="/check-in" element={<CheckInManager activities={props.activities} registrations={props.registrations} onUpdateRegistration={props.onUpdateRegistration} onDeleteRegistration={props.onDeleteRegistration} />} />
-          <Route path="/attendance" element={<AttendanceManager activities={props.activities} members={props.members} attendance={props.attendance} onUpdateAttendance={props.onUpdateAttendance} onDeleteAttendance={props.onDeleteAttendance} />} />
+          <Route path="/attendance" element={<AttendanceManager activities={props.activities} members={props.members} attendance={props.attendance} onUpdateAttendance={props.onUpdateAttendance} onDeleteAttendance={props.onDeleteAttendance} onRefreshAttendance={props.onRefreshAttendance} />} />
           <Route path="/finance" element={<FinanceManager activities={props.activities} financeRecords={props.financeRecords} onAddFinanceRecord={props.onAddFinanceRecord} onUpdateFinanceRecord={props.onUpdateFinanceRecord} onDeleteFinanceRecord={props.onDeleteFinanceRecord} />} />
           <Route path="/milestones" element={<MilestoneManager milestones={props.milestones} onAddMilestone={props.onAddMilestone} onUpdateMilestone={props.onUpdateMilestone} onDeleteMilestone={props.onDeleteMilestone} onUploadImage={props.onUploadImage} />} />
-          
+
           {canAccessActivities && (
             <>
               <Route path="/activities" element={<ActivityManager activities={props.activities} onAddActivity={props.onAddActivity} onUpdateActivity={props.onUpdateActivity} onDeleteActivity={props.onDeleteActivity} onUploadImage={props.onUploadImage} />} />
               <Route path="/members" element={
-                <MemberManager 
-                  members={props.members} 
-                  onAddMember={props.onAddMember} 
-                  onUpdateMember={props.onUpdateMember} 
-                  onDeleteMember={props.onDeleteMember} 
+                <MemberManager
+                  members={props.members}
+                  onAddMember={props.onAddMember}
+                  onUpdateMember={props.onUpdateMember}
+                  onDeleteMember={props.onDeleteMember}
                   onUploadImage={props.onUploadImage}
                 />
               } />
@@ -75,11 +76,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
               <Route path="/membership-expiry" element={<MembershipExpiryManager members={props.members} />} />
             </>
           )}
-          
+
           {canAccessUsers && (
             <Route path="/users" element={<UserManager users={props.users} onAddUser={props.onAddUser} onDeleteUser={props.onDeleteUser} currentUser={props.currentUser} />} />
           )}
-          
+
           <Route path="*" element={<Navigate to="/admin" replace />} />
         </Routes>
       </div>
