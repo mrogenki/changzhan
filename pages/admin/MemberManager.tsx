@@ -1,18 +1,21 @@
 import React, { useState } from 'react';
-import { Download, UserPlus, Edit, Trash2, Shield, Eye, EyeOff, Globe, CalendarDays, FileDown, Bell, AlertTriangle, X, UploadCloud, Loader2, Image as ImageIcon } from 'lucide-react';
+import { Download, UserPlus, Edit, Trash2, Shield, Eye, EyeOff, Globe, CalendarDays, FileDown, Bell, AlertTriangle, X, UploadCloud, Loader2, Image as ImageIcon, FileSpreadsheet } from 'lucide-react';
 import { Member } from '../../types';
+import MemberImportModal from './MemberImportModal';
 
 interface MemberManagerProps {
   members: Member[];
   onAddMember: (m: Member) => void;
   onUpdateMember: (m: Member) => void;
   onDeleteMember: (id: string | number) => void;
+  onBatchImportMembers: (toAdd: Member[], toUpdate: Member[]) => Promise<void>;
   onUploadImage: (file: File) => Promise<string>;
 }
 
-const MemberManager: React.FC<MemberManagerProps> = ({ members, onAddMember, onUpdateMember, onDeleteMember, onUploadImage }) => {
+const MemberManager: React.FC<MemberManagerProps> = ({ members, onAddMember, onUpdateMember, onDeleteMember, onBatchImportMembers, onUploadImage }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  const [isImportOpen, setIsImportOpen] = useState(false);
   const [editingMember, setEditingMember] = useState<Member | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [memberPicture, setMemberPicture] = useState<string>('');
@@ -183,6 +186,13 @@ const MemberManager: React.FC<MemberManagerProps> = ({ members, onAddMember, onU
             title="匯出 Excel (CSV)"
           >
             <FileDown size={18} /> <span className="hidden sm:inline">匯出 Excel</span>
+          </button>
+          <button
+            onClick={() => setIsImportOpen(true)}
+            className="flex items-center gap-2 bg-green-50 text-green-700 px-4 py-2 rounded-lg hover:bg-green-100 transition-colors border border-green-100"
+            title="從 Excel/CSV 批次匯入會員"
+          >
+            <FileSpreadsheet size={18} /> <span className="hidden sm:inline">批次匯入</span>
           </button>
           <button onClick={() => handleOpenModal()} className="flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors shadow-sm">
             <UserPlus size={18} /> 新增會員
@@ -489,6 +499,14 @@ const MemberManager: React.FC<MemberManagerProps> = ({ members, onAddMember, onU
             </button>
           </div>
         </div>
+      )}
+
+      {isImportOpen && (
+        <MemberImportModal
+          existingMembers={members}
+          onClose={() => setIsImportOpen(false)}
+          onImport={onBatchImportMembers}
+        />
       )}
     </div>
   );
