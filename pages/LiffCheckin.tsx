@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import liff from '@line/liff';
 import { createClient } from '@supabase/supabase-js';
 
-// 若你已經在別處 export supabase client,改成 import
 const supabase = createClient(
   import.meta.env.VITE_SUPABASE_URL as string,
   import.meta.env.VITE_SUPABASE_ANON_KEY as string
@@ -26,11 +25,9 @@ export default function LiffCheckin() {
   let tokenFromUrl = urlParams.get('token');
 
   if (activityIdRaw && tokenFromUrl) {
-    // 第一次進來:存進 sessionStorage,以便 OAuth 重導後還能拿到
     sessionStorage.setItem('liff_checkin_activity_id', activityIdRaw);
     sessionStorage.setItem('liff_checkin_token', tokenFromUrl);
   } else {
-    // URL 沒參數:從 sessionStorage 讀
     activityIdRaw = sessionStorage.getItem('liff_checkin_activity_id');
     tokenFromUrl = sessionStorage.getItem('liff_checkin_token');
   }
@@ -80,7 +77,6 @@ export default function LiffCheckin() {
         }
 
         if (data?.success) {
-          // 報到成功,清掉 sessionStorage 避免日後意外沿用
           sessionStorage.removeItem('liff_checkin_activity_id');
           sessionStorage.removeItem('liff_checkin_token');
           setPhase({
@@ -150,7 +146,6 @@ export default function LiffCheckin() {
         p_line_user_id: phase.lineUserId,
       });
       if (checkin.data?.success) {
-        // 報到成功,清掉 sessionStorage
         sessionStorage.removeItem('liff_checkin_activity_id');
         sessionStorage.removeItem('liff_checkin_token');
         setPhase({
@@ -185,12 +180,7 @@ export default function LiffCheckin() {
             <p className="text-xl font-bold text-green-600 mb-2">報到成功</p>
             <p className="text-gray-700">{phase.memberName}</p>
             <p className="text-sm text-gray-500 mt-4">{phase.activityTitle}</p>
-            <button
-              onClick={() => liff.closeWindow()}
-              className="mt-6 w-full bg-gray-100 text-gray-700 py-3 rounded-lg"
-            >
-              關閉
-            </button>
+            <p className="text-xs text-gray-400 mt-6">請點右上角 ✕ 關閉此頁</p>
           </div>
         )}
 
@@ -200,7 +190,6 @@ export default function LiffCheckin() {
             <p className="text-red-600 font-medium">{phase.msg}</p>
             <button
               onClick={() => {
-                // 清掉 sessionStorage,強制讓使用者重新從 QR 掃描
                 sessionStorage.removeItem('liff_checkin_activity_id');
                 sessionStorage.removeItem('liff_checkin_token');
                 window.location.reload();
