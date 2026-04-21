@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { HashRouter as Router, Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
 import { Menu, X, Loader2 } from 'lucide-react';
@@ -9,6 +8,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import LoginPage from './pages/LoginPage';
 import MemberList from './pages/MemberList'; // 新增 import
 import Milestones from './pages/Milestones';
+import LiffCheckin from './pages/LiffCheckin'; // ✨ LINE 報到頁
 import { Activity, ActivityType, Registration, AdminUser, Member, AttendanceRecord, AttendanceStatus, FinanceRecord, Milestone } from './types';
 import { INITIAL_ACTIVITIES, INITIAL_ADMINS, INITIAL_MEMBERS } from './constants'; // 新增 import
 
@@ -84,6 +84,12 @@ const Footer: React.FC = () => {
 };
 
 const App: React.FC = () => {
+  // ✨ LIFF 報到頁:繞過 HashRouter,直接 render
+  // 必須在所有 hooks 之前,單次 session 路徑一致,不違反 hooks rules
+  if (typeof window !== 'undefined' && window.location.pathname === '/liff/checkin') {
+    return <LiffCheckin />;
+  }
+
   const [activities, setActivities] = useState<Activity[]>([]);
   const [registrations, setRegistrations] = useState<Registration[]>([]);
   const [users, setUsers] = useState<AdminUser[]>([]);
