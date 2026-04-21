@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { AlertCircle, Clock, User, ClipboardList, XCircle, Search, RotateCcw } from 'lucide-react';
 import { Activity, ActivityType, Member, AttendanceRecord, AttendanceStatus } from '../../types';
-
+import CheckinQrPanel from '../../components/CheckinQrPanel';
 interface AttendanceManagerProps {
   activities: Activity[];
   members: Member[];
@@ -116,7 +116,14 @@ const AttendanceManager: React.FC<AttendanceManagerProps> = ({ activities, membe
           </select>
         </div>
       </div>
-
+ {/* LINE 報到 QR code (切換活動時會重置 panel 狀態) */}
+      {selectedActivityId && (
+        <CheckinQrPanel
+          key={selectedActivityId}
+          activityId={Number(selectedActivityId)}
+          activityTitle={allActivities.find(a => String(a.id) === selectedActivityId)?.title || ''}
+        />
+      )}
       {/* 統計卡片 */}
       <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
          <div className="bg-white p-3 rounded-xl border border-gray-100 shadow-sm">
