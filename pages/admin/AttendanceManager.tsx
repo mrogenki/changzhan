@@ -1,19 +1,20 @@
-
 import React, { useState, useEffect } from 'react';
 import { AlertCircle, Clock, User, ClipboardList, XCircle, Search, RotateCcw } from 'lucide-react';
 import { Activity, ActivityType, Member, AttendanceRecord, AttendanceStatus } from '../../types';
 import CheckinQrPanel from '../../components/CheckinQrPanel';
+
 interface AttendanceManagerProps {
   activities: Activity[];
   members: Member[];
   attendance: AttendanceRecord[];
   onUpdateAttendance: (actId: string, memId: string, status: AttendanceStatus) => void;
   onDeleteAttendance: (actId: string, memId: string) => void;
+  onRefreshAttendance: () => Promise<void>;
 }
 
-const AttendanceManager: React.FC<AttendanceManagerProps> = ({ activities, members, attendance, onUpdateAttendance, onDeleteAttendance }) => {
+const AttendanceManager: React.FC<AttendanceManagerProps> = ({ activities, members, attendance, onUpdateAttendance, onDeleteAttendance, onRefreshAttendance }) => {
   const allActivities = activities;
-  
+
   const defaultActivityId = React.useMemo(() => {
     if (allActivities.length === 0) return '';
     const now = new Date();
@@ -45,8 +46,8 @@ const AttendanceManager: React.FC<AttendanceManagerProps> = ({ activities, membe
     return valA.localeCompare(valB, undefined, { numeric: true });
   });
 
-  const filteredMembers = sortedMembers.filter(m => 
-    m.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+  const filteredMembers = sortedMembers.filter(m =>
+    m.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     m.company.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (m.member_no && String(m.member_no).includes(searchTerm))
   );
@@ -80,7 +81,7 @@ const AttendanceManager: React.FC<AttendanceManagerProps> = ({ activities, membe
       const member = activeMembers.find(m => String(m.id) === String(r.member_id));
       if (!member) return null;
       return { ...member, updated_at: r.updated_at };
-    }).filter(item => item !== null) as any[]; 
+    }).filter(item => item !== null) as any[];
   };
 
   const lateList = listByStatus(AttendanceStatus.LATE);
@@ -104,9 +105,9 @@ const AttendanceManager: React.FC<AttendanceManagerProps> = ({ activities, membe
           <p className="text-gray-500 text-sm">所有活動的會員出席狀況記錄。</p>
         </div>
         <div className="w-full md:w-auto">
-          <select 
-            value={selectedActivityId} 
-            onChange={e => setSelectedActivityId(e.target.value)} 
+          <select
+            value={selectedActivityId}
+            onChange={e => setSelectedActivityId(e.target.value)}
             className="w-full md:w-64 border rounded-xl px-4 py-3 bg-white outline-none focus:ring-2 focus:ring-red-500 font-bold"
           >
             {allActivities.length === 0 && <option value="">無活動資料</option>}
@@ -116,14 +117,17 @@ const AttendanceManager: React.FC<AttendanceManagerProps> = ({ activities, membe
           </select>
         </div>
       </div>
- {/* LINE 報到 QR code (切換活動時會重置 panel 狀態) */}
+
+      {/* LINE 報到 QR code */}
       {selectedActivityId && (
         <CheckinQrPanel
           key={selectedActivityId}
           activityId={Number(selectedActivityId)}
           activityTitle={allActivities.find(a => String(a.id) === selectedActivityId)?.title || ''}
+          onAttendanceRefresh={onRefreshAttendance}
         />
       )}
+
       {/* 統計卡片 */}
       <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
          <div className="bg-white p-3 rounded-xl border border-gray-100 shadow-sm">
@@ -159,7 +163,6 @@ const AttendanceManager: React.FC<AttendanceManagerProps> = ({ activities, membe
           異常狀況與代理名單列表
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-           {/* 遲到名單 */}
            <div className="bg-white rounded-xl border border-yellow-200 shadow-sm overflow-hidden">
              <div className="bg-yellow-50 px-4 py-3 border-b border-yellow-100 flex justify-between items-center">
                <h3 className="font-bold text-yellow-800 flex items-center gap-2"><Clock size={16}/> 遲到 ({lateList.length})</h3>
@@ -177,7 +180,6 @@ const AttendanceManager: React.FC<AttendanceManagerProps> = ({ activities, membe
              </div>
            </div>
 
-           {/* 代理名單 */}
            <div className="bg-white rounded-xl border border-purple-200 shadow-sm overflow-hidden">
              <div className="bg-purple-50 px-4 py-3 border-b border-purple-100 flex justify-between items-center">
                <h3 className="font-bold text-purple-800 flex items-center gap-2"><User size={16}/> 代理 ({substituteList.length})</h3>
@@ -195,7 +197,6 @@ const AttendanceManager: React.FC<AttendanceManagerProps> = ({ activities, membe
              </div>
            </div>
 
-           {/* 病假名單 */}
            <div className="bg-white rounded-xl border border-blue-200 shadow-sm overflow-hidden">
              <div className="bg-blue-50 px-4 py-3 border-b border-blue-100 flex justify-between items-center">
                <h3 className="font-bold text-blue-800 flex items-center gap-2"><ClipboardList size={16}/> 病假 ({medicalList.length})</h3>
@@ -213,7 +214,6 @@ const AttendanceManager: React.FC<AttendanceManagerProps> = ({ activities, membe
              </div>
            </div>
 
-           {/* 缺席名單 */}
            <div className="bg-white rounded-xl border border-red-200 shadow-sm overflow-hidden">
              <div className="bg-red-50 px-4 py-3 border-b border-red-100 flex justify-between items-center">
                <h3 className="font-bold text-red-800 flex items-center gap-2"><XCircle size={16}/> 缺席 ({absentList.length})</h3>
@@ -236,15 +236,15 @@ const AttendanceManager: React.FC<AttendanceManagerProps> = ({ activities, membe
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
         <div className="p-4 border-b border-gray-100 bg-gray-50/50 flex items-center gap-2">
           <Search size={18} className="text-gray-400" />
-          <input 
-            type="text" 
-            placeholder="搜尋會員編號、姓名或公司..." 
-            value={searchTerm} 
-            onChange={e => setSearchTerm(e.target.value)} 
+          <input
+            type="text"
+            placeholder="搜尋會員編號、姓名或公司..."
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
             className="bg-transparent outline-none w-full text-sm"
           />
         </div>
-        
+
         <div className="overflow-x-auto max-h-[600px]">
           <table className="w-full text-left relative">
             <thead className="bg-gray-50 border-b border-gray-100 sticky top-0 z-10">
@@ -260,7 +260,7 @@ const AttendanceManager: React.FC<AttendanceManagerProps> = ({ activities, membe
                  const record = getMemberRecord(member.id);
                  const currentStatus = record?.status;
                  const updatedAt = record?.updated_at;
-                 
+
                  return (
                   <tr key={member.id} className={`hover:bg-gray-50/50 transition-colors ${currentStatus ? 'bg-gray-50/30' : ''}`}>
                     <td className="px-6 py-4 font-mono text-gray-400 font-bold">{member.member_no}</td>
@@ -282,8 +282,7 @@ const AttendanceManager: React.FC<AttendanceManagerProps> = ({ activities, membe
                             {opt.label}
                           </button>
                         ))}
-                        
-                        {/* 恢復(重置)按鈕：只有當有狀態時才顯示 */}
+
                         {currentStatus && selectedActivityId && (
                            <button
                              onClick={() => onDeleteAttendance(selectedActivityId, String(member.id))}
