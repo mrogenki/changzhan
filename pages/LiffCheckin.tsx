@@ -19,10 +19,24 @@ type Phase =
   | { kind: 'error'; msg: string };
 
 export default function LiffCheckin() {
-  const params = new URLSearchParams(window.location.search);
-  const activityIdRaw = params.get('activity_id');
+  // 取得 activity_id / token:
+  // 先從 URL 讀;若無(可能被 LIFF OAuth 重導洗掉)則從 sessionStorage 還原
+  const urlParams = new URLSearchParams(window.location.search);
+  let activityIdRaw = urlParams.get('activity_id');
+  let tokenFromUrl = urlParams.get('token');
+
+  if (activityIdRaw && tokenFromUrl) {
+    // 第一次進來:存進 sessionStorage,以便 OAuth 重導後還能拿到
+    sessionStorage.setItem('liff_checkin_activity_id', activityIdRaw);
+    sessionStorage.setItem('liff_checkin_token', tokenFromUrl);
+  } else {
+    // URL 沒參數:從 sessionStorage 讀
+    activityIdRaw = sessionStorage.getItem('liff_checkin_activity_id');
+    tokenFromUrl = sessionStorage.getItem('liff_checkin_token');
+  }
+
   const activityId = activityIdRaw ? Number(activityIdRaw) : null;
-  const token = params.get('token');
+  const token = tokenFromUrl;
 
   const [phase, setPhase] = useState<Phase>({ kind: 'loading', msg: '初始化 LINE...' });
 
@@ -66,6 +80,9 @@ export default function LiffCheckin() {
         }
 
         if (data?.success) {
+          // 報到成功,清掉 sessionStorage 避免日後意外沿用
+          sessionStorage.removeItem('liff_checkin_activity_id');
+          sessionStorage.removeItem('liff_checkin_token');
           setPhase({
             kind: 'success',
             memberName: data.member_name,
@@ -133,6 +150,9 @@ export default function LiffCheckin() {
         p_line_user_id: phase.lineUserId,
       });
       if (checkin.data?.success) {
+        // 報到成功,清掉 sessionStorage
+        sessionStorage.removeItem('liff_checkin_activity_id');
+        sessionStorage.removeItem('liff_checkin_token');
         setPhase({
           kind: 'success',
           memberName: checkin.data.member_name,
@@ -179,7 +199,12 @@ export default function LiffCheckin() {
             <div className="text-6xl mb-4">⚠️</div>
             <p className="text-red-600 font-medium">{phase.msg}</p>
             <button
-              onClick={() => window.location.reload()}
+              onClick={() => {
+                // 清掉 sessionStorage,強制讓使用者重新從 QR 掃描
+                sessionStorage.removeItem('liff_checkin_activity_id');
+                sessionStorage.removeItem('liff_checkin_token');
+                window.location.reload();
+              }}
               className="mt-6 w-full bg-blue-500 text-white py-3 rounded-lg"
             >
               重試
