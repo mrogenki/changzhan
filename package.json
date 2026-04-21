@@ -1,36 +1,28 @@
 {
-  "name": "長展分會",
+  "name": "changzhan-palms-report",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "lint": "tsc --noEmit",
     "preview": "vite preview"
   },
   "dependencies": {
-    "@emailjs/browser": "4.1.0",
-    "@supabase/supabase-js": "2.48.1",
-    "@tailwindcss/vite": "^4.2.1",
-    "@types/express": "^5.0.6",
-    "clsx": "^2.1.1",
-    "express": "^5.2.1",
-    "framer-motion": "^12.35.2",
-    "lucide-react": "^0.563.0",
-    "motion": "^12.38.0",
-    "react": "^19.2.4",
-    "react-dom": "^19.2.4",
-    "react-router-dom": "^7.13.0",
-    "tailwind-merge": "^3.5.0",
-    "tailwindcss": "^4.2.1"
     "@line/liff": "^2.26.1",
-"qrcode.react": "^3.2.0",
+    "@supabase/supabase-js": "^2.45.4",
+    "qrcode.react": "^3.2.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
-    "@types/node": "^22.14.0",
-    "@vitejs/plugin-react": "^5.0.0",
-    "typescript": "~5.8.2",
-    "vite": "^6.2.0"
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.3",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.15",
+    "vite": "^5.4.11"
   }
 }
