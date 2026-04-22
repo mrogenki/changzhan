@@ -148,7 +148,7 @@ const MemberImportModal: React.FC<MemberImportModalProps> = ({ existingMembers, 
 
       // 表頭驗證：檢查必填欄位都在
       const headerRow = rows[0].map(h => String(h || '').trim());
-      const requiredHeaders = ['會員編號', '產業鏈', '行業別', '姓名', '公司名稱'];
+      const requiredHeaders = ['會員編號', '姓名'];
       const missingHeaders = requiredHeaders.filter(h => !headerRow.includes(h));
       if (missingHeaders.length > 0) {
         setGlobalError(`檔案缺少必要欄位：${missingHeaders.join('、')}。請使用「下載範本」取得正確格式。`);
@@ -191,14 +191,11 @@ const MemberImportModal: React.FC<MemberImportModalProps> = ({ existingMembers, 
         const category = get(row, '行業別');
         const company = get(row, '公司名稱');
 
-        // 必填驗證
+        // 必填驗證：僅會員編號與姓名
         if (!memberNo) errors.push('缺少會員編號');
         if (!name) errors.push('缺少姓名');
-        if (!chain) errors.push('缺少產業鏈');
-        if (!category) errors.push('缺少行業別');
-        if (!company) errors.push('缺少公司名稱');
 
-        // 產業鏈枚舉驗證
+        // 產業鏈枚舉驗證（選填，但有填就要對）
         if (chain && !VALID_CHAINS.includes(chain)) {
           errors.push(`產業鏈「${chain}」不合法（須為：${VALID_CHAINS.join('/')})`);
         }
@@ -241,11 +238,12 @@ const MemberImportModal: React.FC<MemberImportModalProps> = ({ existingMembers, 
               ...existing,
               // 必填一定有值，直接覆蓋
               member_no: memberNo,
-              industry_chain: chain as any,
-              industry_category: category,
               name,
-              company,
-              // 選填欄位採智慧合併
+              // 以下原本必填、現在改選填，空值不覆蓋舊資料
+              industry_chain: (chain || existing.industry_chain) as any,
+              industry_category: mergeValue(category, existing.industry_category),
+              company: mergeValue(company, existing.company),
+              // 其他選填欄位採智慧合併
               group_name: mergeValue(get(row, '組別'), existing.group_name),
               company_title: mergeValue(get(row, '公司抬頭'), existing.company_title),
               tax_id: mergeValue(taxId, existing.tax_id),
@@ -262,10 +260,11 @@ const MemberImportModal: React.FC<MemberImportModalProps> = ({ existingMembers, 
             }
           : {
               member_no: memberNo,
-              industry_chain: chain as any,
-              industry_category: category,
               name,
-              company,
+              // 新增時：沒填的選填欄位給合理預設
+              industry_chain: (chain || '工商') as any,
+              industry_category: category || '',
+              company: company || '',
               group_name: get(row, '組別') || undefined,
               company_title: get(row, '公司抬頭') || undefined,
               tax_id: taxId || undefined,
@@ -350,8 +349,9 @@ const MemberImportModal: React.FC<MemberImportModalProps> = ({ existingMembers, 
                   <p className="font-bold">使用說明</p>
                   <ul className="list-disc list-inside space-y-0.5 text-blue-800">
                     <li>第一次使用請先點「下載範本」取得正確的欄位格式</li>
-                    <li>必填欄位：會員編號、姓名、產業鏈、行業別、公司名稱</li>
+                    <li>必填欄位：會員編號、姓名</li>
                     <li>已存在的會員編號將「智慧合併」：新欄位有值就更新，空值保留原資料</li>
+                    <li>新增會員時，若未填產業鏈預設為「工商」；行業別、公司等空白欄位可事後補上</li>
                     <li>會員照片需事後在「會員管理」頁面手動上傳</li>
                   </ul>
                 </div>
