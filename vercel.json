@@ -1,5 +1,1 @@
-{
-  "rewrites": [
-    { "source": "/liff/checkin", "destination": "/index.html" }
-  ]
-}
+{}
