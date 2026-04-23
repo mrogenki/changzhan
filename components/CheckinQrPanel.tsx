@@ -101,8 +101,6 @@ export default function CheckinQrPanel({ activityId, activityTitle, onAttendance
     }
   }
 
-  // 優先用 LIFF URL (格式: https://liff.line.me/xxx?a=b)
-  // 否則 fallback 用網站 URL (格式: https://host/liff/checkin?a=b)
   const checkinUrl = token
     ? (LIFF_URL
         ? `${LIFF_URL}?activity_id=${activityId}&token=${token}`
@@ -136,4 +134,57 @@ export default function CheckinQrPanel({ activityId, activityTitle, onAttendance
       <p className="text-sm text-gray-600 mb-4">{activityTitle}</p>
 
       {!token ? (
-        <d
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <label className="text-sm">有效時數</label>
+            <input
+              type="number"
+              min={1}
+              max={24}
+              value={durationHours}
+              onChange={(e) => setDurationHours(Number(e.target.value))}
+              className="w-20 border rounded px-2 py-1"
+            />
+            <span className="text-sm text-gray-500">小時</span>
+          </div>
+          <button
+            onClick={openCheckin}
+            disabled={loading}
+            className="bg-blue-500 text-white px-4 py-2 rounded-lg disabled:opacity-50"
+          >
+            {loading ? '產生中...' : '開啟報到 / 產生 QR code'}
+          </button>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <div className="flex justify-center bg-white p-4 border rounded-lg">
+            <QRCodeCanvas value={checkinUrl!} size={256} level="M" />
+          </div>
+          <div className="text-sm text-gray-600 space-y-1">
+            <p>過期時間:{new Date(expiresAt!).toLocaleString('zh-TW')}</p>
+            <p className="break-all text-xs text-gray-400">{checkinUrl}</p>
+            {!LIFF_URL && (
+              <p className="text-xs text-amber-600">
+                ⚠️ 未設定 VITE_LIFF_URL 環境變數
+              </p>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={openCheckin}
+              className="flex-1 bg-gray-100 px-4 py-2 rounded-lg text-sm"
+            >
+              重新產生 token
+            </button>
+            <button
+              onClick={closeCheckin}
+              className="flex-1 bg-red-50 text-red-600 px-4 py-2 rounded-lg text-sm"
+            >
+              關閉報到
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
