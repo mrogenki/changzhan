@@ -17,12 +17,37 @@ type Phase =
   | { kind: 'success'; memberName: string; activityTitle: string }
   | { kind: 'error'; msg: string };
 
+// 從 URL 解析 activity_id 和 token,處理 LIFF 幾種格式:
+// 1. 正常格式: /liff/checkin?activity_id=10&token=xxx
+// 2. 外部瀏覽器格式: /liff/checkin?liff.state=?activity_id=10&token=xxx (會被 URL encode)
+function parseCheckinParams(): { activityId: string | null; token: string | null } {
+  const urlParams = new URLSearchParams(window.location.search);
+
+  // 先試直接讀取
+  let activityId = urlParams.get('activity_id');
+  let token = urlParams.get('token');
+  if (activityId && token) return { activityId, token };
+
+  // 再試 liff.state (LINE 外部瀏覽器會把原本 query 塞進這裡)
+  const liffState = urlParams.get('liff.state');
+  if (liffState) {
+    // liff.state 可能是 ?activity_id=10&token=xxx 或 activity_id=10&token=xxx
+    const cleaned = liffState.startsWith('?') ? liffState.substring(1) : liffState;
+    const stateParams = new URLSearchParams(cleaned);
+    activityId = stateParams.get('activity_id');
+    token = stateParams.get('token');
+    if (activityId && token) return { activityId, token };
+  }
+
+  return { activityId: null, token: null };
+}
+
 export default function LiffCheckin() {
   // 取得 activity_id / token:
-  // 先從 URL 讀;若無(可能被 LIFF OAuth 重導洗掉)則從 sessionStorage 還原
-  const urlParams = new URLSearchParams(window.location.search);
-  let activityIdRaw = urlParams.get('activity_id');
-  let tokenFromUrl = urlParams.get('token');
+  // 優先從 URL (含 liff.state fallback) 讀;若無則從 sessionStorage 還原
+  const parsed = parseCheckinParams();
+  let activityIdRaw: string | null = parsed.activityId;
+  let tokenFromUrl: string | null = parsed.token;
 
   if (activityIdRaw && tokenFromUrl) {
     sessionStorage.setItem('liff_checkin_activity_id', activityIdRaw);
