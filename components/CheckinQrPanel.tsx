@@ -8,6 +8,10 @@ const supabase = createClient(
   import.meta.env.VITE_SUPABASE_ANON_KEY as string
 );
 
+// LIFF URL (例: https://liff.line.me/1234567890-abcdefgh)
+// 若沒設定,fallback 回一般 URL,只能在 LINE 內部掃才會正確運作
+const LIFF_URL = import.meta.env.VITE_LIFF_URL as string | undefined;
+
 interface Props {
   activityId: number;
   activityTitle: string;
@@ -100,8 +104,11 @@ export default function CheckinQrPanel({ activityId, activityTitle, onAttendance
     }
   }
 
+  // 優先使用 LIFF URL (讓 LINE scanner 可直接開啟 LIFF),否則 fallback 一般 URL
   const checkinUrl = token
-    ? `${window.location.origin}/liff/checkin?activity_id=${activityId}&token=${token}`
+    ? (LIFF_URL
+        ? `${LIFF_URL}?activity_id=${activityId}&token=${token}`
+        : `${window.location.origin}/liff/checkin?activity_id=${activityId}&token=${token}`)
     : null;
 
   if (initialLoading) {
@@ -160,6 +167,11 @@ export default function CheckinQrPanel({ activityId, activityTitle, onAttendance
           <div className="text-sm text-gray-600 space-y-1">
             <p>過期時間:{new Date(expiresAt!).toLocaleString('zh-TW')}</p>
             <p className="break-all text-xs text-gray-400">{checkinUrl}</p>
+            {!LIFF_URL && (
+              <p className="text-xs text-amber-600">
+                ⚠️ 未設定 VITE_LIFF_URL 環境變數,LINE 掃 QR 可能無法正確開啟 LIFF
+              </p>
+            )}
           </div>
           <div className="flex gap-2">
             <button
