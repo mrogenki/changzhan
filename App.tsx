@@ -29,9 +29,8 @@ const Header: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const location = useLocation();
   const isAdminPage = location.pathname.startsWith('/admin');
-  const isLiffPage = location.pathname.startsWith('/liff');
 
-  if (isAdminPage || isLiffPage) return null;
+  if (isAdminPage) return null;
 
   return (
     <nav className="bg-white border-b sticky top-0 z-50">
@@ -70,7 +69,7 @@ const Header: React.FC = () => {
 
 const Footer: React.FC = () => {
   const location = useLocation();
-  if (location.pathname.startsWith('/admin') || location.pathname.startsWith('/liff')) return null;
+  if (location.pathname.startsWith('/admin')) return null;
   return (
     <footer className="bg-white border-t py-12">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
@@ -85,6 +84,12 @@ const Footer: React.FC = () => {
 };
 
 const App: React.FC = () => {
+  // LIFF 報到頁:繞過 HashRouter,直接 render
+  // 檢查實際的 window.location.pathname(Vercel rewrite 會保留原始 pathname)
+  if (typeof window !== 'undefined' && window.location.pathname.startsWith('/liff/checkin')) {
+    return <LiffCheckin />;
+  }
+
   const [activities, setActivities] = useState<Activity[]>([]);
   const [registrations, setRegistrations] = useState<Registration[]>([]);
   const [users, setUsers] = useState<AdminUser[]>([]);
@@ -371,100 +376,4 @@ const App: React.FC = () => {
   const handleUpdateFinanceRecord = async (updated: FinanceRecord) => {
     const { error } = await supabase.from('finance_records').update(updated).eq('id', updated.id);
     if (error) alert('更新收支紀錄失敗：' + error.message);
-    else fetchData();
-  };
-
-  const handleDeleteFinanceRecord = async (id: string | number) => {
-    const { error } = await supabase.from('finance_records').delete().eq('id', id);
-    if (error) alert('刪除收支紀錄失敗：' + error.message);
-    else fetchData();
-  };
-
-  const handleAddMilestone = async (newMilestone: Milestone) => {
-    const { id, ...milestoneData } = newMilestone as any;
-    const { error } = await supabase.from('milestones').insert([milestoneData]);
-    if (error) alert('新增大事記失敗：' + error.message);
-    else fetchData();
-  };
-
-  const handleUpdateMilestone = async (updated: Milestone) => {
-    const { error } = await supabase.from('milestones').update(updated).eq('id', updated.id);
-    if (error) alert('更新大事記失敗：' + error.message);
-    else fetchData();
-  };
-
-  const handleDeleteMilestone = async (id: string | number) => {
-    const { error } = await supabase.from('milestones').delete().eq('id', id);
-    if (error) alert('刪除大事記失敗：' + error.message);
-    else fetchData();
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-white">
-        <div className="text-center space-y-4">
-          <Loader2 className="animate-spin text-red-600" size={56} />
-          <p className="text-gray-400 font-bold tracking-widest text-xs uppercase">Connecting Database</p>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <Router>
-      <div className="min-h-screen flex flex-col">
-        <Header />
-        <main className="flex-grow bg-gray-50/30">
-          <Routes>
-            <Route path="/" element={<Home activities={activities} />} />
-            <Route path="/members" element={<MemberList members={members} />} />
-            <Route path="/milestones" element={<Milestones milestones={milestones} />} />
-            <Route path="/activity/:id" element={<ActivityDetail activities={activities} onRegister={handleRegister} registrations={registrations} members={members} />} />
-            <Route path="/liff/checkin" element={<LiffCheckin />} />
-            <Route path="/admin/login" element={currentUser ? <Navigate to="/admin" /> : <LoginPage users={users} onLogin={handleLogin} />} />
-            <Route path="/admin/*" element={
-              currentUser ? (
-                <AdminDashboard
-                  currentUser={currentUser}
-                  onLogout={handleLogout}
-                  activities={activities}
-                  registrations={registrations}
-                  users={users}
-                  members={members}
-                  attendance={attendance}
-                  onUpdateActivity={handleUpdateActivity}
-                  onAddActivity={handleAddActivity}
-                  onDeleteActivity={handleDeleteActivity}
-                  onUpdateRegistration={handleUpdateRegistration}
-                  onDeleteRegistration={handleDeleteRegistration}
-                  onAddUser={handleAddUser}
-                  onDeleteUser={handleDeleteUser}
-                  onAddMember={handleAddMember}
-                  onUpdateMember={handleUpdateMember}
-                  onDeleteMember={handleDeleteMember}
-                  onUpdateAttendance={handleUpdateAttendance}
-                  onDeleteAttendance={handleDeleteAttendance}
-                  onRefreshAttendance={refreshAttendance}
-                  onAddFinanceRecord={handleAddFinanceRecord}
-                  onUpdateFinanceRecord={handleUpdateFinanceRecord}
-                  onDeleteFinanceRecord={handleDeleteFinanceRecord}
-                  financeRecords={financeRecords}
-                  milestones={milestones}
-                  onAddMilestone={handleAddMilestone}
-                  onUpdateMilestone={handleUpdateMilestone}
-                  onDeleteMilestone={handleDeleteMilestone}
-                  onUploadImage={handleUploadImage}
-                />
-              ) : (
-                <Navigate to="/admin/login" />
-              )
-            } />
-          </Routes>
-        </main>
-        <Footer />
-      </div>
-    </Router>
-  );
-};
-
-export default App;
+    else fetchDat
