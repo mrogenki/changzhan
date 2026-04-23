@@ -6,10 +6,11 @@ import Home from './pages/Home';
 import ActivityDetail from './pages/ActivityDetail';
 import AdminDashboard from './pages/AdminDashboard';
 import LoginPage from './pages/LoginPage';
-import MemberList from './pages/MemberList'; // 新增 import
+import MemberList from './pages/MemberList';
 import Milestones from './pages/Milestones';
+import LiffCheckin from './pages/LiffCheckin';
 import { Activity, ActivityType, Registration, AdminUser, Member, AttendanceRecord, AttendanceStatus, FinanceRecord, Milestone } from './types';
-import { INITIAL_ACTIVITIES, INITIAL_ADMINS, INITIAL_MEMBERS } from './constants'; // 新增 import
+import { INITIAL_ACTIVITIES, INITIAL_ADMINS, INITIAL_MEMBERS } from './constants';
 
 const getEnv = (key: string): string | undefined => {
   try {
@@ -19,7 +20,7 @@ const getEnv = (key: string): string | undefined => {
   }
 };
 
-const SUPABASE_URL = getEnv('VITE_SUPABASE_URL') || 'https://qxoglhkfxxqsjefynzqn.supabase.co'; 
+const SUPABASE_URL = getEnv('VITE_SUPABASE_URL') || 'https://qxoglhkfxxqsjefynzqn.supabase.co';
 const SUPABASE_ANON_KEY = getEnv('VITE_SUPABASE_ANON_KEY') || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF4b2dsaGtmeHhxc2plZnluenFuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAwMzQwNTAsImV4cCI6MjA4NTYxMDA1MH0.gLvcHgY0rqLd26Nw61_M7nmjaz4TUsP9VL-XxN5wNSU';
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -28,8 +29,9 @@ const Header: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const location = useLocation();
   const isAdminPage = location.pathname.startsWith('/admin');
+  const isLiffPage = location.pathname.startsWith('/liff');
 
-  if (isAdminPage) return null;
+  if (isAdminPage || isLiffPage) return null;
 
   return (
     <nav className="bg-white border-b sticky top-0 z-50">
@@ -68,7 +70,7 @@ const Header: React.FC = () => {
 
 const Footer: React.FC = () => {
   const location = useLocation();
-  if (location.pathname.startsWith('/admin')) return null;
+  if (location.pathname.startsWith('/admin') || location.pathname.startsWith('/liff')) return null;
   return (
     <footer className="bg-white border-t py-12">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
@@ -86,26 +88,22 @@ const App: React.FC = () => {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [registrations, setRegistrations] = useState<Registration[]>([]);
   const [users, setUsers] = useState<AdminUser[]>([]);
-  const [members, setMembers] = useState<Member[]>([]); // 新增 members state
-  const [attendance, setAttendance] = useState<AttendanceRecord[]>([]); // 新增 attendance state
-  const [financeRecords, setFinanceRecords] = useState<FinanceRecord[]>([]); // 新增 financeRecords state
-  const [milestones, setMilestones] = useState<Milestone[]>([]); // 新增 milestones state
+  const [members, setMembers] = useState<Member[]>([]);
+  const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
+  const [financeRecords, setFinanceRecords] = useState<FinanceRecord[]>([]);
+  const [milestones, setMilestones] = useState<Milestone[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<AdminUser | null>(() => {
     const saved = sessionStorage.getItem('current_user');
     return saved ? JSON.parse(saved) : null;
   });
 
-  // 修改：加入參數控制是否顯示 Loading 遮罩
-  // 預設為 false (靜默更新)，只有初始化時傳入 true
   const fetchData = async (isInitialLoad = false) => {
     if (isInitialLoad) setLoading(true);
     try {
-      // 獲取活動
       const { data: actData } = await supabase.from('activities').select('*').order('date', { ascending: true }).order('time', { ascending: true });
-      
+
       if (actData) {
-        // 檢查是否需要遷移舊的活動類型字串 (相容性處理)
         const needsMigration = actData.some(a => a.type === '例會' || a.type === '近期活動' || a.type === '精選活動');
         if (needsMigration) {
           const updates = actData.map(async (a) => {
@@ -118,18 +116,16 @@ const App: React.FC = () => {
             return Promise.resolve();
           });
           await Promise.all(updates);
-          fetchData(); // 重新獲取更新後的資料
+          fetchData();
           return;
         }
 
-        // 資料庫沒有 status 欄位，手動補上預設值，避免前端錯誤
         const mappedActs = actData.map((a: any) => ({
           ...a,
           status: a.status || 'active'
         }));
         setActivities(mappedActs);
       } else if (actData && actData.length === 0) {
-        // 只有在資料庫真的完全沒資料時才初始化一次
         const initActs = INITIAL_ACTIVITIES.map(({ id, status, ...rest }) => rest);
         const { data: inserted } = await supabase.from('activities').insert(initActs).select();
         if (inserted) {
@@ -141,11 +137,9 @@ const App: React.FC = () => {
         }
       }
 
-      // 獲取報名
       const { data: regData } = await supabase.from('registrations').select('*').order('created_at', { ascending: false });
       if (regData) setRegistrations(regData);
-      
-      // 獲取管理員
+
       const { data: userData, error: userError } = await supabase.from('admins').select('*');
       if (userData && userData.length > 0) {
         setUsers(userData);
@@ -155,30 +149,25 @@ const App: React.FC = () => {
         if (inserted) setUsers(inserted);
       }
 
-      // 獲取會員 (新增)
       const { data: memberData, error: memberError } = await supabase.from('members').select('*');
       if (memberData && memberData.length > 0) {
         setMembers(memberData);
       } else if (!memberError && memberData && memberData.length === 0) {
-        // 資料庫無資料時初始化
         const initMembers = INITIAL_MEMBERS.map(({ id, ...rest }) => rest);
         const { data: inserted } = await supabase.from('members').insert(initMembers).select();
         if (inserted) setMembers(inserted);
       }
 
-      // 獲取出席紀錄 (新增)
       const { data: attendanceData } = await supabase.from('attendance').select('*');
       if (attendanceData) {
         setAttendance(attendanceData as AttendanceRecord[]);
       }
 
-      // 獲取收支紀錄 (新增)
       const { data: financeData } = await supabase.from('finance_records').select('*').order('date', { ascending: false });
       if (financeData) {
         setFinanceRecords(financeData as FinanceRecord[]);
       }
 
-      // 獲取大事記 (新增)
       const { data: milestoneData } = await supabase.from('milestones').select('*').order('date', { ascending: false });
       if (milestoneData) {
         setMilestones(milestoneData as Milestone[]);
@@ -191,8 +180,13 @@ const App: React.FC = () => {
     }
   };
 
+  const refreshAttendance = async () => {
+    const { data } = await supabase.from('attendance').select('*');
+    if (data) setAttendance(data as AttendanceRecord[]);
+  };
+
   useEffect(() => {
-    fetchData(true); // 首次載入顯示 Loading
+    fetchData(true);
   }, []);
 
   const handleLogin = (user: AdminUser) => {
@@ -205,7 +199,6 @@ const App: React.FC = () => {
     sessionStorage.removeItem('current_user');
   };
 
-  // 處理圖片上傳
   const handleUploadImage = async (file: File): Promise<string> => {
     try {
       const fileExt = file.name.split('.').pop()?.toLowerCase() || 'jpg';
@@ -220,7 +213,7 @@ const App: React.FC = () => {
         });
 
       if (uploadError) {
-        throw uploadError; 
+        throw uploadError;
       }
 
       const { data } = supabase.storage
@@ -235,7 +228,6 @@ const App: React.FC = () => {
     }
   };
 
-  // 修改：回傳 Promise<boolean> 以便前端判斷
   const handleRegister = async (newReg: Registration): Promise<boolean> => {
     const { id, ...regData } = newReg as any;
     const { error } = await supabase.from('registrations').insert([regData]);
@@ -243,7 +235,7 @@ const App: React.FC = () => {
       alert('報名失敗：' + error.message);
       return false;
     } else {
-      await fetchData(); 
+      await fetchData();
       return true;
     }
   };
@@ -297,7 +289,6 @@ const App: React.FC = () => {
     }
   };
 
-  // 會員管理相關功能 (新增)
   const handleAddMember = async (newMember: Member) => {
     const { id, ...memberData } = newMember as any;
     const { error } = await supabase.from('members').insert([memberData]);
@@ -317,43 +308,10 @@ const App: React.FC = () => {
     else fetchData();
   };
 
-  // 新增：批次匯入會員 (Excel/CSV)
-  // toAdd: 不含 id，bulk insert
-  // toUpdate: 含 id（智慧合併後的完整物件），逐筆 update
-  const handleBatchImportMembers = async (toAdd: Member[], toUpdate: Member[]) => {
-    // 1. 批次新增
-    if (toAdd.length > 0) {
-      const cleaned = toAdd.map(m => {
-        const { id, ...rest } = m as any;
-        return rest;
-      });
-      const { error } = await supabase.from('members').insert(cleaned);
-      if (error) {
-        throw new Error(`新增失敗：${error.message}`);
-      }
-    }
-
-    // 2. 逐筆更新（Supabase 沒有原生 bulk update，用 Promise.all 並發）
-    if (toUpdate.length > 0) {
-      const results = await Promise.all(
-        toUpdate.map(m => supabase.from('members').update(m).eq('id', m.id))
-      );
-      const failed = results.filter(r => r.error);
-      if (failed.length > 0) {
-        throw new Error(`部分更新失敗（${failed.length} 筆）：${failed[0].error?.message}`);
-      }
-    }
-
-    await fetchData();
-  };
-
-  // 新增：處理出席紀錄更新 (Upsert)
   const handleUpdateAttendance = async (activityId: string, memberId: string, status: AttendanceStatus) => {
-    // 樂觀更新 (Optimistic Update): 先更新前端狀態，讓 UI 立即反應
     const now = new Date().toISOString();
     const tempId = `temp-${Date.now()}`;
-    
-    // 更新本地 state
+
     setAttendance(prev => {
       const existingIndex = prev.findIndex(r => String(r.activity_id) === String(activityId) && String(r.member_id) === String(memberId));
       if (existingIndex >= 0) {
@@ -366,7 +324,6 @@ const App: React.FC = () => {
     });
 
     try {
-      // 使用 upsert 寫入 Supabase (依賴 activity_id, member_id 的 unique constraint)
       const { data, error } = await supabase
         .from('attendance')
         .upsert(
@@ -377,18 +334,15 @@ const App: React.FC = () => {
 
       if (error) {
         console.error('Attendance update failed:', error);
-        // 如果失敗，應該要回復狀態 (這裡簡化處理：重新 fetch)
-        fetchData(); 
-      } 
+        fetchData();
+      }
     } catch (err) {
       console.error('API error:', err);
       fetchData();
     }
   };
 
-  // 新增：刪除出席紀錄 (重置/恢復)
   const handleDeleteAttendance = async (activityId: string, memberId: string) => {
-    // 樂觀更新：先從本地 state 移除
     setAttendance(prev => prev.filter(r => !(String(r.activity_id) === String(activityId) && String(r.member_id) === String(memberId))));
 
     try {
@@ -399,7 +353,7 @@ const App: React.FC = () => {
 
        if (error) {
          console.error('Delete attendance failed:', error);
-         fetchData(); // 失敗則還原
+         fetchData();
        }
     } catch (err) {
        console.error('API error:', err);
@@ -407,7 +361,6 @@ const App: React.FC = () => {
     }
   };
 
-  // 新增：收支管理相關功能
   const handleAddFinanceRecord = async (newRecord: FinanceRecord) => {
     const { id, ...recordData } = newRecord as any;
     const { error } = await supabase.from('finance_records').insert([recordData]);
@@ -427,7 +380,6 @@ const App: React.FC = () => {
     else fetchData();
   };
 
-  // 大事記管理相關功能 (新增)
   const handleAddMilestone = async (newMilestone: Milestone) => {
     const { id, ...milestoneData } = newMilestone as any;
     const { error } = await supabase.from('milestones').insert([milestoneData]);
@@ -465,20 +417,21 @@ const App: React.FC = () => {
         <main className="flex-grow bg-gray-50/30">
           <Routes>
             <Route path="/" element={<Home activities={activities} />} />
-            <Route path="/members" element={<MemberList members={members} />} /> {/* 新增路由 */}
+            <Route path="/members" element={<MemberList members={members} />} />
             <Route path="/milestones" element={<Milestones milestones={milestones} />} />
             <Route path="/activity/:id" element={<ActivityDetail activities={activities} onRegister={handleRegister} registrations={registrations} members={members} />} />
+            <Route path="/liff/checkin" element={<LiffCheckin />} />
             <Route path="/admin/login" element={currentUser ? <Navigate to="/admin" /> : <LoginPage users={users} onLogin={handleLogin} />} />
             <Route path="/admin/*" element={
               currentUser ? (
-                <AdminDashboard 
+                <AdminDashboard
                   currentUser={currentUser}
                   onLogout={handleLogout}
-                  activities={activities} 
+                  activities={activities}
                   registrations={registrations}
                   users={users}
-                  members={members} // 傳遞 members
-                  attendance={attendance} // 傳遞出席紀錄
+                  members={members}
+                  attendance={attendance}
                   onUpdateActivity={handleUpdateActivity}
                   onAddActivity={handleAddActivity}
                   onDeleteActivity={handleDeleteActivity}
@@ -486,21 +439,21 @@ const App: React.FC = () => {
                   onDeleteRegistration={handleDeleteRegistration}
                   onAddUser={handleAddUser}
                   onDeleteUser={handleDeleteUser}
-                  onAddMember={handleAddMember} // 傳遞會員操作
-                  onUpdateMember={handleUpdateMember} // 傳遞會員操作
-                  onDeleteMember={handleDeleteMember} // 傳遞會員操作
-                  onBatchImportMembers={handleBatchImportMembers} // 傳遞批次匯入
-                  onUpdateAttendance={handleUpdateAttendance} // 傳遞出席更新函數
-                  onDeleteAttendance={handleDeleteAttendance} // 新增：傳遞出席刪除函數
-                  onAddFinanceRecord={handleAddFinanceRecord} // 傳遞收支操作
-                  onUpdateFinanceRecord={handleUpdateFinanceRecord} // 傳遞收支操作
-                  onDeleteFinanceRecord={handleDeleteFinanceRecord} // 傳遞收支操作
-                  financeRecords={financeRecords} // 傳遞收支資料
-                  milestones={milestones} // 傳遞大事記資料
-                  onAddMilestone={handleAddMilestone} // 傳遞大事記操作
-                  onUpdateMilestone={handleUpdateMilestone} // 傳遞大事記操作
-                  onDeleteMilestone={handleDeleteMilestone} // 傳遞大事記操作
-                  onUploadImage={handleUploadImage} 
+                  onAddMember={handleAddMember}
+                  onUpdateMember={handleUpdateMember}
+                  onDeleteMember={handleDeleteMember}
+                  onUpdateAttendance={handleUpdateAttendance}
+                  onDeleteAttendance={handleDeleteAttendance}
+                  onRefreshAttendance={refreshAttendance}
+                  onAddFinanceRecord={handleAddFinanceRecord}
+                  onUpdateFinanceRecord={handleUpdateFinanceRecord}
+                  onDeleteFinanceRecord={handleDeleteFinanceRecord}
+                  financeRecords={financeRecords}
+                  milestones={milestones}
+                  onAddMilestone={handleAddMilestone}
+                  onUpdateMilestone={handleUpdateMilestone}
+                  onDeleteMilestone={handleDeleteMilestone}
+                  onUploadImage={handleUploadImage}
                 />
               ) : (
                 <Navigate to="/admin/login" />
