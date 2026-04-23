@@ -9,7 +9,6 @@ const supabase = createClient(
 );
 
 // LIFF URL (例: https://liff.line.me/1234567890-abcdefgh)
-// 若沒設定,fallback 回一般 URL,只能在 LINE 內部掃才會正確運作
 const LIFF_URL = import.meta.env.VITE_LIFF_URL as string | undefined;
 
 interface Props {
@@ -26,7 +25,6 @@ export default function CheckinQrPanel({ activityId, activityTitle, onAttendance
   const [refreshing, setRefreshing] = useState(false);
   const [durationHours, setDurationHours] = useState(3);
 
-  // 初次載入 / 切換 activity 時,從資料庫讀現有的 token
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -104,11 +102,12 @@ export default function CheckinQrPanel({ activityId, activityTitle, onAttendance
     }
   }
 
-  // 優先使用 LIFF URL (讓 LINE scanner 可直接開啟 LIFF),否則 fallback 一般 URL
+  // 優先用 LIFF URL (格式: https://liff.line.me/xxx?a=b)
+  // 否則用網站自己的 URL (格式: https://host/#/liff/checkin?a=b)
   const checkinUrl = token
     ? (LIFF_URL
         ? `${LIFF_URL}?activity_id=${activityId}&token=${token}`
-        : `${window.location.origin}/liff/checkin?activity_id=${activityId}&token=${token}`)
+        : `${window.location.origin}/#/liff/checkin?activity_id=${activityId}&token=${token}`)
     : null;
 
   if (initialLoading) {
@@ -169,7 +168,7 @@ export default function CheckinQrPanel({ activityId, activityTitle, onAttendance
             <p className="break-all text-xs text-gray-400">{checkinUrl}</p>
             {!LIFF_URL && (
               <p className="text-xs text-amber-600">
-                ⚠️ 未設定 VITE_LIFF_URL 環境變數,LINE 掃 QR 可能無法正確開啟 LIFF
+                ⚠️ 未設定 VITE_LIFF_URL 環境變數
               </p>
             )}
           </div>
