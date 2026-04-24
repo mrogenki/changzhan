@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
+import { HashRouter as Router, Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
 import { Menu, X, Loader2 } from 'lucide-react';
 import { createClient } from '@supabase/supabase-js';
 import Home from './pages/Home';
@@ -84,7 +84,6 @@ const Footer: React.FC = () => {
 };
 
 const App: React.FC = () => {
-  // LIFF 報到頁:繞過 Router,直接 render
   if (typeof window !== 'undefined' && window.location.pathname.startsWith('/liff/checkin')) {
     return <LiffCheckin />;
   }
@@ -187,6 +186,11 @@ const App: React.FC = () => {
   const refreshAttendance = async () => {
     const { data } = await supabase.from('attendance').select('*');
     if (data) setAttendance(data as AttendanceRecord[]);
+  };
+
+  const refreshRegistrations = async () => {
+    const { data } = await supabase.from('registrations').select('*').order('created_at', { ascending: false });
+    if (data) setRegistrations(data);
   };
 
   useEffect(() => {
@@ -448,6 +452,7 @@ const App: React.FC = () => {
                   onUpdateAttendance={handleUpdateAttendance}
                   onDeleteAttendance={handleDeleteAttendance}
                   onRefreshAttendance={refreshAttendance}
+                  onRefreshRegistrations={refreshRegistrations}
                   onAddFinanceRecord={handleAddFinanceRecord}
                   onUpdateFinanceRecord={handleUpdateFinanceRecord}
                   onDeleteFinanceRecord={handleDeleteFinanceRecord}
