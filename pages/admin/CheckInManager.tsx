@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect } from 'react';
-import { Search, FileDown, CheckCircle, XCircle, Trash2 } from 'lucide-react';
+import { Search, FileDown, CheckCircle, XCircle, Trash2, RefreshCw } from 'lucide-react';
 import { Activity, Registration } from '../../types';
 import PaidAmountInput from './PaidAmountInput';
 
@@ -9,11 +8,13 @@ interface CheckInManagerProps {
   registrations: Registration[];
   onUpdateRegistration: (reg: Registration) => void;
   onDeleteRegistration: (id: string | number) => void;
+  onRefreshRegistrations: () => Promise<void>;
 }
 
-const CheckInManager: React.FC<CheckInManagerProps> = ({ activities, registrations, onUpdateRegistration, onDeleteRegistration }) => {
+const CheckInManager: React.FC<CheckInManagerProps> = ({ activities, registrations, onUpdateRegistration, onDeleteRegistration, onRefreshRegistrations }) => {
   const [selectedActivityId, setSelectedActivityId] = useState<string>(activities.length > 0 ? String(activities[0].id) : '');
   const [searchTerm, setSearchTerm] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     if (!selectedActivityId && activities.length > 0) {
@@ -23,11 +24,20 @@ const CheckInManager: React.FC<CheckInManagerProps> = ({ activities, registratio
 
   const filteredRegistrations = registrations.filter(r => {
     const matchesActivity = selectedActivityId === 'all' || String(r.activityId) === selectedActivityId;
-    const matchesSearch = r.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    const matchesSearch = r.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           r.phone.includes(searchTerm) ||
                           r.company?.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesActivity && matchesSearch;
   });
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await onRefreshRegistrations();
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const handleExport = () => {
     if (filteredRegistrations.length === 0) {
@@ -70,7 +80,7 @@ const CheckInManager: React.FC<CheckInManagerProps> = ({ activities, registratio
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
-    
+
     let filename = '活動報名名單.csv';
     if (selectedActivityId !== 'all') {
       const act = activities.find(a => String(a.id) === String(selectedActivityId));
@@ -81,7 +91,7 @@ const CheckInManager: React.FC<CheckInManagerProps> = ({ activities, registratio
       const dateStr = new Date().toISOString().split('T')[0];
       filename = `所有活動報名名單_${dateStr}.csv`;
     }
-    
+
     link.href = url;
     link.setAttribute('download', filename);
     document.body.appendChild(link);
@@ -96,17 +106,26 @@ const CheckInManager: React.FC<CheckInManagerProps> = ({ activities, registratio
            <h1 className="text-2xl font-bold">報到管理 (訪客)</h1>
            <p className="text-gray-500 text-sm">管理活動報名人員的報到狀態與繳費紀錄。</p>
         </div>
-        
+
         <div className="flex items-center gap-2 w-full md:w-auto">
-          <button 
-            onClick={handleExport} 
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="flex items-center gap-2 bg-blue-50 text-blue-700 px-4 py-3 rounded-xl hover:bg-blue-100 transition-all shadow-sm active:scale-95 whitespace-nowrap disabled:opacity-50"
+            title="重新載入報到狀態"
+          >
+            <RefreshCw size={18} className={refreshing ? 'animate-spin' : ''}/>
+            {refreshing ? '更新中...' : '重整報到'}
+          </button>
+          <button
+            onClick={handleExport}
             className="flex items-center gap-2 bg-green-600 text-white px-4 py-3 rounded-xl hover:bg-green-700 transition-all shadow-sm active:scale-95 whitespace-nowrap"
           >
             <FileDown size={18}/> 匯出報名表
           </button>
-          <select 
-            value={selectedActivityId} 
-            onChange={e => setSelectedActivityId(e.target.value)} 
+          <select
+            value={selectedActivityId}
+            onChange={e => setSelectedActivityId(e.target.value)}
             className="w-full md:w-64 border rounded-xl px-4 py-3 bg-white outline-none focus:ring-2 focus:ring-red-500 font-bold"
           >
             <option value="all">所有活動</option>
@@ -121,11 +140,11 @@ const CheckInManager: React.FC<CheckInManagerProps> = ({ activities, registratio
         <div className="p-4 border-b border-gray-100 bg-gray-50/50 flex flex-col sm:flex-row justify-between items-center gap-4">
           <div className="flex items-center gap-2 w-full sm:w-auto">
             <Search size={18} className="text-gray-400" />
-            <input 
-              type="text" 
-              placeholder="搜尋姓名、電話或公司..." 
-              value={searchTerm} 
-              onChange={e => setSearchTerm(e.target.value)} 
+            <input
+              type="text"
+              placeholder="搜尋姓名、電話或公司..."
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
               className="bg-transparent outline-none text-sm w-full sm:w-64"
             />
           </div>
@@ -134,7 +153,7 @@ const CheckInManager: React.FC<CheckInManagerProps> = ({ activities, registratio
              <span className="text-green-600">已報到：{filteredRegistrations.filter(r => r.check_in_status).length}</span>
           </div>
         </div>
-        
+
         <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead className="bg-gray-50 border-b border-gray-100">
@@ -159,11 +178,11 @@ const CheckInManager: React.FC<CheckInManagerProps> = ({ activities, registratio
                     <div className="text-xs text-gray-400">{reg.email}</div>
                   </td>
                   <td className="px-6 py-4">
-                    <button 
+                    <button
                       onClick={() => onUpdateRegistration({...reg, check_in_status: !reg.check_in_status})}
                       className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${
-                        reg.check_in_status 
-                          ? 'bg-green-100 text-green-700 hover:bg-green-200' 
+                        reg.check_in_status
+                          ? 'bg-green-100 text-green-700 hover:bg-green-200'
                           : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
                       }`}
                     >
@@ -174,14 +193,14 @@ const CheckInManager: React.FC<CheckInManagerProps> = ({ activities, registratio
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
                       <span className="text-gray-400 text-xs">$</span>
-                      <PaidAmountInput 
-                        value={reg.paid_amount} 
-                        onSave={(val) => onUpdateRegistration({...reg, paid_amount: val})} 
+                      <PaidAmountInput
+                        value={reg.paid_amount}
+                        onSave={(val) => onUpdateRegistration({...reg, paid_amount: val})}
                       />
                     </div>
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <button 
+                    <button
                       onClick={() => { if(window.confirm('確定要刪除此報名紀錄嗎？')) onDeleteRegistration(reg.id); }}
                       className="text-gray-400 hover:text-red-600 p-2 hover:bg-red-50 rounded-lg transition-colors"
                     >
