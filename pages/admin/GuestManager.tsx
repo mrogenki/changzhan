@@ -191,7 +191,7 @@ async function expandGuest(guestId: number) {
           .from('message_send_log')
           .select('*')
           .eq('recipient_kind', 'guest')
-          .eq('recipient_id', String(guestId))
+          .eq('recipient_id', guestId)
           .order('created_at', { ascending: false })
           .limit(20),
       ]);
