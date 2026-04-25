@@ -8,6 +8,7 @@ const supabase = createClient(
 );
 
 const LIFF_ID = import.meta.env.VITE_LIFF_ID as string;
+const LINE_OA_ID = (import.meta.env.VITE_LINE_OA_ID as string) || ''; // e.g. "@123abcde"
 
 type Member = { id: number; name: string };
 
@@ -37,19 +38,16 @@ function parseCheckinParams(): { activityId: string | null; token: string | null
   return { activityId: null, token: null };
 }
 
-// 變數替換
 function renderTemplate(template: string, vars: Record<string, string>): string {
   return template.replace(/\{(\w+)\}/g, (_, key) => vars[key] ?? `{${key}}`);
 }
 
-// 寄送來賓歡迎訊息 (失敗不丟 error)
 async function sendGuestWelcomeMessage(params: {
   lineUserId: string;
   guestName: string;
   activityId: number;
 }) {
   try {
-    // 撈活動資料 + 全域預設訊息
     const [actRes, settingRes] = await Promise.all([
       supabase
         .from('activities')
@@ -69,14 +67,12 @@ async function sendGuestWelcomeMessage(params: {
       return;
     }
 
-    // 訊息來源優先序: 活動自訂 > 全域預設
     const template = activity.guest_welcome_message || settingRes.data?.value;
     if (!template || !template.trim()) {
       console.log('No welcome message configured, skip');
       return;
     }
 
-    // 變數替換
     const text = renderTemplate(template, {
       name: params.guestName,
       activity_title: activity.title ?? '',
@@ -85,7 +81,6 @@ async function sendGuestWelcomeMessage(params: {
       activity_location: activity.location ?? '',
     });
 
-    // 呼叫 Edge Function
     const { data, error } = await supabase.functions.invoke('send-line-message', {
       body: {
         to: params.lineUserId,
@@ -108,6 +103,13 @@ async function sendGuestWelcomeMessage(params: {
   }
 }
 
+// 產生加好友連結
+function getAddFriendUrl(): string | null {
+  if (!LINE_OA_ID) return null;
+  const id = LINE_OA_ID.startsWith('@') ? LINE_OA_ID.substring(1) : LINE_OA_ID;
+  return `https://line.me/R/ti/p/@${id}`;
+}
+
 export default function LiffCheckin() {
   const parsed = parseCheckinParams();
   let activityIdRaw: string | null = parsed.activityId;
@@ -126,12 +128,10 @@ export default function LiffCheckin() {
 
   const [phase, setPhase] = useState<Phase>({ kind: 'loading', msg: '初始化 LINE...' });
 
-  // 會員綁定用 state
   const [members, setMembers] = useState<Member[]>([]);
   const [selectedMemberId, setSelectedMemberId] = useState<number | ''>('');
   const [memberPhone4, setMemberPhone4] = useState('');
 
-  // 訪客綁定用 state
   const [guestPhone4, setGuestPhone4] = useState('');
 
   const [submitting, setSubmitting] = useState(false);
@@ -170,7 +170,6 @@ export default function LiffCheckin() {
           return;
         }
 
-        // 已綁定使用者(會員或來賓)直接報到成功
         if (data?.success) {
           sessionStorage.removeItem('liff_checkin_activity_id');
           sessionStorage.removeItem('liff_checkin_token');
@@ -183,7 +182,6 @@ export default function LiffCheckin() {
           return;
         }
 
-        // 未綁定 → 顯示身份選擇
         if (data?.error === 'NOT_BOUND') {
           setPhase({
             kind: 'choose_identity',
@@ -193,7 +191,6 @@ export default function LiffCheckin() {
           return;
         }
 
-        // 其他錯誤
         setPhase({ kind: 'error', msg: data?.error ?? '未知錯誤' });
       } catch (e: any) {
         setPhase({ kind: 'error', msg: '發生錯誤:' + (e?.message ?? String(e)) });
@@ -202,7 +199,6 @@ export default function LiffCheckin() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 選擇會員身份
   async function chooseAsMember() {
     if (phase.kind !== 'choose_identity') return;
     setPhase({ kind: 'loading', msg: '載入會員名單...' });
@@ -224,7 +220,6 @@ export default function LiffCheckin() {
     }
   }
 
-  // 選擇來賓身份
   function chooseAsGuest() {
     if (phase.kind !== 'choose_identity') return;
     setPhase({
@@ -234,7 +229,6 @@ export default function LiffCheckin() {
     });
   }
 
-  // 會員綁定 + 報到
   async function handleMemberBind() {
     if (phase.kind !== 'member_binding') return;
     if (!selectedMemberId) {
@@ -286,7 +280,6 @@ export default function LiffCheckin() {
     }
   }
 
-  // 訪客綁定 + 報到
   async function handleGuestBind() {
     if (phase.kind !== 'guest_binding') return;
     if (!/^\d{4}$/.test(guestPhone4)) {
@@ -315,7 +308,6 @@ export default function LiffCheckin() {
       sessionStorage.removeItem('liff_checkin_activity_id');
       sessionStorage.removeItem('liff_checkin_token');
 
-      // 先 set 成功 UI (不阻塞)
       setPhase({
         kind: 'success',
         name: data.name,
@@ -323,7 +315,7 @@ export default function LiffCheckin() {
         isGuest: true,
       });
 
-      // 背景發送來賓歡迎訊息 (失敗不影響成功 UI)
+      // 背景發歡迎訊息
       sendGuestWelcomeMessage({
         lineUserId: phase.lineUserId,
         guestName: data.name,
@@ -333,6 +325,8 @@ export default function LiffCheckin() {
       setSubmitting(false);
     }
   }
+
+  const addFriendUrl = getAddFriendUrl();
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
@@ -355,6 +349,24 @@ export default function LiffCheckin() {
             </p>
             <p className="text-gray-700">{phase.name}</p>
             <p className="text-sm text-gray-500 mt-4">{phase.activityTitle}</p>
+
+            {/* 來賓 + 已設定 OA ID 才顯示加好友按鈕 */}
+            {phase.isGuest && addFriendUrl && (
+              <div className="mt-8 pt-6 border-t border-gray-100">
+                <p className="text-sm text-gray-600 mb-3">
+                  📩 加入官方帳號好友,接收例會邀請與分會資訊
+                </p>
+                
+                  href={addFriendUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center justify-center gap-2 w-full bg-green-500 text-white py-3 rounded-lg font-bold hover:bg-green-600 transition"
+                >
+                  <span>＋</span> 加入官方帳號好友
+                </a>
+              </div>
+            )}
+
             <p className="text-xs text-gray-400 mt-6">請點右上角 ✕ 關閉此頁</p>
           </div>
         )}
