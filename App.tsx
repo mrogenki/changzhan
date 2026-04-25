@@ -426,4 +426,70 @@ const App: React.FC = () => {
             <div className="min-h-screen flex items-center justify-center bg-white">
                 <div className="text-center space-y-4">
                     <Loader2 className="animate-spin text-red-600" size={56} />
-                    <p className="tex
+                    <p className="text-gray-400 font-bold tracking-widest text-xs uppercase">Connecting Database</p>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <Router>
+            <div className="min-h-screen flex flex-col">
+                <Header />
+                <main className="flex-grow bg-gray-50/30">
+                    <Routes>
+                        <Route path="/" element={<Home activities={activities} />} />
+                        <Route path="/regular-meeting" element={<RegularMeeting activities={activities} />} />
+                        <Route path="/training" element={<BusinessTraining activities={activities} />} />
+                        <Route path="/coffee" element={<CoffeeMeeting activities={activities} />} />
+                        <Route path="/members" element={<MemberList members={members} />} />
+                        <Route path="/milestones" element={<Milestones milestones={milestones} />} />
+                        <Route path="/activity/:id" element={<ActivityDetail activities={activities} onRegister={handleRegister} registrations={registrations} members={members} />} />
+                        <Route path="/admin/login" element={currentUser ? <Navigate to="/admin" /> : <LoginPage users={users} onLogin={handleLogin} />} />
+                        <Route path="/admin/*" element={
+                            currentUser ? (
+                                <AdminDashboard
+                                    currentUser={currentUser}
+                                    onLogout={handleLogout}
+                                    activities={activities}
+                                    registrations={registrations}
+                                    users={users}
+                                    members={members}
+                                    attendance={attendance}
+                                    onUpdateActivity={handleUpdateActivity}
+                                    onAddActivity={handleAddActivity}
+                                    onDeleteActivity={handleDeleteActivity}
+                                    onUpdateRegistration={handleUpdateRegistration}
+                                    onDeleteRegistration={handleDeleteRegistration}
+                                    onAddUser={handleAddUser}
+                                    onDeleteUser={handleDeleteUser}
+                                    onAddMember={handleAddMember}
+                                    onUpdateMember={handleUpdateMember}
+                                    onDeleteMember={handleDeleteMember}
+                                    onUpdateAttendance={handleUpdateAttendance}
+                                    onDeleteAttendance={handleDeleteAttendance}
+                                    onRefreshAttendance={refreshAttendance}
+                                    onRefreshRegistrations={refreshRegistrations}
+                                    onAddFinanceRecord={handleAddFinanceRecord}
+                                    onUpdateFinanceRecord={handleUpdateFinanceRecord}
+                                    onDeleteFinanceRecord={handleDeleteFinanceRecord}
+                                    financeRecords={financeRecords}
+                                    milestones={milestones}
+                                    onAddMilestone={handleAddMilestone}
+                                    onUpdateMilestone={handleUpdateMilestone}
+                                    onDeleteMilestone={handleDeleteMilestone}
+                                    onUploadImage={handleUploadImage}
+                                />
+                            ) : (
+                                <Navigate to="/admin/login" />
+                            )
+                        } />
+                    </Routes>
+                </main>
+                <Footer />
+            </div>
+        </Router>
+    );
+};
+
+export default App;
