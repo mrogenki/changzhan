@@ -415,9 +415,9 @@ const App: React.FC = () => {
                 <main className="flex-grow bg-gray-50/30">
                     <Routes>
                         <Route path="/" element={<Home activities={activities} />} />
-                        <Route path="/regular-meeting" element={<RegularMeeting />} />
-                        <Route path="/training" element={<BusinessTraining />} />
-                        <Route path="/coffee" element={<CoffeeMeeting />} />
+                        <Route path="/regular-meeting" element={<RegularMeeting activities={activities} />} />
+                        <Route path="/training" element={<BusinessTraining activities={activities} />} />
+                        <Route path="/coffee" element={<CoffeeMeeting activities={activities} />} />
                         <Route path="/members" element={<MemberList members={members} />} />
                         <Route path="/milestones" element={<Milestones milestones={milestones} />} />
                         <Route path="/activity/:id" element={<ActivityDetail activities={activities} onRegister={handleRegister} registrations={registrations} members={members} />} />
