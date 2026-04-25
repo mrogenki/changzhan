@@ -12,6 +12,7 @@ import FinanceManager from './admin/FinanceManager';
 import MilestoneManager from './admin/MilestoneManager';
 import BirthdayManager from './admin/BirthdayManager';
 import MembershipExpiryManager from './admin/MembershipExpiryManager';
+import GuestManager from './admin/GuestManager';
 
 interface AdminDashboardProps {
   currentUser: AdminUser;
@@ -50,10 +51,27 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
   const canAccessActivities = props.currentUser.role === UserRole.MANAGER || props.currentUser.role === UserRole.SUPER_ADMIN;
   const canAccessUsers = props.currentUser.role === UserRole.SUPER_ADMIN;
 
+  // 手機版 sidebar 開合 state
+  const [sidebarOpen, setSidebarOpen] = React.useState(false);
+
   return (
     <div className="flex bg-gray-50 min-h-screen">
-      <Sidebar user={props.currentUser} onLogout={props.onLogout} />
+      <Sidebar
+        user={props.currentUser}
+        onLogout={props.onLogout}
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+      />
       <div className="flex-grow min-w-0 p-8">
+        {/* 手機版漢堡按鈕 */}
+        <button
+          onClick={() => setSidebarOpen(true)}
+          className="md:hidden mb-4 p-2 bg-gray-900 text-white rounded-lg"
+          aria-label="開啟選單"
+        >
+          ☰ 選單
+        </button>
+
         <Routes>
           <Route path="/" element={<DashboardHome activities={props.activities} registrations={props.registrations} />} />
           <Route path="/check-in" element={<CheckInManager activities={props.activities} registrations={props.registrations} onUpdateRegistration={props.onUpdateRegistration} onDeleteRegistration={props.onDeleteRegistration} onRefreshRegistrations={props.onRefreshRegistrations} />} />
@@ -73,6 +91,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
                   onUploadImage={props.onUploadImage}
                 />
               } />
+              <Route path="/guests" element={<GuestManager currentUser={props.currentUser} />} />
               <Route path="/birthdays" element={<BirthdayManager members={props.members} />} />
               <Route path="/membership-expiry" element={<MembershipExpiryManager members={props.members} />} />
             </>
