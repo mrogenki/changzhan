@@ -111,4 +111,25 @@ export interface Member {
   mobile_phone?: string;  // 手機號碼
   landline?: string;      // 室內電話
   address?: string;       // 地址
-  group_name?: string;    // 組別 (e.g. 第1組、三尊
+  group_name?: string;    // 組別 (e.g. 第1組、三尊)
+  line_user_id?: string | null; // 新增：LINE userId（用於 LIFF 綁定報到）
+}
+// 新增：出席紀錄介面
+export interface AttendanceRecord {
+  id?: string | number;
+  activity_id: string;
+  member_id: string;
+  status: AttendanceStatus;
+  updated_at?: string;
+}
+
+// 新增：來賓資料（LINE 綁定）
+export interface Guest {
+  id: number;
+  created_at: string;
+  line_user_id: string;
+  name: string;
+  phone: string;
+  email?: string;
+  company?: string;
+}
