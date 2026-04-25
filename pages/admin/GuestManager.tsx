@@ -173,7 +173,7 @@ const GuestManager: React.FC<GuestManagerProps> = ({ currentUser }) => {
     }
   }
 
-  async function expandGuest(guestId: number) {
+async function expandGuest(guestId: number) {
     if (expandedGuestId === guestId) {
       setExpandedGuestId(null);
       setExpandedAttendance([]);
@@ -187,8 +187,15 @@ const GuestManager: React.FC<GuestManagerProps> = ({ currentUser }) => {
     try {
       const [regRes, msgRes] = await Promise.all([
         supabase.from('registrations').select('*').eq('guest_id', guestId).order('created_at', { ascending: false }),
-        supabase.from('message_send_log').select('*').eq('recipient_kind', 'guest').eq('recipient_id', guestId).order('created_at', { ascending: false }).limit(20),
+        supabase
+          .from('message_send_log')
+          .select('*')
+          .eq('recipient_kind', 'guest')
+          .eq('recipient_id', String(guestId))
+          .order('created_at', { ascending: false })
+          .limit(20),
       ]);
+      console.log('expandGuest msgRes:', msgRes);  // debug 用,確認後可移除
 
       const regs = (regRes.data ?? []) as RegistrationRow[];
       const items: AttendanceItem[] = regs.map(r => {
