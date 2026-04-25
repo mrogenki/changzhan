@@ -8,7 +8,7 @@ const supabase = createClient(
 );
 
 const LIFF_ID = import.meta.env.VITE_LIFF_ID as string;
-const LINE_OA_ID = (import.meta.env.VITE_LINE_OA_ID as string) || ''; // e.g. "@123abcde"
+const LINE_OA_ID = (import.meta.env.VITE_LINE_OA_ID as string) || '';
 
 type Member = { id: number; name: string };
 
@@ -62,16 +62,10 @@ async function sendGuestWelcomeMessage(params: {
     ]);
 
     const activity = actRes.data;
-    if (!activity) {
-      console.warn('Activity not found, skip welcome message');
-      return;
-    }
+    if (!activity) return;
 
     const template = activity.guest_welcome_message || settingRes.data?.value;
-    if (!template || !template.trim()) {
-      console.log('No welcome message configured, skip');
-      return;
-    }
+    if (!template || !template.trim()) return;
 
     const text = renderTemplate(template, {
       name: params.guestName,
@@ -81,29 +75,17 @@ async function sendGuestWelcomeMessage(params: {
       activity_location: activity.location ?? '',
     });
 
-    const { data, error } = await supabase.functions.invoke('send-line-message', {
+    await supabase.functions.invoke('send-line-message', {
       body: {
         to: params.lineUserId,
         messages: [{ type: 'text', text }],
       },
     });
-
-    if (error) {
-      console.warn('Welcome message send failed:', error.message);
-      return;
-    }
-    if (!data?.success) {
-      console.warn('Welcome message send failed:', data?.error);
-      return;
-    }
-
-    console.log('Welcome message sent to', params.guestName);
   } catch (e) {
     console.warn('Welcome message error (non-fatal):', e);
   }
 }
 
-// 產生加好友連結
 function getAddFriendUrl(): string | null {
   if (!LINE_OA_ID) return null;
   const id = LINE_OA_ID.startsWith('@') ? LINE_OA_ID.substring(1) : LINE_OA_ID;
@@ -127,13 +109,10 @@ export default function LiffCheckin() {
   const token = tokenFromUrl;
 
   const [phase, setPhase] = useState<Phase>({ kind: 'loading', msg: '初始化 LINE...' });
-
   const [members, setMembers] = useState<Member[]>([]);
   const [selectedMemberId, setSelectedMemberId] = useState<number | ''>('');
   const [memberPhone4, setMemberPhone4] = useState('');
-
   const [guestPhone4, setGuestPhone4] = useState('');
-
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -315,7 +294,6 @@ export default function LiffCheckin() {
         isGuest: true,
       });
 
-      // 背景發歡迎訊息
       sendGuestWelcomeMessage({
         lineUserId: phase.lineUserId,
         guestName: data.name,
@@ -344,26 +322,16 @@ export default function LiffCheckin() {
         {phase.kind === 'success' && (
           <div className="text-center py-8">
             <div className="text-6xl mb-4">✅</div>
-            <p className="text-xl font-bold text-green-600 mb-2">
-              {phase.isGuest ? '來賓報到成功' : '報到成功'}
-            </p>
+            <p className="text-xl font-bold text-green-600 mb-2">{phase.isGuest ? '來賓報到成功' : '報到成功'}</p>
             <p className="text-gray-700">{phase.name}</p>
             <p className="text-sm text-gray-500 mt-4">{phase.activityTitle}</p>
 
-            {/* 來賓 + 已設定 OA ID 才顯示加好友按鈕 */}
             {phase.isGuest && addFriendUrl && (
               <div className="mt-8 pt-6 border-t border-gray-100">
-                <p className="text-sm text-gray-600 mb-3">
-                  📩 加入官方帳號好友,接收例會邀請與分會資訊
-                </p>
-                
-                  href={addFriendUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center justify-center gap-2 w-full bg-green-500 text-white py-3 rounded-lg font-bold hover:bg-green-600 transition"
-                >
-                  <span>＋</span> 加入官方帳號好友
-                </a>
+                <p className="text-sm text-gray-600 mb-3">📩 加入官方帳號好友,接收例會邀請與分會資訊</p>
+                <button onClick={() => window.open(addFriendUrl, '_blank')} className="inline-flex items-center justify-center gap-2 w-full bg-green-500 text-white py-3 rounded-lg font-bold hover:bg-green-600 transition">
+                  ＋ 加入官方帳號好友
+                </button>
               </div>
             )}
 
@@ -390,25 +358,11 @@ export default function LiffCheckin() {
 
         {phase.kind === 'choose_identity' && (
           <div>
-            <p className="text-sm text-gray-600 mb-4 text-center">
-              Hi {phase.displayName},請選擇您的身份
-            </p>
+            <p className="text-sm text-gray-600 mb-4 text-center">Hi {phase.displayName},請選擇您的身份</p>
             <div className="space-y-3">
-              <button
-                onClick={chooseAsMember}
-                className="w-full bg-red-600 text-white py-4 rounded-lg font-bold hover:bg-red-700"
-              >
-                我是會員
-              </button>
-              <button
-                onClick={chooseAsGuest}
-                className="w-full bg-blue-500 text-white py-4 rounded-lg font-bold hover:bg-blue-600"
-              >
-                我是來賓
-              </button>
-              <p className="text-xs text-gray-400 text-center mt-4">
-                首次使用需要綁定,之後就不用再輸入了
-              </p>
+              <button onClick={chooseAsMember} className="w-full bg-red-600 text-white py-4 rounded-lg font-bold hover:bg-red-700">我是會員</button>
+              <button onClick={chooseAsGuest} className="w-full bg-blue-500 text-white py-4 rounded-lg font-bold hover:bg-blue-600">我是來賓</button>
+              <p className="text-xs text-gray-400 text-center mt-4">首次使用需要綁定,之後就不用再輸入了</p>
             </div>
           </div>
         )}
@@ -450,11 +404,7 @@ export default function LiffCheckin() {
                   placeholder="例如 1234"
                 />
               </div>
-              <button
-                onClick={handleMemberBind}
-                disabled={submitting}
-                className="w-full bg-red-600 text-white py-3 rounded-lg disabled:opacity-50"
-              >
+              <button onClick={handleMemberBind} disabled={submitting} className="w-full bg-red-600 text-white py-3 rounded-lg disabled:opacity-50">
                 {submitting ? '綁定中...' : '綁定並報到'}
               </button>
             </div>
@@ -472,9 +422,7 @@ export default function LiffCheckin() {
                 ← 返回
               </button>
             </div>
-            <p className="text-xs text-gray-500 mb-4">
-              請先在網站報名此場活動,然後在這裡輸入您報名時填的手機末 4 碼
-            </p>
+            <p className="text-xs text-gray-500 mb-4">請先在網站報名此場活動,然後在這裡輸入您報名時填的手機末 4 碼</p>
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium mb-1">手機末 4 碼</label>
@@ -489,11 +437,7 @@ export default function LiffCheckin() {
                   autoFocus
                 />
               </div>
-              <button
-                onClick={handleGuestBind}
-                disabled={submitting}
-                className="w-full bg-blue-500 text-white py-3 rounded-lg disabled:opacity-50"
-              >
+              <button onClick={handleGuestBind} disabled={submitting} className="w-full bg-blue-500 text-white py-3 rounded-lg disabled:opacity-50">
                 {submitting ? '報到中...' : '綁定並報到'}
               </button>
             </div>
