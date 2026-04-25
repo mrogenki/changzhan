@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { AlertCircle, Clock, User, ClipboardList, XCircle, Search, RotateCcw } from 'lucide-react';
 import { Activity, ActivityType, Member, AttendanceRecord, AttendanceStatus } from '../../types';
 import CheckinQrPanel from '../../components/CheckinQrPanel';
+import LineMessageTester from '../../components/LineMessageTester';
 
 interface AttendanceManagerProps {
   activities: Activity[];
@@ -127,6 +128,9 @@ const AttendanceManager: React.FC<AttendanceManagerProps> = ({ activities, membe
           onAttendanceRefresh={onRefreshAttendance}
         />
       )}
+
+      {/* LINE 訊息測試 (Step 4 暫時放這,確認通了之後可移除) */}
+      <LineMessageTester />
 
       {/* 統計卡片 */}
       <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
