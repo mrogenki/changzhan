@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, Calendar, Clock, MapPin, Image as ImageIcon, UploadCloud, Loader2 } from 'lucide-react';
+import { Plus, Edit, Trash2, Calendar, Clock, MapPin, Image as ImageIcon, UploadCloud, Loader2, MessageCircle } from 'lucide-react';
 import { Activity, ActivityType } from '../../types';
 
 interface ActivityManagerProps {
@@ -11,18 +10,27 @@ interface ActivityManagerProps {
   onUploadImage: (file: File) => Promise<string>;
 }
 
+const DEFAULT_GUEST_WELCOME_PLACEHOLDER = `🎉 {name},感謝您參加 BNI 長展分會!
+
+您已完成報到:
+📅 {activity_title}
+🗓 {activity_date} {activity_time}
+📍 {activity_location}
+
+如有任何問題,歡迎在此 LINE 訊息中聯絡我們。期待與您再次相見!`;
+
 const ActivityManager: React.FC<ActivityManagerProps> = ({ activities, onAddActivity, onUpdateActivity, onDeleteActivity, onUploadImage }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingActivity, setEditingActivity] = useState<Activity | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [activeTab, setActiveTab] = useState<'upcoming' | 'past'>('upcoming');
-  
+
   const today = new Date().toISOString().split('T')[0];
 
   const upcomingActivities = activities
     .filter(a => a.date >= today)
     .sort((a, b) => a.date.localeCompare(b.date));
-  
+
   const pastActivities = activities
     .filter(a => a.date < today)
     .sort((a, b) => b.date.localeCompare(a.date));
@@ -37,7 +45,8 @@ const ActivityManager: React.FC<ActivityManagerProps> = ({ activities, onAddActi
     location: '台北市大安區忠孝東路四段 218 號 (阿波羅大廈)',
     price: 500,
     picture: 'https://images.unsplash.com/photo-1517457373958-b7bdd4587205?q=80&w=2069&auto=format&fit=crop',
-    description: ''
+    description: '',
+    guest_welcome_message: '',
   };
 
   const [formData, setFormData] = useState(defaultFormState);
@@ -52,7 +61,8 @@ const ActivityManager: React.FC<ActivityManagerProps> = ({ activities, onAddActi
         location: editingActivity.location,
         price: editingActivity.price,
         picture: editingActivity.picture,
-        description: editingActivity.description
+        description: editingActivity.description,
+        guest_welcome_message: (editingActivity as any).guest_welcome_message || '',
       });
     } else {
       setFormData(defaultFormState);
@@ -80,8 +90,10 @@ const ActivityManager: React.FC<ActivityManagerProps> = ({ activities, onAddActi
     const activityData: Activity = {
       id: editingActivity ? editingActivity.id : Date.now().toString(),
       ...formData,
-      status: 'active'
-    };
+      // 空字串轉 null,讓 RPC 端走全域預設
+      guest_welcome_message: formData.guest_welcome_message.trim() || null,
+      status: 'active',
+    } as any;
 
     if (editingActivity) {
       onUpdateActivity(activityData);
@@ -96,7 +108,7 @@ const ActivityManager: React.FC<ActivityManagerProps> = ({ activities, onAddActi
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">活動管理</h1>
-        <button 
+        <button
           onClick={() => { setEditingActivity(null); setIsModalOpen(true); }}
           className="flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors shadow-sm"
         >
@@ -108,8 +120,8 @@ const ActivityManager: React.FC<ActivityManagerProps> = ({ activities, onAddActi
         <button
           onClick={() => setActiveTab('upcoming')}
           className={`px-6 py-3 font-bold text-sm transition-all border-b-2 ${
-            activeTab === 'upcoming' 
-              ? 'border-red-600 text-red-600' 
+            activeTab === 'upcoming'
+              ? 'border-red-600 text-red-600'
               : 'border-transparent text-gray-400 hover:text-gray-600'
           }`}
         >
@@ -118,8 +130,8 @@ const ActivityManager: React.FC<ActivityManagerProps> = ({ activities, onAddActi
         <button
           onClick={() => setActiveTab('past')}
           className={`px-6 py-3 font-bold text-sm transition-all border-b-2 ${
-            activeTab === 'past' 
-              ? 'border-red-600 text-red-600' 
+            activeTab === 'past'
+              ? 'border-red-600 text-red-600'
               : 'border-transparent text-gray-400 hover:text-gray-600'
           }`}
         >
@@ -134,13 +146,13 @@ const ActivityManager: React.FC<ActivityManagerProps> = ({ activities, onAddActi
               <div className="relative aspect-video">
                 <img src={activity.picture} alt={activity.title} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                 <div className="absolute top-2 right-2 flex gap-1">
-                  <button 
+                  <button
                     onClick={() => { setEditingActivity(activity); setIsModalOpen(true); }}
                     className="p-2 bg-white/90 rounded-lg text-gray-700 hover:text-blue-600 backdrop-blur-sm"
                   >
                     <Edit size={16} />
                   </button>
-                  <button 
+                  <button
                     onClick={() => { if(window.confirm('確定要刪除此活動嗎？')) onDeleteActivity(activity.id); }}
                     className="p-2 bg-white/90 rounded-lg text-gray-700 hover:text-red-600 backdrop-blur-sm"
                   >
@@ -188,17 +200,17 @@ const ActivityManager: React.FC<ActivityManagerProps> = ({ activities, onAddActi
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="md:col-span-2">
                   <label className="block text-sm font-bold text-gray-700 mb-1">活動標題</label>
-                  <input 
-                    required 
-                    value={formData.title} 
+                  <input
+                    required
+                    value={formData.title}
                     onChange={e => setFormData({...formData, title: e.target.value})}
-                    className="w-full border rounded-lg px-3 py-3 outline-none focus:ring-2 focus:ring-red-500" 
-                    placeholder="活動名稱" 
+                    className="w-full border rounded-lg px-3 py-3 outline-none focus:ring-2 focus:ring-red-500"
+                    placeholder="活動名稱"
                   />
                 </div>
                 <div>
                    <label className="block text-sm font-bold text-gray-700 mb-1">活動類型</label>
-                   <select 
+                   <select
                      value={formData.type}
                      onChange={e => setFormData({...formData, type: e.target.value as ActivityType})}
                      className="w-full border rounded-lg px-3 py-3 bg-white outline-none focus:ring-2 focus:ring-red-500"
@@ -209,43 +221,43 @@ const ActivityManager: React.FC<ActivityManagerProps> = ({ activities, onAddActi
                 </div>
                 <div>
                    <label className="block text-sm font-bold text-gray-700 mb-1">報名費用</label>
-                   <input 
-                    required 
+                   <input
+                    required
                     type="number"
-                    value={formData.price} 
+                    value={formData.price}
                     onChange={e => setFormData({...formData, price: parseInt(e.target.value)})}
-                    className="w-full border rounded-lg px-3 py-3 outline-none focus:ring-2 focus:ring-red-500" 
-                    placeholder="500" 
+                    className="w-full border rounded-lg px-3 py-3 outline-none focus:ring-2 focus:ring-red-500"
+                    placeholder="500"
                   />
                 </div>
                 <div>
                    <label className="block text-sm font-bold text-gray-700 mb-1">活動日期</label>
-                   <input 
-                    required 
+                   <input
+                    required
                     type="date"
-                    value={formData.date} 
+                    value={formData.date}
                     onChange={e => setFormData({...formData, date: e.target.value})}
-                    className="w-full border rounded-lg px-3 py-3 outline-none focus:ring-2 focus:ring-red-500" 
+                    className="w-full border rounded-lg px-3 py-3 outline-none focus:ring-2 focus:ring-red-500"
                   />
                 </div>
                 <div>
                    <label className="block text-sm font-bold text-gray-700 mb-1">活動時間</label>
-                   <input 
-                    required 
+                   <input
+                    required
                     type="time"
-                    value={formData.time} 
+                    value={formData.time}
                     onChange={e => setFormData({...formData, time: e.target.value})}
-                    className="w-full border rounded-lg px-3 py-3 outline-none focus:ring-2 focus:ring-red-500" 
+                    className="w-full border rounded-lg px-3 py-3 outline-none focus:ring-2 focus:ring-red-500"
                   />
                 </div>
                 <div className="md:col-span-2">
                   <label className="block text-sm font-bold text-gray-700 mb-1">活動地點</label>
-                  <input 
-                    required 
-                    value={formData.location} 
+                  <input
+                    required
+                    value={formData.location}
                     onChange={e => setFormData({...formData, location: e.target.value})}
-                    className="w-full border rounded-lg px-3 py-3 outline-none focus:ring-2 focus:ring-red-500" 
-                    placeholder="地址" 
+                    className="w-full border rounded-lg px-3 py-3 outline-none focus:ring-2 focus:ring-red-500"
+                    placeholder="地址"
                   />
                 </div>
                 <div className="md:col-span-2">
@@ -256,39 +268,75 @@ const ActivityManager: React.FC<ActivityManagerProps> = ({ activities, onAddActi
                     </div>
                     <div className="flex-grow space-y-3">
                        <div className="relative">
-                         <input 
-                           type="file" 
+                         <input
+                           type="file"
                            accept="image/*"
                            onChange={handleImageChange}
                            className="hidden"
                            id="upload-image"
                          />
-                         <label 
-                           htmlFor="upload-image" 
+                         <label
+                           htmlFor="upload-image"
                            className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold cursor-pointer transition-colors ${isUploading ? 'bg-gray-100 text-gray-400 cursor-wait' : 'bg-red-50 text-red-600 hover:bg-red-100'}`}
                          >
                            {isUploading ? <Loader2 className="animate-spin" size={16} /> : <UploadCloud size={16} />}
                            {isUploading ? '上傳中...' : '上傳圖片'}
                          </label>
                        </div>
-                       <input 
-                          value={formData.picture} 
+                       <input
+                          value={formData.picture}
                           onChange={e => setFormData({...formData, picture: e.target.value})}
-                          className="w-full border rounded-lg px-3 py-2 text-xs text-gray-500 outline-none focus:ring-2 focus:ring-red-500" 
-                          placeholder="或貼上圖片 URL" 
+                          className="w-full border rounded-lg px-3 py-2 text-xs text-gray-500 outline-none focus:ring-2 focus:ring-red-500"
+                          placeholder="或貼上圖片 URL"
                         />
                     </div>
                   </div>
                 </div>
                 <div className="md:col-span-2">
                   <label className="block text-sm font-bold text-gray-700 mb-1">活動說明</label>
-                  <textarea 
+                  <textarea
                     rows={4}
-                    value={formData.description} 
+                    value={formData.description}
                     onChange={e => setFormData({...formData, description: e.target.value})}
-                    className="w-full border rounded-lg px-3 py-3 outline-none focus:ring-2 focus:ring-red-500 resize-none" 
-                    placeholder="活動詳細內容..." 
+                    className="w-full border rounded-lg px-3 py-3 outline-none focus:ring-2 focus:ring-red-500 resize-none"
+                    placeholder="活動詳細內容..."
                   />
+                </div>
+
+                {/* === 來賓歡迎訊息 (新增) === */}
+                <div className="md:col-span-2 pt-4 border-t border-gray-100">
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-sm font-bold text-gray-700 flex items-center gap-2">
+                      <MessageCircle size={16} className="text-blue-500" />
+                      來賓歡迎訊息(LINE)
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setFormData({...formData, guest_welcome_message: DEFAULT_GUEST_WELCOME_PLACEHOLDER})}
+                      className="text-xs text-blue-500 hover:underline"
+                    >
+                      帶入預設範本
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-500 mb-2">
+                    來賓首次掃 QR 完成綁定 + 報到後,自動發送的 LINE 訊息。
+                    <span className="font-bold">留空</span>則使用全域預設訊息。
+                  </p>
+                  <textarea
+                    rows={6}
+                    value={formData.guest_welcome_message}
+                    onChange={e => setFormData({...formData, guest_welcome_message: e.target.value})}
+                    className="w-full border rounded-lg px-3 py-3 outline-none focus:ring-2 focus:ring-blue-500 resize-none text-sm font-mono"
+                    placeholder="留空使用全域預設訊息,或自訂這場活動的歡迎訊息..."
+                  />
+                  <div className="mt-2 text-xs text-gray-400 flex flex-wrap gap-2">
+                    <span className="font-bold text-gray-500">可用變數:</span>
+                    <code className="bg-gray-100 px-1.5 py-0.5 rounded">{'{name}'}</code>
+                    <code className="bg-gray-100 px-1.5 py-0.5 rounded">{'{activity_title}'}</code>
+                    <code className="bg-gray-100 px-1.5 py-0.5 rounded">{'{activity_date}'}</code>
+                    <code className="bg-gray-100 px-1.5 py-0.5 rounded">{'{activity_time}'}</code>
+                    <code className="bg-gray-100 px-1.5 py-0.5 rounded">{'{activity_location}'}</code>
+                  </div>
                 </div>
               </div>
               <div className="flex gap-4 pt-4 border-t border-gray-100 mt-4">
