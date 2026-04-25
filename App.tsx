@@ -11,6 +11,7 @@ import Milestones from './pages/Milestones';
 import RegularMeeting from './pages/RegularMeeting';
 import BusinessTraining from './pages/BusinessTraining';
 import CoffeeMeeting from './pages/CoffeeMeeting';
+import LiffCheckin from './pages/LiffCheckin';
 import { Activity, ActivityType, Registration, AdminUser, Member, AttendanceRecord, AttendanceStatus, FinanceRecord, Milestone } from './types';
 import { INITIAL_ACTIVITIES, INITIAL_ADMINS, INITIAL_MEMBERS } from './constants';
 
@@ -77,7 +78,7 @@ const Header: React.FC = () => {
 const Footer: React.FC = () => {
     const location = useLocation();
     if (location.pathname.startsWith('/admin')) return null;
-    
+
     return (
         <footer className="bg-white border-t py-12">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
@@ -92,6 +93,18 @@ const Footer: React.FC = () => {
 };
 
 const App: React.FC = () => {
+    // ⚠️ LIFF 短路判斷:必須在所有 hooks 之前
+    // 條件: path 是 /liff/checkin,或 URL 含有 LIFF 特徵參數(OAuth 重定向回來時 path 會變成 /)
+    if (typeof window !== 'undefined') {
+        const path = window.location.pathname;
+        const search = window.location.search;
+        const isLiffPath = path.startsWith('/liff/checkin');
+        const hasLiffParams = search.includes('liff.state') || (search.includes('activity_id=') && search.includes('token='));
+        if (isLiffPath || hasLiffParams) {
+            return <LiffCheckin />;
+        }
+    }
+
     const [activities, setActivities] = useState<Activity[]>([]);
     const [registrations, setRegistrations] = useState<Registration[]>([]);
     const [users, setUsers] = useState<AdminUser[]>([]);
@@ -182,6 +195,17 @@ const App: React.FC = () => {
         } finally {
             if (isInitialLoad) setLoading(false);
         }
+    };
+
+    // 局部 refresh:只重抓 attendance / registrations,不全量 fetchData
+    const refreshAttendance = async () => {
+        const { data } = await supabase.from('attendance').select('*');
+        if (data) setAttendance(data as AttendanceRecord[]);
+    };
+
+    const refreshRegistrations = async () => {
+        const { data } = await supabase.from('registrations').select('*').order('created_at', { ascending: false });
+        if (data) setRegistrations(data);
     };
 
     useEffect(() => {
@@ -402,68 +426,4 @@ const App: React.FC = () => {
             <div className="min-h-screen flex items-center justify-center bg-white">
                 <div className="text-center space-y-4">
                     <Loader2 className="animate-spin text-red-600" size={56} />
-                    <p className="text-gray-400 font-bold tracking-widest text-xs uppercase">Connecting Database</p>
-                </div>
-            </div>
-        );
-    }
-
-    return (
-        <Router>
-            <div className="min-h-screen flex flex-col">
-                <Header />
-                <main className="flex-grow bg-gray-50/30">
-                    <Routes>
-                        <Route path="/" element={<Home activities={activities} />} />
-                        <Route path="/regular-meeting" element={<RegularMeeting activities={activities} />} />
-                        <Route path="/training" element={<BusinessTraining activities={activities} />} />
-                        <Route path="/coffee" element={<CoffeeMeeting activities={activities} />} />
-                        <Route path="/members" element={<MemberList members={members} />} />
-                        <Route path="/milestones" element={<Milestones milestones={milestones} />} />
-                        <Route path="/activity/:id" element={<ActivityDetail activities={activities} onRegister={handleRegister} registrations={registrations} members={members} />} />
-                        <Route path="/admin/login" element={currentUser ? <Navigate to="/admin" /> : <LoginPage users={users} onLogin={handleLogin} />} />
-                        <Route path="/admin/*" element={
-                            currentUser ? (
-                                <AdminDashboard
-                                    currentUser={currentUser}
-                                    onLogout={handleLogout}
-                                    activities={activities}
-                                    registrations={registrations}
-                                    users={users}
-                                    members={members}
-                                    attendance={attendance}
-                                    onUpdateActivity={handleUpdateActivity}
-                                    onAddActivity={handleAddActivity}
-                                    onDeleteActivity={handleDeleteActivity}
-                                    onUpdateRegistration={handleUpdateRegistration}
-                                    onDeleteRegistration={handleDeleteRegistration}
-                                    onAddUser={handleAddUser}
-                                    onDeleteUser={handleDeleteUser}
-                                    onAddMember={handleAddMember}
-                                    onUpdateMember={handleUpdateMember}
-                                    onDeleteMember={handleDeleteMember}
-                                    onUpdateAttendance={handleUpdateAttendance}
-                                    onDeleteAttendance={handleDeleteAttendance}
-                                    onAddFinanceRecord={handleAddFinanceRecord}
-                                    onUpdateFinanceRecord={handleUpdateFinanceRecord}
-                                    onDeleteFinanceRecord={handleDeleteFinanceRecord}
-                                    financeRecords={financeRecords}
-                                    milestones={milestones}
-                                    onAddMilestone={handleAddMilestone}
-                                    onUpdateMilestone={handleUpdateMilestone}
-                                    onDeleteMilestone={handleDeleteMilestone}
-                                    onUploadImage={handleUploadImage}
-                                />
-                            ) : (
-                                <Navigate to="/admin/login" />
-                            )
-                        } />
-                    </Routes>
-                </main>
-                <Footer />
-            </div>
-        </Router>
-    );
-};
-
-export default App;
+                    <p className="tex
