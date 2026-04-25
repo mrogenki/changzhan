@@ -13,13 +13,9 @@ type Member = { id: number; name: string };
 
 type Phase =
   | { kind: 'loading'; msg: string }
-  // 未綁定:要求選身份
   | { kind: 'choose_identity'; lineUserId: string; displayName: string }
-  // 會員綁定
   | { kind: 'member_binding'; lineUserId: string; displayName: string }
-  // 訪客綁定
   | { kind: 'guest_binding'; lineUserId: string; displayName: string }
-  // 成功
   | { kind: 'success'; name: string; activityTitle: string; isGuest: boolean }
   | { kind: 'error'; msg: string };
 
@@ -39,6 +35,77 @@ function parseCheckinParams(): { activityId: string | null; token: string | null
   }
 
   return { activityId: null, token: null };
+}
+
+// 變數替換
+function renderTemplate(template: string, vars: Record<string, string>): string {
+  return template.replace(/\{(\w+)\}/g, (_, key) => vars[key] ?? `{${key}}`);
+}
+
+// 寄送來賓歡迎訊息 (失敗不丟 error)
+async function sendGuestWelcomeMessage(params: {
+  lineUserId: string;
+  guestName: string;
+  activityId: number;
+}) {
+  try {
+    // 撈活動資料 + 全域預設訊息
+    const [actRes, settingRes] = await Promise.all([
+      supabase
+        .from('activities')
+        .select('title, date, time, location, guest_welcome_message')
+        .eq('id', params.activityId)
+        .single(),
+      supabase
+        .from('app_settings')
+        .select('value')
+        .eq('key', 'default_guest_welcome_message')
+        .single(),
+    ]);
+
+    const activity = actRes.data;
+    if (!activity) {
+      console.warn('Activity not found, skip welcome message');
+      return;
+    }
+
+    // 訊息來源優先序: 活動自訂 > 全域預設
+    const template = activity.guest_welcome_message || settingRes.data?.value;
+    if (!template || !template.trim()) {
+      console.log('No welcome message configured, skip');
+      return;
+    }
+
+    // 變數替換
+    const text = renderTemplate(template, {
+      name: params.guestName,
+      activity_title: activity.title ?? '',
+      activity_date: activity.date ?? '',
+      activity_time: activity.time ?? '',
+      activity_location: activity.location ?? '',
+    });
+
+    // 呼叫 Edge Function
+    const { data, error } = await supabase.functions.invoke('send-line-message', {
+      body: {
+        to: params.lineUserId,
+        messages: [{ type: 'text', text }],
+      },
+    });
+
+    if (error) {
+      console.warn('Welcome message send failed:', error.message);
+      return;
+    }
+    if (!data?.success) {
+      console.warn('Welcome message send failed:', data?.error);
+      return;
+    }
+
+    console.log('Welcome message sent to', params.guestName);
+  } catch (e) {
+    console.warn('Welcome message error (non-fatal):', e);
+  }
 }
 
 export default function LiffCheckin() {
@@ -126,7 +193,7 @@ export default function LiffCheckin() {
           return;
         }
 
-        // 其他錯誤 (token 失效、已綁定但該場無報名紀錄 等)
+        // 其他錯誤
         setPhase({ kind: 'error', msg: data?.error ?? '未知錯誤' });
       } catch (e: any) {
         setPhase({ kind: 'error', msg: '發生錯誤:' + (e?.message ?? String(e)) });
@@ -247,12 +314,21 @@ export default function LiffCheckin() {
 
       sessionStorage.removeItem('liff_checkin_activity_id');
       sessionStorage.removeItem('liff_checkin_token');
+
+      // 先 set 成功 UI (不阻塞)
       setPhase({
         kind: 'success',
         name: data.name,
         activityTitle: data.activity_title,
         isGuest: true,
       });
+
+      // 背景發送來賓歡迎訊息 (失敗不影響成功 UI)
+      sendGuestWelcomeMessage({
+        lineUserId: phase.lineUserId,
+        guestName: data.name,
+        activityId: activityId!,
+      }).catch(e => console.warn('welcome msg fire-and-forget error:', e));
     } finally {
       setSubmitting(false);
     }
@@ -328,9 +404,7 @@ export default function LiffCheckin() {
         {phase.kind === 'member_binding' && (
           <div>
             <div className="flex items-center justify-between mb-4">
-              <p className="text-sm text-gray-600">
-                會員綁定
-              </p>
+              <p className="text-sm text-gray-600">會員綁定</p>
               <button
                 onClick={() => setPhase({ kind: 'choose_identity', lineUserId: phase.lineUserId, displayName: phase.displayName })}
                 className="text-xs text-gray-400 hover:text-gray-600"
@@ -378,9 +452,7 @@ export default function LiffCheckin() {
         {phase.kind === 'guest_binding' && (
           <div>
             <div className="flex items-center justify-between mb-4">
-              <p className="text-sm text-gray-600">
-                來賓報到
-              </p>
+              <p className="text-sm text-gray-600">來賓報到</p>
               <button
                 onClick={() => setPhase({ kind: 'choose_identity', lineUserId: phase.lineUserId, displayName: phase.displayName })}
                 className="text-xs text-gray-400 hover:text-gray-600"
