@@ -42,6 +42,14 @@ function renderTemplate(template: string, vars: Record<string, string>): string 
   return template.replace(/\{(\w+)\}/g, (_, key) => vars[key] ?? `{${key}}`);
 }
 
+// timeout wrapper:任何 promise 超過 ms 毫秒就 reject
+function withTimeout<T>(promise: Promise<T>, ms: number, errMsg: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => setTimeout(() => reject(new Error(errMsg)), ms)),
+  ]);
+}
+
 async function sendGuestWelcomeMessage(params: {
   lineUserId: string;
   guestName: string;
@@ -127,7 +135,13 @@ export default function LiffCheckin() {
           return;
         }
 
-        await liff.init({ liffId: LIFF_ID });
+        // liff.init 加 8 秒 timeout
+        try {
+          await withTimeout(liff.init({ liffId: LIFF_ID }), 8000, 'LINE 初始化逾時');
+        } catch (e: any) {
+          setPhase({ kind: 'error', msg: 'LINE 初始化失敗:' + e.message + '。請關閉本頁重新掃 QR,或長按 QR 用 Chrome 開啟' });
+          return;
+        }
 
         if (!liff.isLoggedIn()) {
           liff.login({ redirectUri: window.location.href });
@@ -135,14 +149,32 @@ export default function LiffCheckin() {
         }
 
         setPhase({ kind: 'loading', msg: '取得 LINE 資料...' });
-        const profile = await liff.getProfile();
+        let profile;
+        try {
+          profile = await withTimeout(liff.getProfile(), 5000, '取得 LINE 資料逾時');
+        } catch (e: any) {
+          setPhase({ kind: 'error', msg: '取得 LINE 資料失敗:' + e.message });
+          return;
+        }
 
         setPhase({ kind: 'loading', msg: '報到中...' });
-        const { data, error } = await supabase.rpc('line_checkin', {
-          p_activity_id: activityId,
-          p_token: token,
-          p_line_user_id: profile.userId,
-        });
+        let data: any, error: any;
+        try {
+          const result = await withTimeout(
+            supabase.rpc('line_checkin', {
+              p_activity_id: activityId,
+              p_token: token,
+              p_line_user_id: profile.userId,
+            }),
+            10000,
+            '報到請求逾時'
+          );
+          data = (result as any).data;
+          error = (result as any).error;
+        } catch (e: any) {
+          setPhase({ kind: 'error', msg: '報到失敗:' + e.message + '。請檢查網路後重試' });
+          return;
+        }
 
         if (error) {
           setPhase({ kind: 'error', msg: '系統錯誤:' + error.message });
@@ -316,6 +348,7 @@ export default function LiffCheckin() {
           <div className="text-center py-8">
             <div className="inline-block animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500 mb-4" />
             <p className="text-gray-600">{phase.msg}</p>
+            <p className="text-xs text-gray-400 mt-4">如卡超過 15 秒,請點右上 ✕ 關閉重掃</p>
           </div>
         )}
 
