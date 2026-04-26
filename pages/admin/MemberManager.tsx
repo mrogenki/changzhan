@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Download, UserPlus, Edit, Trash2, Shield, Eye, EyeOff, Globe, CalendarDays, FileDown, Bell, AlertTriangle, X, UploadCloud, Loader2, Image as ImageIcon, FileSpreadsheet } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { Download, UserPlus, Edit, Trash2, Shield, Eye, EyeOff, Globe, CalendarDays, FileDown, Bell, AlertTriangle, X, UploadCloud, Loader2, Image as ImageIcon, FileSpreadsheet, Search, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
 import { Member } from '../../types';
 import MemberImportModal from './MemberImportModal';
 
@@ -12,6 +12,9 @@ interface MemberManagerProps {
   onUploadImage: (file: File) => Promise<string>;
 }
 
+type SortField = 'member_no' | 'group_name' | 'industry_chain' | 'status' | 'company' | 'name';
+type SortDirection = 'asc' | 'desc';
+
 const MemberManager: React.FC<MemberManagerProps> = ({ members, onAddMember, onUpdateMember, onDeleteMember, onBatchImportMembers, onUploadImage }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
@@ -19,6 +22,11 @@ const MemberManager: React.FC<MemberManagerProps> = ({ members, onAddMember, onU
   const [editingMember, setEditingMember] = useState<Member | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [memberPicture, setMemberPicture] = useState<string>('');
+
+  // 搜尋與排序狀態
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortField, setSortField] = useState<SortField>('member_no');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -126,14 +134,103 @@ const MemberManager: React.FC<MemberManagerProps> = ({ members, onAddMember, onU
     document.body.removeChild(link);
   };
 
-  const sortedMembers = [...members].sort((a, b) => {
-    const valA = a.member_no !== undefined && a.member_no !== null ? String(a.member_no) : '';
-    const valB = b.member_no !== undefined && b.member_no !== null ? String(b.member_no) : '';
-    if (!valA && !valB) return 0;
-    if (!valA) return 1;
-    if (!valB) return -1;
-    return valA.localeCompare(valB, undefined, { numeric: true });
-  });
+  // 點擊欄位標題切換排序
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
+  // 取得排序值
+  const getSortValue = (m: Member, field: SortField): string => {
+    switch (field) {
+      case 'member_no':
+        return m.member_no !== undefined && m.member_no !== null ? String(m.member_no) : '';
+      case 'group_name':
+        return m.group_name || '';
+      case 'industry_chain':
+        return m.industry_chain || '';
+      case 'status':
+        // 活躍排前面、停權排後面（asc）
+        return m.status === 'inactive' ? '1' : '0';
+      case 'company':
+        return m.company || '';
+      case 'name':
+        return m.name || '';
+      default:
+        return '';
+    }
+  };
+
+  // 過濾 + 排序
+  const displayMembers = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+
+    // 先過濾
+    const filtered = q
+      ? members.filter(m => {
+          const haystack = [
+            m.member_no,
+            m.name,
+            m.company,
+            m.group_name,
+            m.industry_chain,
+            m.industry_category,
+            m.company_title,
+            m.mobile_phone,
+            m.landline,
+            m.tax_id,
+          ]
+            .map(v => (v === undefined || v === null ? '' : String(v)))
+            .join(' ')
+            .toLowerCase();
+          return haystack.includes(q);
+        })
+      : [...members];
+
+    // 再排序
+    filtered.sort((a, b) => {
+      const valA = getSortValue(a, sortField);
+      const valB = getSortValue(b, sortField);
+
+      // 空值永遠排最後（不論 asc/desc）
+      if (!valA && !valB) return 0;
+      if (!valA) return 1;
+      if (!valB) return -1;
+
+      const cmp = valA.localeCompare(valB, undefined, { numeric: true });
+      return sortDirection === 'asc' ? cmp : -cmp;
+    });
+
+    return filtered;
+  }, [members, searchQuery, sortField, sortDirection]);
+
+  // 排序欄位的箭頭圖示
+  const SortIcon: React.FC<{ field: SortField }> = ({ field }) => {
+    if (sortField !== field) {
+      return <ArrowUpDown size={12} className="text-gray-300 group-hover:text-gray-400 transition-colors" />;
+    }
+    return sortDirection === 'asc'
+      ? <ArrowUp size={12} className="text-red-600" />
+      : <ArrowDown size={12} className="text-red-600" />;
+  };
+
+  // 可排序欄位標題
+  const SortableHeader: React.FC<{ field: SortField; label: string }> = ({ field, label }) => (
+    <th className="px-6 py-4">
+      <button
+        type="button"
+        onClick={() => handleSort(field)}
+        className="group flex items-center gap-1.5 text-xs font-bold text-gray-400 uppercase tracking-widest hover:text-gray-700 transition-colors"
+      >
+        {label}
+        <SortIcon field={field} />
+      </button>
+    </th>
+  );
 
   const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -166,7 +263,7 @@ const MemberManager: React.FC<MemberManagerProps> = ({ members, onAddMember, onU
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <h1 className="text-2xl font-bold">會員資料管理</h1>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <button 
             onClick={() => setIsNotificationOpen(true)}
             className="relative flex items-center gap-2 bg-white text-gray-600 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors border border-gray-200 shadow-sm"
@@ -200,82 +297,130 @@ const MemberManager: React.FC<MemberManagerProps> = ({ members, onAddMember, onU
         </div>
       </div>
 
+      {/* 搜尋列 */}
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+        <div className="relative flex-1 max-w-md">
+          <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            placeholder="搜尋編號、姓名、公司、組別、產業鏈、行業別..."
+            className="w-full pl-10 pr-10 py-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-all text-sm"
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery('')}
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors"
+              title="清除搜尋"
+            >
+              <X size={14} />
+            </button>
+          )}
+        </div>
+        <div className="text-xs text-gray-500 font-medium">
+          {searchQuery ? (
+            <>找到 <span className="font-bold text-gray-700">{displayMembers.length}</span> 筆 / 共 {members.length} 筆</>
+          ) : (
+            <>共 <span className="font-bold text-gray-700">{members.length}</span> 筆會員</>
+          )}
+        </div>
+      </div>
+
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-        <table className="w-full text-left">
-          <thead className="bg-gray-50 border-b border-gray-100">
-            <tr className="text-xs font-bold text-gray-400 uppercase tracking-widest">
-              <th className="px-6 py-4">照片</th>
-              <th className="px-6 py-4">編號</th>
-              <th className="px-6 py-4">產業鏈</th>
-              <th className="px-6 py-4">狀態</th>
-              <th className="px-6 py-4">品牌/公司</th>
-              <th className="px-6 py-4">姓名</th>
-              <th className="px-6 py-4 text-right">操作</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-50">
-            {sortedMembers.map(member => (
-              <tr key={member.id} className={`hover:bg-gray-50/50 transition-colors ${member.status === 'inactive' ? 'opacity-60 bg-gray-50' : ''}`}>
-                <td className="px-6 py-4">
-                  <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-100 border border-gray-100">
-                    {member.picture ? (
-                      <img src={member.picture} alt={member.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-gray-300">
-                        <ImageIcon size={16} />
-                      </div>
-                    )}
-                  </div>
-                </td>
-                <td className="px-6 py-4 font-mono text-gray-400 font-bold">{member.member_no}</td>
-                <td className="px-6 py-4">
-                  <span className={`px-2 py-1 rounded text-xs font-bold ${
-                    member.industry_chain === '美食' ? 'bg-orange-100 text-orange-600' :
-                    member.industry_chain === '工程' ? 'bg-blue-100 text-blue-600' :
-                    member.industry_chain === '健康' ? 'bg-green-100 text-green-600' :
-                    member.industry_chain === '幸福' ? 'bg-pink-100 text-pink-600' :
-                    'bg-purple-100 text-purple-600'
-                  }`}>
-                    {member.industry_chain}
-                  </span>
-                </td>
-                <td className="px-6 py-4">
-                  <div className="flex flex-col items-start gap-1">
-                    <span className={`flex w-fit items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold ${
-                      member.status === 'inactive' ? 'bg-gray-200 text-gray-600' : 'bg-green-100 text-green-600'
-                    }`}>
-                      {member.status === 'inactive' ? <EyeOff size={12}/> : <Eye size={12}/>}
-                      {member.status === 'inactive' ? '停權/離會' : '活躍'}
-                    </span>
-                    {member.end_date && (
-                      <span className="text-[10px] text-gray-400 font-mono flex items-center gap-1 ml-1">
-                        <CalendarDays size={10} />
-                        {member.end_date}
-                      </span>
-                    )}
-                  </div>
-                </td>
-                <td className="px-6 py-4 font-bold text-gray-900">
-                  {member.company || <span className="text-gray-300 font-normal">-</span>}
-                  {member.website && (
-                    <a href={member.website} target="_blank" rel="noopener noreferrer" className="ml-2 inline-block text-gray-400 hover:text-red-600">
-                      <Globe size={14} />
-                    </a>
-                  )}
-                </td>
-                <td className="px-6 py-4 text-gray-700">{member.name}</td>
-                <td className="px-6 py-4 text-right">
-                  <div className="flex justify-end gap-2">
-                    <button onClick={() => handleOpenModal(member)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"><Edit size={16} /></button>
-                    <button onClick={() => confirmDelete(member)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"><Trash2 size={16} /></button>
-                  </div>
-                </td>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead className="bg-gray-50 border-b border-gray-100">
+              <tr>
+                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest">照片</th>
+                <SortableHeader field="member_no" label="編號" />
+                <SortableHeader field="group_name" label="組別" />
+                <SortableHeader field="industry_chain" label="產業鏈" />
+                <SortableHeader field="status" label="狀態" />
+                <SortableHeader field="company" label="品牌/公司" />
+                <SortableHeader field="name" label="姓名" />
+                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest text-right">操作</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {displayMembers.map(member => (
+                <tr key={member.id} className={`hover:bg-gray-50/50 transition-colors ${member.status === 'inactive' ? 'opacity-60 bg-gray-50' : ''}`}>
+                  <td className="px-6 py-4">
+                    <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-100 border border-gray-100">
+                      {member.picture ? (
+                        <img src={member.picture} alt={member.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-gray-300">
+                          <ImageIcon size={16} />
+                        </div>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 font-mono text-gray-400 font-bold">{member.member_no}</td>
+                  <td className="px-6 py-4 text-sm">
+                    {member.group_name ? (
+                      <span className="inline-block px-2 py-0.5 rounded bg-gray-100 text-gray-700 font-medium">
+                        {member.group_name}
+                      </span>
+                    ) : (
+                      <span className="text-gray-300">-</span>
+                    )}
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className={`px-2 py-1 rounded text-xs font-bold ${
+                      member.industry_chain === '美食' ? 'bg-orange-100 text-orange-600' :
+                      member.industry_chain === '工程' ? 'bg-blue-100 text-blue-600' :
+                      member.industry_chain === '健康' ? 'bg-green-100 text-green-600' :
+                      member.industry_chain === '幸福' ? 'bg-pink-100 text-pink-600' :
+                      'bg-purple-100 text-purple-600'
+                    }`}>
+                      {member.industry_chain}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex flex-col items-start gap-1">
+                      <span className={`flex w-fit items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                        member.status === 'inactive' ? 'bg-gray-200 text-gray-600' : 'bg-green-100 text-green-600'
+                      }`}>
+                        {member.status === 'inactive' ? <EyeOff size={12}/> : <Eye size={12}/>}
+                        {member.status === 'inactive' ? '停權/離會' : '活躍'}
+                      </span>
+                      {member.end_date && (
+                        <span className="text-[10px] text-gray-400 font-mono flex items-center gap-1 ml-1">
+                          <CalendarDays size={10} />
+                          {member.end_date}
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 font-bold text-gray-900">
+                    {member.company || <span className="text-gray-300 font-normal">-</span>}
+                    {member.website && (
+                      <a href={member.website} target="_blank" rel="noopener noreferrer" className="ml-2 inline-block text-gray-400 hover:text-red-600">
+                        <Globe size={14} />
+                      </a>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 text-gray-700">{member.name}</td>
+                  <td className="px-6 py-4 text-right">
+                    <div className="flex justify-end gap-2">
+                      <button onClick={() => handleOpenModal(member)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"><Edit size={16} /></button>
+                      <button onClick={() => confirmDelete(member)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"><Trash2 size={16} /></button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
         {members.length === 0 && (
           <div className="p-10 text-center text-gray-400">目前尚無會員資料</div>
+        )}
+        {members.length > 0 && displayMembers.length === 0 && (
+          <div className="p-10 text-center text-gray-400">
+            找不到符合「<span className="font-bold text-gray-600">{searchQuery}</span>」的會員
+          </div>
         )}
       </div>
 
