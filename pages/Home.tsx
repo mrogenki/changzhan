@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Calendar, MapPin, DollarSign, ChevronRight, Clock, ChevronLeft } from 'lucide-react';
@@ -219,6 +218,45 @@ const HeroCarousel: React.FC<{ activities: Activity[] }> = ({ activities }) => {
   );
 };
 
+// 各活動類型的顯示設定（順序、標題、副標題、顏色）
+const TYPE_SECTIONS: Array<{
+  type: ActivityType;
+  title: string;
+  subtitle: string;
+  barColor: string;
+}> = [
+  {
+    type: ActivityType.REGULAR_MEETING,
+    title: '例會活動',
+    subtitle: '（每週固定的例行商務會議）',
+    barColor: 'bg-red-600',
+  },
+  {
+    type: ActivityType.BUSINESS_TRAINING,
+    title: '商務培訓',
+    subtitle: '（提升商務能力的專業課程）',
+    barColor: 'bg-orange-500',
+  },
+  {
+    type: ActivityType.COFFEE_MEETING,
+    title: '咖啡會議',
+    subtitle: '（輕鬆交流的會員聚會）',
+    barColor: 'bg-amber-700',
+  },
+  {
+    type: ActivityType.REGULAR,
+    title: '會員專屬活動',
+    subtitle: '（會員專屬的活動例如培訓課程等）',
+    barColor: 'bg-red-600',
+  },
+  {
+    type: ActivityType.SPECIAL,
+    title: '一般活動',
+    subtitle: '（公開型的活動，可以邀請來賓一同參與）',
+    barColor: 'bg-gray-800',
+  },
+];
+
 const Home: React.FC<HomeProps> = ({ activities }) => {
   const now = new Date();
 
@@ -228,14 +266,24 @@ const Home: React.FC<HomeProps> = ({ activities }) => {
     return isActive && activityFullDate > now;
   };
 
-  const upcomingActivities = activities.filter(filterUpcoming);
-  const regularMeetings = upcomingActivities.filter(a => a.type === ActivityType.REGULAR);
-  const specialEvents = upcomingActivities.filter(a => a.type === ActivityType.SPECIAL);
+  const upcomingActivities = activities
+    .filter(filterUpcoming)
+    .sort((a, b) => {
+      const dateA = new Date(`${a.date.replace(/-/g, '/')} ${a.time}`).getTime();
+      const dateB = new Date(`${b.date.replace(/-/g, '/')} ${b.time}`).getTime();
+      return dateA - dateB;
+    });
 
   // 用於輪播的活動 (取最近的 5 個)
-  const carouselActivities = [...upcomingActivities]
-    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-    .slice(0, 5);
+  const carouselActivities = upcomingActivities.slice(0, 5);
+
+  // 各區塊的活動（依 TYPE_SECTIONS 順序）
+  const sectionsWithData = TYPE_SECTIONS
+    .map(section => ({
+      ...section,
+      items: upcomingActivities.filter(a => a.type === section.type),
+    }))
+    .filter(section => section.items.length > 0);
 
   return (
     <div className="pb-20">
@@ -244,47 +292,26 @@ const Home: React.FC<HomeProps> = ({ activities }) => {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="space-y-16">
-          {/* Regular Meetings (Member Exclusive) */}
-          {regularMeetings.length > 0 && (
-            <div>
+          {sectionsWithData.map(section => (
+            <div key={section.type}>
               <div className="flex items-center justify-between mb-8">
                 <div className="flex flex-col">
                   <h2 className="text-2xl font-bold flex items-center gap-2">
-                    <span className="w-2 h-8 bg-red-600 rounded-full"></span>
-                    會員專屬活動
+                    <span className={`w-2 h-8 ${section.barColor} rounded-full`}></span>
+                    {section.title}
                   </h2>
-                  <p className="text-gray-500 text-sm mt-1 ml-4">（會員專屬的活動例如培訓課程等）</p>
+                  <p className="text-gray-500 text-sm mt-1 ml-4">{section.subtitle}</p>
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                {regularMeetings.map(activity => (
+                {section.items.map(activity => (
                   <ActivityCard key={activity.id} activity={activity} />
                 ))}
               </div>
             </div>
-          )}
+          ))}
 
-          {/* Special Events (Recent Activities) */}
-          {specialEvents.length > 0 && (
-            <div>
-              <div className="flex items-center justify-between mb-8">
-                <div className="flex flex-col">
-                  <h2 className="text-2xl font-bold flex items-center gap-2">
-                    <span className="w-2 h-8 bg-gray-800 rounded-full"></span>
-                    一般活動
-                  </h2>
-                  <p className="text-gray-500 text-sm mt-1 ml-4">（公開型的活動，可以邀請來賓一同參與）</p>
-                </div>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                {specialEvents.map(activity => (
-                  <ActivityCard key={activity.id} activity={activity} />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {regularMeetings.length === 0 && specialEvents.length === 0 && (
+          {sectionsWithData.length === 0 && (
             <div className="bg-white p-20 rounded-3xl border border-dashed text-center">
               <Calendar className="mx-auto text-gray-200 mb-4" size={48} />
               <h3 className="text-xl font-bold text-gray-400">目前暫無即將舉行的活動</h3>
