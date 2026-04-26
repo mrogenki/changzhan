@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Calendar, Users, LogOut, ClipboardList, Building2, Shield, Banknote, Award, Cake, CalendarClock, X, UserCheck } from 'lucide-react';
+import { LayoutDashboard, Calendar, Users, LogOut, ClipboardList, Building2, Shield, Banknote, Award, Cake, CalendarClock, X, UserCheck, FolderOpen } from 'lucide-react';
 import { AdminUser, UserRole } from '../../types';
 
 interface SidebarProps {
@@ -112,6 +112,10 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout, isOpen, onClose }) =>
               <Link to="/admin/membership-expiry" onClick={handleNavClick} className={linkClass(location.pathname.startsWith('/admin/membership-expiry'))}>
                 <CalendarClock size={20} />
                 <span>會員會籍管理</span>
+              </Link>
+              <Link to="/admin/documents" onClick={handleNavClick} className={linkClass(location.pathname.startsWith('/admin/documents'))}>
+                <FolderOpen size={20} />
+                <span>文件管理</span>
               </Link>
             </>
           )}
