@@ -9,7 +9,7 @@ const getEnv = (key: string): string | undefined => {
   }
 };
 
-const LINE_OA_ID = getEnv('VITE_LINE_OA_ID') || '';
+const LINE_OA_ID = getEnv('VITE_LINE_OA_ID') || '@568cognw';
 
 // 把 LINE OA ID 轉成可以開啟聊天的 URL
 // 接受 @xxxxx 或 xxxxx 兩種格式，自動補 @ 前綴
