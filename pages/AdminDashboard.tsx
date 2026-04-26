@@ -1,6 +1,6 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { Activity, Registration, AdminUser, UserRole, Member, AttendanceRecord, AttendanceStatus, FinanceRecord, Milestone } from '../types';
+import { Activity, Registration, AdminUser, UserRole, Member, AttendanceRecord, AttendanceStatus, FinanceRecord, Milestone, ChapterDocument } from '../types';
 import Sidebar from './admin/Sidebar';
 import DashboardHome from './admin/DashboardHome';
 import CheckInManager from './admin/CheckInManager';
@@ -13,6 +13,7 @@ import MilestoneManager from './admin/MilestoneManager';
 import BirthdayManager from './admin/BirthdayManager';
 import MembershipExpiryManager from './admin/MembershipExpiryManager';
 import GuestManager from './admin/GuestManager';
+import DocumentManager from './admin/DocumentManager';
 
 interface AdminDashboardProps {
   currentUser: AdminUser;
@@ -44,6 +45,12 @@ interface AdminDashboardProps {
   onAddMilestone: (milestone: Milestone) => void;
   onUpdateMilestone: (milestone: Milestone) => void;
   onDeleteMilestone: (id: string | number) => void;
+  documents: ChapterDocument[];
+  onAddDocument: (doc: Omit<ChapterDocument, 'id' | 'created_at' | 'updated_at'>) => Promise<void>;
+  onUpdateDocument: (doc: ChapterDocument) => Promise<void>;
+  onDeleteDocument: (doc: ChapterDocument) => Promise<void>;
+  onUploadDocumentFile: (file: File) => Promise<{ filePath: string; publicUrl: string }>;
+  onGetDocumentDownloadUrl: (filePath: string) => Promise<string>;
   onUploadImage: (file: File) => Promise<string>;
 }
 
@@ -94,6 +101,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
               <Route path="/guests" element={<GuestManager currentUser={props.currentUser} />} />
               <Route path="/birthdays" element={<BirthdayManager members={props.members} />} />
               <Route path="/membership-expiry" element={<MembershipExpiryManager members={props.members} />} />
+              <Route path="/documents" element={
+                <DocumentManager
+                  documents={props.documents}
+                  uploaderName={props.currentUser.name}
+                  onAddDocument={props.onAddDocument}
+                  onUpdateDocument={props.onUpdateDocument}
+                  onDeleteDocument={props.onDeleteDocument}
+                  onUploadFile={props.onUploadDocumentFile}
+                  onGetDownloadUrl={props.onGetDocumentDownloadUrl}
+                />
+              } />
             </>
           )}
 
