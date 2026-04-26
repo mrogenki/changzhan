@@ -12,7 +12,7 @@ import RegularMeeting from './pages/RegularMeeting';
 import BusinessTraining from './pages/BusinessTraining';
 import CoffeeMeeting from './pages/CoffeeMeeting';
 import LiffCheckin from './pages/LiffCheckin';
-import { Activity, ActivityType, Registration, AdminUser, Member, AttendanceRecord, AttendanceStatus, FinanceRecord, Milestone } from './types';
+import { Activity, ActivityType, Registration, AdminUser, Member, AttendanceRecord, AttendanceStatus, FinanceRecord, Milestone, ChapterDocument } from './types';
 import { INITIAL_ACTIVITIES, INITIAL_ADMINS, INITIAL_MEMBERS } from './constants';
 
 const getEnv = (key: string): string | undefined => {
@@ -112,6 +112,7 @@ const App: React.FC = () => {
     const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
     const [financeRecords, setFinanceRecords] = useState<FinanceRecord[]>([]);
     const [milestones, setMilestones] = useState<Milestone[]>([]);
+    const [documents, setDocuments] = useState<ChapterDocument[]>([]);
     const [loading, setLoading] = useState(true);
     const [currentUser, setCurrentUser] = useState<AdminUser | null>(() => {
         const saved = sessionStorage.getItem('current_user');
@@ -189,6 +190,11 @@ const App: React.FC = () => {
             const { data: milestoneData } = await supabase.from('milestones').select('*').order('date', { ascending: false });
             if (milestoneData) {
                 setMilestones(milestoneData as Milestone[]);
+            }
+
+            const { data: documentData } = await supabase.from('documents').select('*').order('created_at', { ascending: false });
+            if (documentData) {
+                setDocuments(documentData as ChapterDocument[]);
             }
         } catch (err) {
             console.error('Fetch error:', err);
@@ -421,6 +427,80 @@ const App: React.FC = () => {
         else fetchData();
     };
 
+    // ===== 文件管理 =====
+    const handleUploadDocumentFile = async (file: File): Promise<{ filePath: string; publicUrl: string }> => {
+        const safeName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+        const fileName = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}_${safeName}`;
+        const filePath = `documents/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+            .from('chapter-documents')
+            .upload(filePath, file, {
+                cacheControl: '3600',
+                upsert: false,
+                contentType: file.type || 'application/octet-stream',
+            });
+
+        if (uploadError) throw uploadError;
+
+        const { data } = supabase.storage
+            .from('chapter-documents')
+            .getPublicUrl(filePath);
+
+        return { filePath, publicUrl: data.publicUrl };
+    };
+
+    const handleGetDocumentDownloadUrl = async (filePath: string): Promise<string> => {
+        // 用 signed URL 觸發瀏覽器下載並設定 content-disposition
+        const { data, error } = await supabase.storage
+            .from('chapter-documents')
+            .createSignedUrl(filePath, 60, { download: true });
+        if (error || !data?.signedUrl) {
+            // Fallback：用 public URL
+            const { data: pubData } = supabase.storage
+                .from('chapter-documents')
+                .getPublicUrl(filePath);
+            return pubData.publicUrl;
+        }
+        return data.signedUrl;
+    };
+
+    const handleAddDocument = async (doc: Omit<ChapterDocument, 'id' | 'created_at' | 'updated_at'>) => {
+        const { error } = await supabase.from('documents').insert([doc]);
+        if (error) {
+            alert('新增文件失敗:' + error.message);
+            throw error;
+        }
+        await fetchData();
+    };
+
+    const handleUpdateDocument = async (doc: ChapterDocument) => {
+        const { id, created_at, updated_at, ...updateData } = doc;
+        const payload = { ...updateData, updated_at: new Date().toISOString() };
+        const { error } = await supabase.from('documents').update(payload).eq('id', id);
+        if (error) {
+            alert('更新文件失敗:' + error.message);
+            throw error;
+        }
+        await fetchData();
+    };
+
+    const handleDeleteDocument = async (doc: ChapterDocument) => {
+        // 先刪 storage 檔案，再刪 db
+        const { error: storageError } = await supabase.storage
+            .from('chapter-documents')
+            .remove([doc.file_path]);
+        if (storageError) {
+            console.warn('刪除實體檔案失敗 (可能已不存在):', storageError);
+        }
+        const { error } = await supabase.from('documents').delete().eq('id', doc.id);
+        if (error) {
+            alert('刪除文件失敗:' + error.message);
+            throw error;
+        }
+        await fetchData();
+    };
+
     if (loading) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-white">
@@ -478,6 +558,12 @@ const App: React.FC = () => {
                                     onAddMilestone={handleAddMilestone}
                                     onUpdateMilestone={handleUpdateMilestone}
                                     onDeleteMilestone={handleDeleteMilestone}
+                                    documents={documents}
+                                    onAddDocument={handleAddDocument}
+                                    onUpdateDocument={handleUpdateDocument}
+                                    onDeleteDocument={handleDeleteDocument}
+                                    onUploadDocumentFile={handleUploadDocumentFile}
+                                    onGetDocumentDownloadUrl={handleGetDocumentDownloadUrl}
                                     onUploadImage={handleUploadImage}
                                 />
                             ) : (
