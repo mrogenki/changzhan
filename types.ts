@@ -140,3 +140,28 @@ export interface Guest {
     email?: string;
     company?: string;
 }
+
+// 新增：文件管理
+export type DocumentCategory =
+    | '例會資料'
+    | '商務培訓'
+    | '會議記錄'
+    | '表單範本'
+    | '財務文件'
+    | '章程規範'
+    | '其他';
+
+export interface ChapterDocument {
+    id: string | number;
+    title: string;
+    description?: string;
+    category: DocumentCategory;
+    file_name: string;       // 原始檔名
+    file_path: string;       // Supabase Storage 中的路徑
+    file_url: string;        // Public URL
+    file_size: number;       // 位元組
+    file_type: string;       // MIME type
+    uploaded_by?: string;    // 上傳者姓名
+    created_at?: string;
+    updated_at?: string;
+}
