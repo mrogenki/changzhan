@@ -93,7 +93,7 @@ const Footer: React.FC = () => {
                 {lineUrl && (
                     <div className="mb-4">
                         
-                            href={lineUrl}
+                           <a href={lineUrl}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#06C755]/10 text-[#06C755] hover:bg-[#06C755] hover:text-white transition-all text-sm font-bold"
