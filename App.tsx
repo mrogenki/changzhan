@@ -12,6 +12,7 @@ import RegularMeeting from './pages/RegularMeeting';
 import BusinessTraining from './pages/BusinessTraining';
 import CoffeeMeeting from './pages/CoffeeMeeting';
 import LiffCheckin from './pages/LiffCheckin';
+import LineFloatingButton, { LineLogo, buildLineChatUrl } from './components/LineFloatingButton';
 import { Activity, ActivityType, Registration, AdminUser, Member, AttendanceRecord, AttendanceStatus, FinanceRecord, Milestone, ChapterDocument } from './types';
 import { INITIAL_ACTIVITIES, INITIAL_ADMINS, INITIAL_MEMBERS } from './constants';
 
@@ -79,6 +80,9 @@ const Footer: React.FC = () => {
     const location = useLocation();
     if (location.pathname.startsWith('/admin')) return null;
 
+    const lineOaId = getEnv('VITE_LINE_OA_ID') || '';
+    const lineUrl = buildLineChatUrl(lineOaId);
+
     return (
         <footer className="bg-white border-t py-12">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
@@ -86,6 +90,19 @@ const Footer: React.FC = () => {
                     <div className="w-6 h-6 bg-red-600 rounded-md flex items-center justify-center text-white text-xs font-bold">長</div>
                     <span className="font-bold text-gray-800 tracking-wider">BNI 長展分會</span>
                 </div>
+                {lineUrl && (
+                    <div className="mb-4">
+                        
+                            href={lineUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#06C755]/10 text-[#06C755] hover:bg-[#06C755] hover:text-white transition-all text-sm font-bold"
+                        >
+                            <LineLogo size={18} />
+                            <span>官方 LINE 客服</span>
+                        </a>
+                    </div>
+                )}
                 <p className="text-gray-400 text-xs">&copy; 2026 長展分會. All rights reserved.</p>
             </div>
         </footer>
@@ -573,6 +590,7 @@ const App: React.FC = () => {
                     </Routes>
                 </main>
                 <Footer />
+                <LineFloatingButton />
             </div>
         </Router>
     );
