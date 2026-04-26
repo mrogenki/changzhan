@@ -80,7 +80,7 @@ const Footer: React.FC = () => {
     const location = useLocation();
     if (location.pathname.startsWith('/admin')) return null;
 
-    const lineOaId = getEnv('VITE_LINE_OA_ID') || '';
+    const lineOaId = getEnv('VITE_LINE_OA_ID') || '@568cognw';
     const lineUrl = buildLineChatUrl(lineOaId);
 
     return (
