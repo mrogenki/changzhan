@@ -61,7 +61,12 @@ const ActivityDetail: React.FC<ActivityDetailProps> = ({ activities, registratio
   const alreadyRegisteredCount = registrations.filter(r => String(r.activityId) === String(id)).length;
 
   const handleShare = async () => {
-    const shareUrl = window.location.href;
+    // 在 share URL 加上 ?t={timestamp} cache buster，
+    // 讓 LINE / FB / 其他平台每次都重新抓 OG tag，避開舊縮圖 cache 殘留
+    const url = new URL(window.location.href);
+    url.searchParams.set('t', String(Date.now()));
+    const shareUrl = url.toString();
+
     const description = activity.description?.trim();
     const descriptionBlock = description ? `\n\n📋 活動介紹：\n${description}` : '';
     const shareText = `【長展分會活動推薦】\n活動：${activity.title}\n日期：${activity.date}\n時間：${activity.time}\n地點：${activity.location}${descriptionBlock}\n\n立即點擊連結報名：`;
