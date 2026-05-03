@@ -7,7 +7,20 @@ interface Props {
 }
 
 const CoffeeMeeting: React.FC<Props> = ({ activities }) => {
-    const filtered = activities.filter(a => a.type === ActivityType.COFFEE_MEETING);
+    const now = new Date();
+    const filtered = activities
+        .filter(a => {
+            if (a.type !== ActivityType.COFFEE_MEETING) return false;
+            const isActive = a.status === 'active' || !a.status;
+            if (!isActive) return false;
+            const fullDate = new Date(`${a.date.replace(/-/g, '/')} ${a.time}`);
+            return fullDate > now;
+        })
+        .sort((a, b) => {
+            const dateA = new Date(`${a.date.replace(/-/g, '/')} ${a.time}`).getTime();
+            const dateB = new Date(`${b.date.replace(/-/g, '/')} ${b.time}`).getTime();
+            return dateA - dateB;
+        });
     return (
         <ActivityListView
             title="咖啡會議"

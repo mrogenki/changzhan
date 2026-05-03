@@ -7,7 +7,21 @@ interface Props {
 }
 
 const RegularMeeting: React.FC<Props> = ({ activities }) => {
-    const filtered = activities.filter(a => a.type === ActivityType.REGULAR_MEETING);
+    const now = new Date();
+    const filtered = activities
+        .filter(a => {
+            if (a.type !== ActivityType.REGULAR_MEETING) return false;
+            const isActive = a.status === 'active' || !a.status;
+            if (!isActive) return false;
+            // 過濾掉已過期的活動（活動開始時間已過）
+            const fullDate = new Date(`${a.date.replace(/-/g, '/')} ${a.time}`);
+            return fullDate > now;
+        })
+        .sort((a, b) => {
+            const dateA = new Date(`${a.date.replace(/-/g, '/')} ${a.time}`).getTime();
+            const dateB = new Date(`${b.date.replace(/-/g, '/')} ${b.time}`).getTime();
+            return dateA - dateB;
+        });
     return (
         <ActivityListView
             title="例會活動"
