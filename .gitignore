@@ -12,6 +12,17 @@ dist
 dist-ssr
 *.local
 
+# env files (do not commit any .env*)
+.env*
+!.env.example
+!.env.local.example
+
+# vercel
+.vercel
+
+# claude code local state
+.claude/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
