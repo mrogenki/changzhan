@@ -14,6 +14,7 @@ import BirthdayManager from './admin/BirthdayManager';
 import MembershipExpiryManager from './admin/MembershipExpiryManager';
 import GuestManager from './admin/GuestManager';
 import DocumentManager from './admin/DocumentManager';
+import LineGroupManager from './admin/LineGroupManager';
 
 interface AdminDashboardProps {
   currentUser: AdminUser;
@@ -110,6 +111,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
                   onDeleteDocument={props.onDeleteDocument}
                   onUploadFile={props.onUploadDocumentFile}
                   onGetDownloadUrl={props.onGetDocumentDownloadUrl}
+                />
+              } />
+              <Route path="/line-groups" element={
+                <LineGroupManager
+                  currentUser={props.currentUser}
+                  onUploadImage={props.onUploadImage}
                 />
               } />
             </>

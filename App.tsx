@@ -275,14 +275,24 @@ const App: React.FC = () => {
 
     const handleRegister = async (newReg: Registration): Promise<boolean> => {
         const { id, ...regData } = newReg as any;
-        const { error } = await supabase.from('registrations').insert([regData]);
+        const { data: inserted, error } = await supabase
+            .from('registrations')
+            .insert([regData])
+            .select('id')
+            .single();
         if (error) {
             alert('報名失敗:' + error.message);
             return false;
-        } else {
-            await fetchData();
-            return true;
         }
+        // 觸發 LINE 群組通知（若 app_settings 沒設目標群組會靜默跳過）
+        // 失敗不影響報名動作，所以 fire-and-forget + 吞掉錯誤
+        if (inserted?.id) {
+            supabase.functions
+                .invoke('line-notify-registration', { body: { registrationId: inserted.id } })
+                .catch((err) => console.warn('line-notify-registration failed:', err));
+        }
+        await fetchData();
+        return true;
     };
 
     const handleUpdateActivity = async (updated: Activity) => {

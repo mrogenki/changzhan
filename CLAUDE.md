@@ -56,7 +56,7 @@
 
 ### 各系統獨佔的 tables
 
-**本系統（changzhan）獨佔**：`activities`、`admins`、`registrations`、`members`、`attendance`、`finance_records`、`milestones`、`guests`、`app_settings`、`message_send_log`、`documents`
+**本系統（changzhan）獨佔**：`activities`、`admins`、`registrations`、`members`、`attendance`、`finance_records`、`milestones`、`guests`、`app_settings`、`message_send_log`、`documents`、`line_groups`
 
 **bni-report 獨佔**：`palms_imports`、`traffic_light_imports`、`member_groups`
 
@@ -110,7 +110,7 @@
 
 ## 五、Supabase 資料表
 
-### 本系統使用的（11 張）
+### 本系統使用的（12 張）
 
 | Table | 說明 |
 |-------|------|
@@ -122,9 +122,10 @@
 | `guests` | 訪客資料 |
 | `finance_records` | 財務記錄 |
 | `milestones` | 大事記 |
-| `app_settings` | 系統設定 |
-| `message_send_log` | LINE 訊息發送記錄 |
+| `app_settings` | 系統設定（key/value，例：`line_notify_registration_group_id`） |
+| `message_send_log` | LINE 訊息發送記錄（`recipient_kind`: member / guest / **group**） |
 | `documents` | 文件管理 |
+| `line_groups` | LINE 長展小幫手所在群組（`line_group_id`, `name`, `is_active`，由 `line-webhook` 自動寫入） |
 
 ### 共用（與 bni-report）
 
@@ -201,6 +202,33 @@ npm run preview  # 本機預覽 build
 - 設定 LIFF ID 在 LINE Developers Console
 - 從 LINE 開啟連結 → 進入 LIFF SDK 處理 → 拿到 `liff.getProfile()` 的 user_id
 - 後續呼叫 `line_checkin()` 或 `guest_bind_and_checkin()` SECURITY DEFINER function
+
+### LINE 長展小幫手（OA bot 推播）
+共用同一個 LINE Channel（與 `send-line-message` 用的 Channel Access Token 相同）。
+
+**Edge Functions（皆部署於 Supabase，repo 內無原始檔）：**
+
+| Function | verify_jwt | 用途 |
+|----------|-----------|------|
+| `send-line-message` | ✅ | 1 對 1 推播給會員 / 來賓（既有） |
+| `line-webhook` | ❌ | LINE 平台 webhook 接收端，HMAC 驗簽，自動 upsert `line_groups` |
+| `line-broadcast` | ✅ | admin/editor 觸發，多群組同時推播文字 + 圖片 |
+| `line-notify-registration` | ✅ | 報名後自動推到 `app_settings.line_notify_registration_group_id` 指定的群組 |
+
+**所需 Supabase Edge Function Secrets：**
+- `LINE_CHANNEL_ACCESS_TOKEN`（已存在）
+- `LINE_CHANNEL_SECRET`（webhook 驗簽用，**新增**）
+- `SUPABASE_URL`、`SUPABASE_SERVICE_ROLE_KEY`、`SUPABASE_ANON_KEY`（Supabase 自動注入）
+
+**LINE Developers Console 設定：**
+- Webhook URL：`https://qxoglhkfxxqsjefynzqn.supabase.co/functions/v1/line-webhook`
+- Use webhook：ON
+- Allow bot to join group chats：ON
+- 把 bot 加到群組後，bot 收到 `join` 事件就會自動進 `line_groups` 表
+
+**Admin 介面：** `/admin/line-groups`（由 `pages/admin/LineGroupManager.tsx` 提供）— 群組清單、報名通知群組設定、群發公告（多選 + 全選 + 文字 + 圖片）、發送紀錄
+
+**報名通知流程：** `App.tsx::handleRegister` insert 完 `registrations` 後 fire-and-forget invoke `line-notify-registration`，失敗不影響使用者報名動作。
 
 ---
 
