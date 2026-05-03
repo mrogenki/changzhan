@@ -16,6 +16,9 @@ import {
   Gauge,
   AlertTriangle,
   Infinity as InfinityIcon,
+  Megaphone,
+  Power,
+  PowerOff,
 } from 'lucide-react';
 import { AdminUser } from '../../types';
 
@@ -59,6 +62,9 @@ interface Props {
 }
 
 const NOTIFY_SETTING_KEY = 'line_notify_registration_group_id';
+const BOT_ENABLED_KEY = 'bot_reply_enabled';
+const BOT_ANNOUNCEMENT_KEY = 'bot_reply_announcement_text';
+const BOT_ANNOUNCEMENT_UPDATED_KEY = 'bot_reply_announcement_updated_at';
 
 const LineGroupManager: React.FC<Props> = ({ currentUser, onUploadImage }) => {
   const [groups, setGroups] = useState<LineGroup[]>([]);
@@ -69,6 +75,12 @@ const LineGroupManager: React.FC<Props> = ({ currentUser, onUploadImage }) => {
   const [quota, setQuota] = useState<QuotaInfo | null>(null);
   const [quotaLoading, setQuotaLoading] = useState(false);
   const [quotaError, setQuotaError] = useState<string | null>(null);
+
+  // 自動回覆公告
+  const [botEnabled, setBotEnabled] = useState(true);
+  const [announcement, setAnnouncement] = useState('');
+  const [announcementUpdatedAt, setAnnouncementUpdatedAt] = useState<string>('');
+  const [savingBot, setSavingBot] = useState(false);
 
   // Broadcast composer
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -87,7 +99,7 @@ const LineGroupManager: React.FC<Props> = ({ currentUser, onUploadImage }) => {
   const fetchAll = async () => {
     setLoading(true);
     try {
-      const [groupRes, settingRes, logRes] = await Promise.all([
+      const [groupRes, settingRes, logRes, botSettingsRes] = await Promise.all([
         supabase
           .from('line_groups')
           .select('*')
@@ -104,10 +116,21 @@ const LineGroupManager: React.FC<Props> = ({ currentUser, onUploadImage }) => {
           .eq('recipient_kind', 'group')
           .order('created_at', { ascending: false })
           .limit(50),
+        supabase
+          .from('app_settings')
+          .select('key, value')
+          .in('key', [BOT_ENABLED_KEY, BOT_ANNOUNCEMENT_KEY, BOT_ANNOUNCEMENT_UPDATED_KEY]),
       ]);
       if (groupRes.data) setGroups(groupRes.data as LineGroup[]);
       if (settingRes.data) setNotifyGroupId(settingRes.data.value || '');
       if (logRes.data) setLogs(logRes.data as SendLogRow[]);
+      if (botSettingsRes.data) {
+        const map: Record<string, string> = {};
+        botSettingsRes.data.forEach((r: any) => { map[r.key] = r.value ?? ''; });
+        setBotEnabled((map[BOT_ENABLED_KEY] ?? 'true') !== 'false');
+        setAnnouncement(map[BOT_ANNOUNCEMENT_KEY] ?? '');
+        setAnnouncementUpdatedAt(map[BOT_ANNOUNCEMENT_UPDATED_KEY] ?? '');
+      }
     } catch (e: any) {
       console.error(e);
       alert('載入失敗：' + (e.message || e));
@@ -178,6 +201,30 @@ const LineGroupManager: React.FC<Props> = ({ currentUser, onUploadImage }) => {
       return;
     }
     fetchAll();
+  };
+
+  // === 自動回覆公告設定 ===
+  const saveBotSettings = async () => {
+    setSavingBot(true);
+    try {
+      const nowIso = new Date().toISOString();
+      const rows = [
+        { key: BOT_ENABLED_KEY, value: botEnabled ? 'true' : 'false', updated_at: nowIso },
+        { key: BOT_ANNOUNCEMENT_KEY, value: announcement, updated_at: nowIso },
+        { key: BOT_ANNOUNCEMENT_UPDATED_KEY, value: nowIso, updated_at: nowIso },
+      ];
+      const { error } = await supabase
+        .from('app_settings')
+        .upsert(rows, { onConflict: 'key' });
+      if (error) {
+        alert('儲存失敗：' + error.message);
+        return;
+      }
+      setAnnouncementUpdatedAt(nowIso);
+      alert('已儲存自動回覆設定');
+    } finally {
+      setSavingBot(false);
+    }
   };
 
   // === 報名通知群組設定 ===
@@ -314,6 +361,80 @@ const LineGroupManager: React.FC<Props> = ({ currentUser, onUploadImage }) => {
         onRefresh={fetchQuota}
       />
 
+
+      {/* === 區塊 0: 自動回覆公告（!公告 指令） === */}
+      <section className="bg-white rounded-xl shadow p-6">
+        <div className="flex items-start justify-between mb-4 gap-4">
+          <div className="flex items-center gap-2">
+            <Megaphone size={20} className="text-emerald-600" />
+            <h2 className="text-xl font-bold">自動回覆公告</h2>
+          </div>
+          <button
+            onClick={() => setBotEnabled(v => !v)}
+            className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium ${
+              botEnabled
+                ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
+                : 'bg-gray-200 text-gray-500 hover:bg-gray-300'
+            }`}
+            title="按一下切換啟用/停用，記得儲存"
+          >
+            {botEnabled ? <Power size={12} /> : <PowerOff size={12} />}
+            {botEnabled ? '已啟用' : '已停用'}
+          </button>
+        </div>
+
+        <div className="text-sm text-gray-600 mb-4 bg-emerald-50 border border-emerald-200 rounded-lg p-3 leading-relaxed">
+          <p className="font-medium text-emerald-900 mb-1">💡 完全免費（透過 LINE Reply API）</p>
+          <p>群組裡任何成員打 <code className="bg-white px-1.5 py-0.5 rounded text-emerald-700 font-mono">!公告</code> 等指令，bot 會自動回覆。不算進每月推播額度。</p>
+          <p className="mt-1">支援指令：<code className="bg-white px-1 rounded">!公告</code> <code className="bg-white px-1 rounded">!活動</code> <code className="bg-white px-1 rounded">!例會</code> <code className="bg-white px-1 rounded">!咖啡</code> <code className="bg-white px-1 rounded">!培訓</code> <code className="bg-white px-1 rounded">!幫助</code></p>
+          <p className="mt-1 text-emerald-800">活動類指令會自動撈 DB 最新資料，這裡只需編輯 <code className="bg-white px-1 rounded">!公告</code> 內容。</p>
+        </div>
+
+        <label className="block font-medium mb-2">
+          📣 <code className="font-mono">!公告</code> 回覆內容
+        </label>
+        <textarea
+          value={announcement}
+          onChange={e => setAnnouncement(e.target.value)}
+          rows={6}
+          placeholder="例：&#10;本週主題：客戶開發三大關鍵&#10;時間：週二 06:30&#10;地點：88號樂章&#10;歡迎邀請朋友參與！"
+          className="w-full border rounded-lg px-3 py-2 font-mono text-sm"
+        />
+        <p className="text-xs text-gray-500 mt-1">
+          {announcementUpdatedAt
+            ? `上次更新：${new Date(announcementUpdatedAt).toLocaleString('zh-TW')}`
+            : '尚未設定過'}
+        </p>
+
+        <div className="mt-3 flex flex-col sm:flex-row gap-3 sm:items-center">
+          <button
+            onClick={saveBotSettings}
+            disabled={savingBot}
+            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg flex items-center gap-2 disabled:opacity-50"
+          >
+            {savingBot ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+            儲存
+          </button>
+          <span className="text-xs text-gray-500">
+            儲存後群組裡馬上可用，不需重啟服務。
+          </span>
+        </div>
+
+        {/* 預覽 */}
+        {announcement.trim() && (
+          <details className="mt-4">
+            <summary className="text-sm text-emerald-700 cursor-pointer hover:underline">
+              👁 預覽 LINE 回覆畫面
+            </summary>
+            <div className="mt-2 p-3 bg-gray-100 rounded-lg max-w-md">
+              <div className="bg-white rounded-lg p-3 shadow-sm whitespace-pre-line text-sm">
+                <div className="font-bold mb-1">📣 最新公告</div>
+                <div>{announcement}</div>
+              </div>
+            </div>
+          </details>
+        )}
+      </section>
 
       {/* === 區塊 1: 報名通知設定 === */}
       <section className="bg-white rounded-xl shadow p-6">
