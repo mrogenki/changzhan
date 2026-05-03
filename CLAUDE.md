@@ -173,7 +173,7 @@ npm run preview  # 本機預覽 build
 
 ### 安全
 - 🔴 **`attendance` 表 RLS 未啟用**（advisor ERROR）— 任何人可直接修改出席記錄
-- 🟡 多張表是 `allow_all` 政策（activities、admins、documents、finance_records、members、milestones、registrations）— 需逐一 audit + 收緊
+- 🟡 多張表是 `allow_all` 政策（activities、admins、documents、finance_records、members、milestones、registrations、**line_groups、app_settings(UPDATE/INSERT)**）— 需逐一 audit + 收緊。根因是後台登入是純前端 state（比對 `admins` 表密碼後 setState），沒走 Supabase Auth；所有 admin 寫操作都是 anon。等系統遷到 Supabase Auth 後可一次收緊所有 admin 表 RLS。
 - 🟡 `guest_attendance_summary` view 是 SECURITY DEFINER（advisor ERROR）— 應改為 SECURITY INVOKER 或 revoke
 - 🟡 `guests` 與 `message_send_log` 允許 anon insert/update — 需評估是否真的需要
 - 🟡 Storage buckets `activity-images`、`chapter-documents` 允許公開列檔 — 改為僅按 URL 存取
