@@ -13,6 +13,9 @@ import {
   RefreshCw,
   AlertCircle,
   Bell,
+  Gauge,
+  AlertTriangle,
+  Infinity as InfinityIcon,
 } from 'lucide-react';
 import { AdminUser } from '../../types';
 
@@ -43,6 +46,13 @@ interface SendLogRow {
   batch_id: string | null;
 }
 
+interface QuotaInfo {
+  type: 'limited' | 'none';
+  limit: number | null;
+  used: number;
+  remaining: number | null;
+}
+
 interface Props {
   currentUser: AdminUser;
   onUploadImage: (file: File) => Promise<string>;
@@ -56,6 +66,9 @@ const LineGroupManager: React.FC<Props> = ({ currentUser, onUploadImage }) => {
   const [notifyGroupId, setNotifyGroupId] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [savingNotify, setSavingNotify] = useState(false);
+  const [quota, setQuota] = useState<QuotaInfo | null>(null);
+  const [quotaLoading, setQuotaLoading] = useState(false);
+  const [quotaError, setQuotaError] = useState<string | null>(null);
 
   // Broadcast composer
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -103,8 +116,33 @@ const LineGroupManager: React.FC<Props> = ({ currentUser, onUploadImage }) => {
     }
   };
 
+  const fetchQuota = async () => {
+    setQuotaLoading(true);
+    setQuotaError(null);
+    try {
+      const { data, error } = await supabase.functions.invoke('line-quota', { body: {} });
+      if (error) {
+        setQuotaError(error.message || '查詢失敗');
+        setQuota(null);
+        return;
+      }
+      if (data?.error) {
+        setQuotaError(String(data.error));
+        setQuota(null);
+        return;
+      }
+      setQuota(data as QuotaInfo);
+    } catch (e: any) {
+      setQuotaError(e.message || String(e));
+      setQuota(null);
+    } finally {
+      setQuotaLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchAll();
+    fetchQuota();
   }, []);
 
   // === 群組編輯 ===
@@ -197,7 +235,19 @@ const LineGroupManager: React.FC<Props> = ({ currentUser, onUploadImage }) => {
       alert('請輸入文字或上傳圖片');
       return;
     }
-    if (!confirm(`確定要發送給 ${selected.size} 個群組？`)) return;
+
+    // 額度預警：群數 > 剩餘額度
+    if (quota?.type === 'limited' && quota.remaining !== null && selected.size > quota.remaining) {
+      const cont = confirm(
+        `⚠️ 額度警告\n\n` +
+        `本月剩餘 ${quota.remaining} 則，但你選了 ${selected.size} 個群組。\n` +
+        `送出後會有 ${selected.size - quota.remaining} 個群組失敗（LINE 會回 429）。\n\n` +
+        `仍要繼續嗎？`,
+      );
+      if (!cont) return;
+    } else if (!confirm(`確定要發送給 ${selected.size} 個群組？`)) {
+      return;
+    }
 
     setSending(true);
     try {
@@ -230,6 +280,7 @@ const LineGroupManager: React.FC<Props> = ({ currentUser, onUploadImage }) => {
         setImageUrl('');
         setSelected(new Set());
         fetchAll();
+        fetchQuota();
       } else {
         alert('發送回應異常：' + JSON.stringify(data));
       }
@@ -248,12 +299,21 @@ const LineGroupManager: React.FC<Props> = ({ currentUser, onUploadImage }) => {
           LINE 長展小幫手
         </h1>
         <button
-          onClick={fetchAll}
+          onClick={() => { fetchAll(); fetchQuota(); }}
           className="flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900"
         >
           <RefreshCw size={16} /> 重新整理
         </button>
       </div>
+
+      {/* === 額度卡片 === */}
+      <QuotaCard
+        quota={quota}
+        loading={quotaLoading}
+        error={quotaError}
+        onRefresh={fetchQuota}
+      />
+
 
       {/* === 區塊 1: 報名通知設定 === */}
       <section className="bg-white rounded-xl shadow p-6">
@@ -573,6 +633,141 @@ const LineGroupManager: React.FC<Props> = ({ currentUser, onUploadImage }) => {
         )}
       </section>
     </div>
+  );
+};
+
+// =====================================================
+// QuotaCard：本月推播額度顯示
+// =====================================================
+const QuotaCard: React.FC<{
+  quota: QuotaInfo | null;
+  loading: boolean;
+  error: string | null;
+  onRefresh: () => void;
+}> = ({ quota, loading, error, onRefresh }) => {
+  // 不限額方案
+  if (quota?.type === 'none') {
+    return (
+      <section className="bg-gradient-to-r from-emerald-50 to-green-50 border border-emerald-200 rounded-xl p-5">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <InfinityIcon size={28} className="text-emerald-600" />
+            <div>
+              <div className="text-sm text-emerald-700 font-medium">推播方案</div>
+              <div className="text-2xl font-bold text-emerald-900">不限額</div>
+              <div className="text-xs text-emerald-700 mt-0.5">
+                本月已用 {quota.used.toLocaleString()} 則
+              </div>
+            </div>
+          </div>
+          <button onClick={onRefresh} disabled={loading} className="text-sm text-emerald-700 hover:text-emerald-900 flex items-center gap-1">
+            {loading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+            更新
+          </button>
+        </div>
+      </section>
+    );
+  }
+
+  // 限額方案
+  if (quota?.type === 'limited' && quota.limit !== null) {
+    const used = quota.used;
+    const limit = quota.limit;
+    const remaining = quota.remaining ?? 0;
+    const pct = limit > 0 ? Math.min(100, Math.round((used / limit) * 100)) : 0;
+
+    let tone: 'ok' | 'warn' | 'danger' = 'ok';
+    if (pct >= 100) tone = 'danger';
+    else if (pct >= 80) tone = 'warn';
+
+    const colorMap = {
+      ok:     { bg: 'bg-blue-50',    border: 'border-blue-200',    text: 'text-blue-900',    sub: 'text-blue-700',    bar: 'bg-blue-500',   icon: 'text-blue-600' },
+      warn:   { bg: 'bg-amber-50',   border: 'border-amber-200',   text: 'text-amber-900',   sub: 'text-amber-700',   bar: 'bg-amber-500',  icon: 'text-amber-600' },
+      danger: { bg: 'bg-red-50',     border: 'border-red-200',     text: 'text-red-900',     sub: 'text-red-700',     bar: 'bg-red-500',    icon: 'text-red-600' },
+    } as const;
+    const c = colorMap[tone];
+
+    return (
+      <section className={`${c.bg} border ${c.border} rounded-xl p-5`}>
+        <div className="flex items-start justify-between gap-4 mb-3">
+          <div className="flex items-center gap-3 min-w-0">
+            {tone === 'danger' ? (
+              <AlertTriangle size={28} className={c.icon + ' flex-shrink-0'} />
+            ) : (
+              <Gauge size={28} className={c.icon + ' flex-shrink-0'} />
+            )}
+            <div className="min-w-0">
+              <div className={`text-sm font-medium ${c.sub}`}>本月推播額度</div>
+              <div className={`text-2xl font-bold ${c.text}`}>
+                {used.toLocaleString()} / {limit.toLocaleString()}
+                <span className={`ml-2 text-base font-normal ${c.sub}`}>
+                  剩 {remaining.toLocaleString()}
+                </span>
+              </div>
+              {tone === 'danger' && (
+                <div className="text-xs text-red-700 mt-1 font-medium">
+                  ⚠️ 額度已滿，本月再發會收到 LINE 429 錯誤
+                </div>
+              )}
+              {tone === 'warn' && (
+                <div className="text-xs text-amber-700 mt-1 font-medium">
+                  ⚠️ 額度即將用盡，建議升級方案或減少群發
+                </div>
+              )}
+              <div className={`text-xs ${c.sub} mt-1`}>
+                每月 1 號 GMT 重置 · 1 個群組 = 1 則
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={onRefresh}
+            disabled={loading}
+            className={`text-sm ${c.sub} hover:${c.text} flex items-center gap-1 flex-shrink-0`}
+          >
+            {loading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+            更新
+          </button>
+        </div>
+        {/* 進度條 */}
+        <div className="w-full h-2 bg-white/60 rounded-full overflow-hidden">
+          <div
+            className={`h-full ${c.bar} transition-all`}
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+        <div className={`text-xs ${c.sub} mt-1 text-right`}>{pct}% 已使用</div>
+      </section>
+    );
+  }
+
+  // loading / error / 尚未取得
+  return (
+    <section className="bg-gray-50 border border-gray-200 rounded-xl p-5">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Gauge size={24} className="text-gray-400" />
+          <div>
+            <div className="text-sm font-medium text-gray-600">本月推播額度</div>
+            {loading ? (
+              <div className="text-gray-500 text-sm flex items-center gap-2">
+                <Loader2 size={14} className="animate-spin" /> 查詢中…
+              </div>
+            ) : error ? (
+              <div className="text-red-600 text-sm">查詢失敗：{error}</div>
+            ) : (
+              <div className="text-gray-500 text-sm">尚未取得</div>
+            )}
+          </div>
+        </div>
+        <button
+          onClick={onRefresh}
+          disabled={loading}
+          className="text-sm text-gray-600 hover:text-gray-900 flex items-center gap-1"
+        >
+          <RefreshCw size={14} /> 重試
+        </button>
+      </div>
+    </section>
   );
 };
 
