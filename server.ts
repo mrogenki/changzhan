@@ -81,7 +81,7 @@ async function startServer() {
       // 預設 OG 標籤
       let ogTitle = "長展分會活動報名";
       let ogDescription = "立即報名參加 BNI 長展分會的商務例會與精選活動。";
-      let ogImage = "https://images.unsplash.com/photo-1515187029135-18ee286d815b?q=80&w=1200&auto=format&fit=crop";
+      let ogImage = "https://qxoglhkfxxqsjefynzqn.supabase.co/storage/v1/object/public/activity-images/changzhan-logo.jpg";
       let ogUrl = process.env.APP_URL || `https://${req.get('host')}${url}`;
 
       // 檢查是否為活動詳情頁面
