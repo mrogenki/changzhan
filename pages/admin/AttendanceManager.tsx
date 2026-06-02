@@ -254,6 +254,7 @@ const AttendanceManager: React.FC<AttendanceManagerProps> = ({ activities, membe
             <thead className="bg-gray-50 border-b border-gray-100 sticky top-0 z-10">
               <tr className="text-xs font-bold text-gray-400 uppercase tracking-widest">
                 <th className="px-6 py-4 w-20">No.</th>
+                <th className="px-6 py-4 w-24">組別</th>
                 <th className="px-6 py-4 w-1/4">會員資訊</th>
                 <th className="px-6 py-4">出席狀況</th>
                 <th className="px-6 py-4 w-32 text-right">時間</th>
@@ -268,6 +269,7 @@ const AttendanceManager: React.FC<AttendanceManagerProps> = ({ activities, membe
                  return (
                   <tr key={member.id} className={`hover:bg-gray-50/50 transition-colors ${currentStatus ? 'bg-gray-50/30' : ''}`}>
                     <td className="px-6 py-4 font-mono text-gray-400 font-bold">{member.member_no}</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">{member.group_name || '-'}</td>
                     <td className="px-6 py-4">
                       <div className="font-bold text-gray-900">{member.name}</div>
                       <div className="text-xs text-gray-500 mt-0.5">{member.company}</div>
