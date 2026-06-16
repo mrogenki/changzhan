@@ -28,6 +28,24 @@ const SUPABASE_URL = getEnv('VITE_SUPABASE_URL') || 'https://qxoglhkfxxqsjefynzq
 const SUPABASE_ANON_KEY = getEnv('VITE_SUPABASE_ANON_KEY') || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF4b2dsaGtmeHhxc2plZnluenFuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAwMzQwNTAsImV4cCI6MjA4NTYxMDA1MH0.gLvcHgY0rqLd26Nw61_M7nmjaz4TUsP9VL-XxN5wNSU';
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+// PostgREST 預設每次查詢上限 1000 筆。attendance 等會持續成長的表必須分頁
+// 全量抓回,否則最新的記錄會被截斷(例如當日報到記錄是最新寫入,會剛好被丟掉)。
+const PAGE_SIZE = 1000;
+const fetchAllRows = async (table: string): Promise<any[]> => {
+    const all: any[] = [];
+    for (let from = 0; ; from += PAGE_SIZE) {
+        const { data, error } = await supabase
+            .from(table)
+            .select('*')
+            .range(from, from + PAGE_SIZE - 1);
+        if (error) throw error;
+        if (!data || data.length === 0) break;
+        all.push(...data);
+        if (data.length < PAGE_SIZE) break;
+    }
+    return all;
+};
+
 const Header: React.FC = () => {
     const [isOpen, setIsOpen] = useState(false);
     const location = useLocation();
@@ -185,16 +203,16 @@ const App: React.FC = () => {
                 if (inserted) setUsers(inserted);
             }
 
-            const { data: memberData, error: memberError } = await supabase.from('members').select('*');
+            const memberData = await fetchAllRows('members');
             if (memberData && memberData.length > 0) {
                 setMembers(memberData);
-            } else if (!memberError && memberData && memberData.length === 0) {
+            } else if (memberData && memberData.length === 0) {
                 const initMembers = INITIAL_MEMBERS.map(({ id, ...rest }) => rest);
                 const { data: inserted } = await supabase.from('members').insert(initMembers).select();
                 if (inserted) setMembers(inserted);
             }
 
-            const { data: attendanceData } = await supabase.from('attendance').select('*');
+            const attendanceData = await fetchAllRows('attendance');
             if (attendanceData) {
                 setAttendance(attendanceData as AttendanceRecord[]);
             }
@@ -222,7 +240,7 @@ const App: React.FC = () => {
 
     // 局部 refresh:只重抓 attendance / registrations,不全量 fetchData
     const refreshAttendance = async () => {
-        const { data } = await supabase.from('attendance').select('*');
+        const data = await fetchAllRows('attendance');
         if (data) setAttendance(data as AttendanceRecord[]);
     };
 
