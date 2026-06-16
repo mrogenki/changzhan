@@ -232,6 +232,30 @@ npm run preview  # 本機預覽 build
 
 ---
 
+## 九之一、業務規則（出席判定）
+
+### 例會遲到規則（07:01）
+
+**規則：** 「例會活動」報到時間以**台北當地時間 07:01** 為界，**07:01（含）之後**報到記為「遲到（late）」，07:01 以前（即 07:00:59 含以前）記為「出席（present）」。
+
+- **僅限例會**：只有 `activities.type = '例會活動'`（`ActivityType.REGULAR_MEETING`）才套用，因為例會時間固定。其他活動類型（一般活動、商務培訓等）一律記「出席」，不看時間。
+- **作用點**：實作在 Supabase `line_checkin()` SECURITY DEFINER function 內（LINE LIFF 掃碼自動報到的會員主流程）。判斷式：
+  ```sql
+  IF v_activity.type = '例會活動'
+     AND (NOW() AT TIME ZONE 'Asia/Taipei')::time >= TIME '07:01' THEN
+    v_status := 'late';
+  ELSE
+    v_status := 'present';
+  END IF;
+  ```
+- **邊界**：`>= 07:01`，所以 07:00:59 仍算「出席」，07:01:00 起算「遲到」。
+- **時區**：DB 存 UTC，比較時用 `AT TIME ZONE 'Asia/Taipei'` 換算。
+- **重複掃碼**：同一會員再掃會依當下時間重新判定並更新 `updated_at`。
+- **不影響後台手動操作**：`pages/admin/AttendanceManager.tsx` 的五顆狀態按鈕（出席/遲到/代理/病假/缺席）仍是幹部手動覆寫，**不會**被此規則自動改寫。
+- **門檻寫死 07:01**：如未來需各活動可調遲到門檻，再改為讀 `app_settings` 或 `activities` 欄位。
+
+---
+
 ## 十、與其他專案
 
 - **bni-report**：共用 Supabase project，`user_roles` + `current_user_role()` 共用
