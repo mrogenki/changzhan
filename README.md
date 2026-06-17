@@ -17,7 +17,7 @@ BNI 長展分會的對外活動報名 + LINE 簽到 + 後台管理系統。
 ```bash
 npm install
 cp .env.example .env.local      # 填入實際值，從 Vercel Dashboard 取得
-npm run dev                      # http://localhost:3000
+npm run dev                      # http://localhost:3001
 ```
 
 ## 環境變數
