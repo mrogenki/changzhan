@@ -160,7 +160,7 @@
 
 ```bash
 npm install
-npm run dev      # 本機 http://localhost:3000（用 server.ts，含 OG tags）
+npm run dev      # 本機 http://localhost:3001（用 server.ts，含 OG tags）
 npm run build    # 產出 dist/
 npm run preview  # 本機預覽 build
 ```
