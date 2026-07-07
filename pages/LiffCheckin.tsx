@@ -214,11 +214,8 @@ export default function LiffCheckin() {
     if (phase.kind !== 'choose_identity') return;
     setPhase({ kind: 'loading', msg: '載入會員名單...' });
     try {
-      const { data: memberList } = await supabase
-        .from('members')
-        .select('id, name')
-        .is('line_user_id', null)
-        .order('name');
+      // 改走 SECURITY DEFINER RPC，只回未綁定會員的 id+name（不再讓 anon 直接讀整張 members）
+      const { data: memberList } = await supabase.rpc('list_unbound_members');
 
       setMembers(memberList ?? []);
       setPhase({

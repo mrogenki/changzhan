@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
 import { Menu, X, Loader2 } from 'lucide-react';
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from './supabaseClient';
 import Home from './pages/Home';
 import ActivityDetail from './pages/ActivityDetail';
 import AdminDashboard from './pages/AdminDashboard';
@@ -14,7 +14,7 @@ import CoffeeMeeting from './pages/CoffeeMeeting';
 import LiffCheckin from './pages/LiffCheckin';
 import LineFloatingButton, { LineLogo, buildLineChatUrl } from './components/LineFloatingButton';
 import { Activity, ActivityType, Registration, AdminUser, Member, AttendanceRecord, AttendanceStatus, FinanceRecord, Milestone, ChapterDocument } from './types';
-import { INITIAL_ACTIVITIES, INITIAL_ADMINS, INITIAL_MEMBERS } from './constants';
+import { INITIAL_ACTIVITIES } from './constants';
 
 const getEnv = (key: string): string | undefined => {
   try {
@@ -23,10 +23,6 @@ const getEnv = (key: string): string | undefined => {
     return undefined;
   }
 };
-
-const SUPABASE_URL = getEnv('VITE_SUPABASE_URL') || 'https://qxoglhkfxxqsjefynzqn.supabase.co';
-const SUPABASE_ANON_KEY = getEnv('VITE_SUPABASE_ANON_KEY') || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF4b2dsaGtmeHhxc2plZnluenFuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAwMzQwNTAsImV4cCI6MjA4NTYxMDA1MH0.gLvcHgY0rqLd26Nw61_M7nmjaz4TUsP9VL-XxN5wNSU';
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // PostgREST 預設每次查詢上限 1000 筆。attendance 等會持續成長的表必須分頁
 // 全量抓回,否則最新的記錄會被截斷(例如當日報到記錄是最新寫入,會剛好被丟掉)。
@@ -149,10 +145,9 @@ const App: React.FC = () => {
     const [milestones, setMilestones] = useState<Milestone[]>([]);
     const [documents, setDocuments] = useState<ChapterDocument[]>([]);
     const [loading, setLoading] = useState(true);
-    const [currentUser, setCurrentUser] = useState<AdminUser | null>(() => {
-        const saved = sessionStorage.getItem('current_user');
-        return saved ? JSON.parse(saved) : null;
-    });
+    const [currentUser, setCurrentUser] = useState<AdminUser | null>(null);
+    const [session, setSession] = useState<any>(null);
+    const [authReady, setAuthReady] = useState(false);
 
     const fetchData = async (isInitialLoad = false) => {
         if (isInitialLoad) setLoading(true);
@@ -191,46 +186,42 @@ const App: React.FC = () => {
                 }
             }
 
-            const { data: regData } = await supabase.from('registrations').select('*').order('created_at', { ascending: false });
-            if (regData) setRegistrations(regData);
-
-            const { data: userData, error: userError } = await supabase.from('admins').select('*');
-            if (userData && userData.length > 0) {
-                setUsers(userData);
-            } else if (!userError && userData && userData.length === 0) {
-                const initAdmins = INITIAL_ADMINS.map(({ id, ...rest }) => rest);
-                const { data: inserted } = await supabase.from('admins').insert(initAdmins).select();
-                if (inserted) setUsers(inserted);
+            // 會員：登入者取完整資料；公開訪客只透過 RPC 取安全欄位名錄（無電話/Email）
+            if (session) {
+                const memberData = await fetchAllRows('members');
+                if (memberData) setMembers(memberData as Member[]);
+            } else {
+                const { data: dir } = await supabase.rpc('public_member_directory');
+                setMembers((dir ?? []) as Member[]);
             }
 
-            const memberData = await fetchAllRows('members');
-            if (memberData && memberData.length > 0) {
-                setMembers(memberData);
-            } else if (memberData && memberData.length === 0) {
-                const initMembers = INITIAL_MEMBERS.map(({ id, ...rest }) => rest);
-                const { data: inserted } = await supabase.from('members').insert(initMembers).select();
-                if (inserted) setMembers(inserted);
+            // 以下皆為受保護的後台資料：僅登入管理員可讀，公開訪客一律清空
+            if (session) {
+                const { data: regData } = await supabase.from('registrations').select('*').order('created_at', { ascending: false });
+                if (regData) setRegistrations(regData);
+
+                const { data: userData } = await supabase.from('admins').select('*');
+                if (userData) setUsers(userData);
+
+                const attendanceData = await fetchAllRows('attendance');
+                if (attendanceData) setAttendance(attendanceData as AttendanceRecord[]);
+
+                const { data: financeData } = await supabase.from('finance_records').select('*').order('date', { ascending: false });
+                if (financeData) setFinanceRecords(financeData as FinanceRecord[]);
+
+                const { data: documentData } = await supabase.from('documents').select('*').order('created_at', { ascending: false });
+                if (documentData) setDocuments(documentData as ChapterDocument[]);
+            } else {
+                setRegistrations([]);
+                setUsers([]);
+                setAttendance([]);
+                setFinanceRecords([]);
+                setDocuments([]);
             }
 
-            const attendanceData = await fetchAllRows('attendance');
-            if (attendanceData) {
-                setAttendance(attendanceData as AttendanceRecord[]);
-            }
-
-            const { data: financeData } = await supabase.from('finance_records').select('*').order('date', { ascending: false });
-            if (financeData) {
-                setFinanceRecords(financeData as FinanceRecord[]);
-            }
-
+            // 里程碑為公開內容
             const { data: milestoneData } = await supabase.from('milestones').select('*').order('date', { ascending: false });
-            if (milestoneData) {
-                setMilestones(milestoneData as Milestone[]);
-            }
-
-            const { data: documentData } = await supabase.from('documents').select('*').order('created_at', { ascending: false });
-            if (documentData) {
-                setDocuments(documentData as ChapterDocument[]);
-            }
+            if (milestoneData) setMilestones(milestoneData as Milestone[]);
         } catch (err) {
             console.error('Fetch error:', err);
         } finally {
@@ -249,18 +240,40 @@ const App: React.FC = () => {
         if (data) setRegistrations(data);
     };
 
+    // 監聽 Supabase Auth session（管理員登入狀態的唯一來源）
     useEffect(() => {
-        fetchData(true);
+        supabase.auth.getSession().then(({ data }) => {
+            setSession(data.session);
+            setAuthReady(true);
+        });
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, sess) => {
+            setSession(sess);
+            setAuthReady(true);
+        });
+        return () => subscription.unsubscribe();
     }, []);
 
-    const handleLogin = (user: AdminUser) => {
-        setCurrentUser(user);
-        sessionStorage.setItem('current_user', JSON.stringify(user));
-    };
+    // 一律載入公開資料；登入（session 變化）後會重載並取得受保護的後台資料
+    useEffect(() => {
+        if (!authReady) return;
+        fetchData(true);
+        if (!session) setCurrentUser(null);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [authReady, session?.user?.id]);
 
-    const handleLogout = () => {
+    // 由 session email 對應到 admins 取得姓名/角色/權限
+    useEffect(() => {
+        const email = session?.user?.email?.toLowerCase();
+        if (email && users.length > 0) {
+            const me = users.find(u => ((u as any).email || '').toLowerCase() === email);
+            setCurrentUser(me ?? null);
+        }
+    }, [session?.user?.email, users]);
+
+    const handleLogout = async () => {
+        await supabase.auth.signOut();
         setCurrentUser(null);
-        sessionStorage.removeItem('current_user');
+        setSession(null);
     };
 
     const handleUploadImage = async (file: File): Promise<string> => {
@@ -570,9 +583,15 @@ const App: React.FC = () => {
                         <Route path="/members" element={<MemberList members={members} />} />
                         <Route path="/milestones" element={<Milestones milestones={milestones} />} />
                         <Route path="/activity/:id" element={<ActivityDetail activities={activities} onRegister={handleRegister} registrations={registrations} members={members} />} />
-                        <Route path="/admin/login" element={currentUser ? <Navigate to="/admin" /> : <LoginPage users={users} onLogin={handleLogin} />} />
+                        <Route path="/admin/login" element={session ? <Navigate to="/admin" /> : <LoginPage />} />
                         <Route path="/admin/*" element={
-                            currentUser ? (
+                            !session ? (
+                                <Navigate to="/admin/login" />
+                            ) : !currentUser ? (
+                                <div className="min-h-[60vh] flex items-center justify-center">
+                                    <Loader2 className="animate-spin text-red-600" size={40} />
+                                </div>
+                            ) : (
                                 <AdminDashboard
                                     currentUser={currentUser}
                                     onLogout={handleLogout}
@@ -611,8 +630,6 @@ const App: React.FC = () => {
                                     onGetDocumentDownloadUrl={handleGetDocumentDownloadUrl}
                                     onUploadImage={handleUploadImage}
                                 />
-                            ) : (
-                                <Navigate to="/admin/login" />
                             )
                         } />
                     </Routes>

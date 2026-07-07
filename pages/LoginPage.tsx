@@ -2,35 +2,26 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ShieldCheck, Lock, Smartphone } from 'lucide-react';
-import { AdminUser } from '../types';
-import { INITIAL_ADMINS } from '../constants';
+import { supabase, phoneToEmail } from '../supabaseClient';
 
-interface LoginPageProps {
-  users: AdminUser[];
-  onLogin: (user: AdminUser) => void;
-}
-
-const LoginPage: React.FC<LoginPageProps> = ({ users, onLogin }) => {
+const LoginPage: React.FC = () => {
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleLoginSubmit = (e: React.FormEvent) => {
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // 優先檢查資料庫中的使用者
-    let foundUser = users.find(u => u.phone === phone && u.password === password);
-    
-    // 備援：如果資料庫中找不到，檢查常數中的初始管理員 (保證絕對能登入)
-    if (!foundUser) {
-      foundUser = INITIAL_ADMINS.find(u => u.phone === phone && u.password === password);
-    }
-
-    if (foundUser) {
-      onLogin(foundUser);
-    } else {
+    setError('');
+    setLoading(true);
+    // 以「手機衍生 email + 密碼」向 Supabase Auth 登入；成功後由 App 的 onAuthStateChange 導向後台
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email: phoneToEmail(phone),
+      password,
+    });
+    setLoading(false);
+    if (signInError) {
       setError('帳號或密碼錯誤，請重新輸入');
-      // 兩秒後清除錯誤提示
       setTimeout(() => setError(''), 3000);
     }
   };
@@ -84,11 +75,12 @@ const LoginPage: React.FC<LoginPageProps> = ({ users, onLogin }) => {
               </div>
             )}
 
-            <button 
-              type="submit" 
-              className="w-full bg-red-600 text-white py-4 rounded-2xl font-bold text-lg hover:bg-red-700 active:scale-[0.98] transition-all shadow-xl shadow-red-200"
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-red-600 text-white py-4 rounded-2xl font-bold text-lg hover:bg-red-700 active:scale-[0.98] transition-all shadow-xl shadow-red-200 disabled:opacity-60"
             >
-              進入管理後台
+              {loading ? '登入中…' : '進入管理後台'}
             </button>
           </form>
         </div>
