@@ -306,20 +306,17 @@ const App: React.FC = () => {
 
     const handleRegister = async (newReg: Registration): Promise<boolean> => {
         const { id, ...regData } = newReg as any;
-        const { data: inserted, error } = await supabase
-            .from('registrations')
-            .insert([regData])
-            .select('id')
-            .single();
+        // 走 definer RPC 新增報名並回傳 id（anon 無法直接 SELECT registrations 以保護他人 PII）
+        const { data: newId, error } = await supabase.rpc('public_create_registration', { p_reg: regData });
         if (error) {
             alert('報名失敗:' + error.message);
             return false;
         }
         // 觸發 LINE 群組通知（若 app_settings 沒設目標群組會靜默跳過）
         // 失敗不影響報名動作，所以 fire-and-forget + 吞掉錯誤
-        if (inserted?.id) {
+        if (newId) {
             supabase.functions
-                .invoke('line-notify-registration', { body: { registrationId: inserted.id } })
+                .invoke('line-notify-registration', { body: { registrationId: newId } })
                 .catch((err) => console.warn('line-notify-registration failed:', err));
         }
         await fetchData();
