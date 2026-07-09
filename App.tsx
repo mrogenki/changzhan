@@ -357,16 +357,22 @@ const App: React.FC = () => {
     };
 
     const handleAddUser = async (newUser: AdminUser) => {
-        const { id, ...userData } = newUser as any;
-        const { error } = await supabase.from('admins').insert([userData]);
-        if (error) alert('新增管理員失敗:' + error.message);
+        const { name, phone, password, role } = newUser as any;
+        // 經 edge function 同時建立 Supabase Auth 帳號 + admins 資料（需管理員身分）
+        const { data, error } = await supabase.functions.invoke('manage-admin', {
+            body: { action: 'create', name, phone, password, role },
+        });
+        if (error || data?.error) alert('新增管理員失敗：' + (data?.message || error?.message || ''));
         else fetchData();
     };
 
     const handleDeleteUser = async (id: string | number) => {
-        const { error } = await supabase.from('admins').delete().eq('id', id);
-        if (error) {
-            alert('刪除人員失敗:' + error.message);
+        // 經 edge function 同時移除 Auth 帳號 + admins 資料
+        const { data, error } = await supabase.functions.invoke('manage-admin', {
+            body: { action: 'delete', id },
+        });
+        if (error || data?.error) {
+            alert('刪除人員失敗：' + (data?.message || error?.message || ''));
         } else {
             fetchData();
         }

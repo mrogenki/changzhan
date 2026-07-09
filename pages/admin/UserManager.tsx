@@ -101,7 +101,7 @@ const UserManager: React.FC<UserManagerProps> = ({ users, onAddUser, onDeleteUse
                         </div>
                         <div>
                             <label className="block text-sm font-bold text-gray-700 mb-1">密碼</label>
-                            <input name="password" type="password" required className="w-full border rounded-lg px-3 py-3 outline-none focus:ring-2 focus:ring-red-500" placeholder="設定密碼" />
+                            <input name="password" type="password" required minLength={6} className="w-full border rounded-lg px-3 py-3 outline-none focus:ring-2 focus:ring-red-500" placeholder="設定密碼（至少 6 碼）" />
                         </div>
                         <div>
                             <label className="block text-sm font-bold text-gray-700 mb-1">權限角色</label>
