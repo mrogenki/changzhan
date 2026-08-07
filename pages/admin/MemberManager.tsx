@@ -89,7 +89,7 @@ const MemberManager: React.FC<MemberManagerProps> = ({ members, onAddMember, onU
     }
     
     // 定義標題
-    const headers = ['會員編號', '組別', '產業鏈', '行業別', '姓名', '公司名稱', '公司抬頭', '統一編號', '手機號碼', '室內電話', '地址', '會員簡介', '網站連結', '狀態', '入會日期', '會籍到期日', '生日'];
+    const headers = ['會員編號', '組別', '產業鏈', '行業別', '姓名', '公司名稱', '公司抬頭', '統一編號', '手機號碼', '室內電話', '電子郵件', '地址', '會員簡介', '網站連結', '狀態', '入會日期', '會籍到期日', '生日'];
     
     // 加入 BOM 以讓 Excel 正確識別 UTF-8
     let csvContent = '\uFEFF'; 
@@ -112,6 +112,7 @@ const MemberManager: React.FC<MemberManagerProps> = ({ members, onAddMember, onU
         escape(m.tax_id),
         escape(m.mobile_phone),
         escape(m.landline),
+        escape(m.email),
         escape(m.address),
         escape(m.intro),
         escape(m.website),

@@ -20,6 +20,7 @@ const TEMPLATE_HEADERS = [
   '統一編號',     // tax_id
   '手機號碼',     // mobile_phone
   '室內電話',     // landline
+  '電子郵件',     // email (電子名片「寫信給我」用)
   '地址',         // address
   '會員簡介',     // intro
   '網站連結',     // website
@@ -249,6 +250,7 @@ const MemberImportModal: React.FC<MemberImportModalProps> = ({ existingMembers, 
               tax_id: mergeValue(taxId, existing.tax_id),
               mobile_phone: mergeValue(get(row, '手機號碼'), existing.mobile_phone),
               landline: mergeValue(get(row, '室內電話'), existing.landline),
+              email: mergeValue(get(row, '電子郵件'), existing.email),
               address: mergeValue(get(row, '地址'), existing.address),
               intro: mergeValue(get(row, '會員簡介'), existing.intro),
               website: mergeValue(get(row, '網站連結'), existing.website),
@@ -270,6 +272,7 @@ const MemberImportModal: React.FC<MemberImportModalProps> = ({ existingMembers, 
               tax_id: taxId || undefined,
               mobile_phone: get(row, '手機號碼') || undefined,
               landline: get(row, '室內電話') || undefined,
+              email: get(row, '電子郵件') || undefined,
               address: get(row, '地址') || undefined,
               intro: get(row, '會員簡介') || undefined,
               website: get(row, '網站連結') || undefined,
