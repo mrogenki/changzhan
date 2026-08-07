@@ -232,19 +232,30 @@ function CardPreview({ m }: { m: MemberCardData }) {
 
         <div className="mt-4 space-y-2">
           {(m.mobile_phone ?? '').trim() && (
-            <div className="w-full py-2.5 rounded-lg bg-red-600 text-white text-sm font-bold text-center">
+            <a
+              href={`tel:${m.mobile_phone!.replace(/[^0-9+]/g, '')}`}
+              className="block w-full py-2.5 rounded-lg bg-red-600 text-white text-sm font-bold text-center active:opacity-80"
+            >
               撥打電話
-            </div>
+            </a>
           )}
           {(m.website ?? '').trim() && (
-            <div className="w-full py-2.5 rounded-lg bg-gray-100 text-gray-700 text-sm font-bold text-center">
+            <a
+              href={/^https?:\/\//i.test(m.website!.trim()) ? m.website!.trim() : `https://${m.website!.trim()}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block w-full py-2.5 rounded-lg bg-gray-100 text-gray-700 text-sm font-bold text-center active:opacity-80"
+            >
               看官網
-            </div>
+            </a>
           )}
           {(m.email ?? '').trim() && (
-            <div className="w-full py-2.5 rounded-lg bg-gray-100 text-gray-700 text-sm font-bold text-center">
+            <a
+              href={`mailto:${m.email!.trim()}`}
+              className="block w-full py-2.5 rounded-lg bg-gray-100 text-gray-700 text-sm font-bold text-center active:opacity-80"
+            >
               寫信給我
-            </div>
+            </a>
           )}
         </div>
       </div>
