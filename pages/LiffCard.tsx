@@ -57,6 +57,7 @@ export default function LiffCard() {
   const [cards, setCards] = useState<MemberCardData[]>([]);
   const [sharing, setSharing] = useState(false);
   const [canShare, setCanShare] = useState(false);
+  const [envInfo, setEnvInfo] = useState('');
 
   useEffect(() => {
     (async () => {
@@ -96,7 +97,12 @@ export default function LiffCard() {
         }
 
         setCards(list);
-        setCanShare(liff.isApiAvailable('shareTargetPicker'));
+        // isApiAvailable 在 iOS LINE 內建瀏覽器有時誤報 false，
+        // 故只要在 LINE 內(isInClient)就允許嘗試，實際能否用交給 shareTargetPicker try/catch。
+        const inClient = liff.isInClient();
+        const apiAvail = liff.isApiAvailable('shareTargetPicker');
+        setCanShare(inClient || apiAvail);
+        setEnvInfo(`inClient=${inClient} · api=${apiAvail}`);
         setPhase({ kind: 'ready' });
       } catch (e: any) {
         setPhase({ kind: 'error', msg: '發生錯誤:' + (e?.message ?? String(e)) });
@@ -107,7 +113,7 @@ export default function LiffCard() {
 
   async function handleShare() {
     if (cards.length === 0) return;
-    if (!liff.isApiAvailable('shareTargetPicker')) {
+    if (typeof (liff as any).shareTargetPicker !== 'function') {
       alert('此環境不支援分享,請在 LINE App 內開啟本頁');
       return;
     }
@@ -190,6 +196,9 @@ export default function LiffCard() {
             <p className="text-center text-xs text-gray-400 mt-3">
               點擊後可選擇要傳送的好友或群組
             </p>
+            {envInfo && (
+              <p className="text-center text-[10px] text-gray-300 mt-4 font-mono">{envInfo}</p>
+            )}
           </div>
         )}
       </div>
