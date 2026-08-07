@@ -57,7 +57,7 @@ function textOrDash(v?: string | null): string {
  * 版型：大頭照(hero) → 產業別/姓名/職稱·公司/簡介 → 底部按鈕（電話 / 官網 / 寫信）
  */
 export function buildMemberCardBubble(m: MemberCardData): any {
-  const subtitleParts = [m.company_title, m.company]
+  const subtitleParts = [m.company, m.company_title]
     .map((s) => (s ?? '').trim())
     .filter(Boolean);
   const subtitle = subtitleParts.join(' · ');

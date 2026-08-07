@@ -393,7 +393,7 @@ function FilterChip({
 
 /** 名片預覽（近似 LINE flex 呈現，讓使用者確認要送什麼） */
 function CardPreview({ m }: { m: MemberCardData }) {
-  const subtitle = [m.company_title, m.company]
+  const subtitle = [m.company, m.company_title]
     .map((s) => (s ?? '').trim())
     .filter(Boolean)
     .join(' · ');
