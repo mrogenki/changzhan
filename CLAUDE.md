@@ -237,9 +237,11 @@ npm run preview  # 本機預覽 build
 讓會員 / 夥伴在 **LINE App 內**把會員名片直接分享給好友或群組，**不經後台、不吃 OA 推播額度**（走 `liff.shareTargetPicker`，訊息由使用者本人送出）。
 
 **組成：**
-- `lib/memberCard.ts` — flex builder：`buildMemberCardMessage`（單張 bubble）、`buildMemberCarouselMessage`（多張 carousel，上限 12）。版型：大頭照 + 產業別/姓名/職稱·公司/簡介 + 底部按鈕（撥打電話 `tel:` / 看官網 `uri` / 寫信給我 `mailto:`，只顯示有資料的）。
-- `pages/LiffCard.tsx` — LIFF 頁，`liff.init` 後呼叫 `public_member_cards` RPC 取資料 → 預覽 → `shareTargetPicker`。
-- `pages/MemberList.tsx` — 每位會員一顆「分享電子名片」按鈕，deep link 到 `https://liff.line.me/<VITE_LIFF_CARD_ID>?member=<id>`（在 LINE 內開啟）。
+- `lib/memberCard.ts` — flex builder：`buildMemberCardMessage`（單張 bubble）、`buildMemberCarouselMessage`（單則 carousel，上限 12）、`buildMemberShareMessages`（拆多則：每則 carousel 12、最多 5 則＝60 位）。版型：大頭照 + 產業別/姓名/職稱·公司/簡介 + 底部按鈕（撥打電話 `tel:` / 看官網 `uri` / 寫信給我 `mailto:`，只顯示有資料的）。
+- `pages/LiffCard.tsx` — LIFF 頁，**雙模式**：
+  - 帶參數（`?member=<id>` 或 `?ids=1,2,3`）→ 呼叫 `public_member_cards` → 預覽 → `shareTargetPicker`。
+  - **無參數**（`/liff/card`）→ **多選挑選頁**：讀 `public_member_directory` 顯示可搜尋 / 產業鏈篩選的清單，勾選後抓 `public_member_cards` 組多則訊息一次分享。此無參數網址即 **OA 圖文選單**的入口。
+- `pages/MemberList.tsx` — 每位會員一顆「分享電子名片」按鈕（`?member=<id>`）＋頁首一顆「多選會員·一次分享」按鈕（無參數 → 挑選頁）。deep link 皆為 `https://liff.line.me/<VITE_LIFF_CARD_ID>[?member=<id>]`。
 - `members.email` 欄位（新增）+ 後台 `MemberManager.tsx` Email 輸入欄；沒填 email 的會員，名片自動不顯示「寫信給我」。
 
 **需要的設定（只有你能做）：**

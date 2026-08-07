@@ -204,3 +204,37 @@ export function buildMemberCarouselMessage(members: MemberCardData[]): {
     truncated,
   };
 }
+
+/**
+ * 把多位會員拆成多則訊息一次分享。
+ * LINE 限制：carousel 每則上限 12 bubble、shareTargetPicker 一次上限 5 則。
+ * 故最多 12 × 5 = 60 位；超過回傳截斷數。
+ */
+export function buildMemberShareMessages(members: MemberCardData[]): {
+  messages: any[];
+  truncated: number;
+} {
+  const PER_MSG = 12;
+  const MAX_MSG = 5;
+  const cap = PER_MSG * MAX_MSG;
+  const used = members.slice(0, cap);
+  const truncated = members.length - used.length;
+
+  const messages: any[] = [];
+  for (let i = 0; i < used.length; i += PER_MSG) {
+    const chunk = used.slice(i, i + PER_MSG);
+    messages.push(
+      chunk.length === 1
+        ? buildMemberCardMessage(chunk[0])
+        : {
+            type: 'flex',
+            altText: `BNI 長展分會會員名片（${used.length} 位）`,
+            contents: {
+              type: 'carousel',
+              contents: chunk.map(buildMemberCardBubble),
+            },
+          }
+    );
+  }
+  return { messages, truncated };
+}

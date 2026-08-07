@@ -16,6 +16,12 @@ function buildCardShareUrl(memberId: string | number): string | null {
   return `https://liff.line.me/${LIFF_CARD_ID}?member=${memberId}`;
 }
 
+// 無參數 → 進入多選挑選頁（也用於 OA 圖文選單）
+function buildPickerUrl(): string | null {
+  if (!LIFF_CARD_ID) return null;
+  return `https://liff.line.me/${LIFF_CARD_ID}`;
+}
+
 const MemberList: React.FC<MemberListProps> = ({ members }) => {
   const [filter, setFilter] = useState<string>('all');
   const chains = ['美食', '工程', '健康', '幸福', '工商'];
@@ -95,7 +101,19 @@ const MemberList: React.FC<MemberListProps> = ({ members }) => {
         <div className="max-w-7xl mx-auto text-center">
           <h1 className="text-3xl md:text-4xl font-extrabold mb-4 text-gray-900">分會成員介紹</h1>
           <p className="text-gray-500 max-w-2xl mx-auto">匯聚各產業菁英，打造最強商務連結。點擊下方分類快速尋找合作夥伴。</p>
-          
+
+          {buildPickerUrl() && (
+            <a
+              href={buildPickerUrl()!}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center justify-center gap-2 mt-6 px-6 py-3 rounded-full font-bold bg-[#06C755] hover:bg-[#05b34c] text-white shadow-sm"
+            >
+              <Share2 size={18} />
+              多選會員 · 一次分享到 LINE
+            </a>
+          )}
+
           <div className="flex flex-wrap justify-center gap-3 mt-8">
             <button 
               onClick={() => setFilter('all')}
