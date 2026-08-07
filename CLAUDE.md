@@ -243,9 +243,11 @@ npm run preview  # 本機預覽 build
 - `members.email` 欄位（新增）+ 後台 `MemberManager.tsx` Email 輸入欄；沒填 email 的會員，名片自動不顯示「寫信給我」。
 
 **需要的設定（只有你能做）：**
-- **新環境變數 `VITE_LIFF_CARD_ID`**（`.env.local` 與 Vercel 都要加）：一個**專用 LIFF app** 的 ID。
-- **LINE Developers Console**：為此 LIFF app 建立 → Endpoint URL 設為 `https://<你的網域>/liff/card` → **開啟 Share target picker**（`shareTargetPicker`）→ Scope 勾 `profile`。
-- `mailto:` 按鈕若日後發現 LINE 拒收，改成把 email 以文字列呈現即可（builder 內單點可調）。
+- **環境變數 `VITE_LIFF_CARD_ID`**（`.env.local` 與 Vercel 都要加，Vercel 改動後需重新 deploy 才生效，因為是 `VITE_` build-time 變數）：專用 LIFF app 的 ID。目前值 `2009854899-hb4y0DiX`，建於「長展分會」LINE Login channel。
+- **LIFF app 設定**：Endpoint URL = `https://changzhan.vercel.app/liff/card`、Size = Full、Scope 勾 `profile`、Add friend option = On (normal)。
+- **⚠️ shareTargetPicker 啟用（關鍵、易漏）**：不在單一 LIFF app 的 Options 頁（那裡只有 Scan QR / Module mode），而是在 **LIFF 分頁清單層級**點 `shareTargetPicker` → 同意「Agreement Regarding Use of Information」→ Enable。這是 **channel 層級**一次性同意，開一次全 channel 的 LIFF 都能用。未啟用時 `shareTargetPicker()` 會丟 `shareTargetPicker is not allowed in this LIFF app`。
+- iOS LINE 內建瀏覽器的 `liff.isApiAvailable('shareTargetPicker')` 有時誤報 false，故 `LiffCard.tsx` 以 `isInClient() || isApiAvailable()` 判斷按鈕可用，實際能否用交給 `shareTargetPicker()` 的 try/catch。
+- `mailto:` 「寫信給我」按鈕實測可用（LINE 接受）；若日後某情境被拒，改成 email 文字列即可（builder 內單點可調）。
 
 **判斷路由：** `App.tsx` 最前面的 LIFF 短路判斷**先判名片**（path `/liff/card` 或 `member`/`ids` 參數，含 `liff.state` 包裹），再判例會報到，避免參數被吃掉。
 
