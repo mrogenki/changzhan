@@ -81,6 +81,7 @@
 | `Milestones.tsx` | 大事記 |
 | `MemberList.tsx` | 會員列表 |
 | `LiffCheckin.tsx` | LINE LIFF 內嵌簽到頁 |
+| `LiffCard.tsx` | LINE LIFF 電子名片分享頁（`/liff/card?member=<id>` 或 `?ids=1,2,3`，用 `liff.shareTargetPicker` 讓使用者把會員名片直接分享給 LINE 好友/群組）|
 | `LoginPage.tsx` | 後台登入 |
 | `AdminDashboard.tsx` | 後台主頁 |
 | `admin/` | 後台子頁面（待補充細節） |
@@ -151,6 +152,7 @@
 | `line_checkin(p_activity_id, p_token, p_line_user_id)` | LINE 簽到主流程 |
 | `sync_role_to_jwt()` | 把角色同步到 JWT |
 | `check_message_recently_sent(p_line_user_id, p_message_hash, p_window_hours)` | 訊息防重複發送 |
+| `public_member_cards(p_ids bigint[])` | 電子名片：回傳指定會員的名片欄位（含 `mobile_phone`/`email`，僅 active，依傳入順序）。供 `LiffCard.tsx`（anon）取單/多位會員資料。⚠️ 對 anon 開放電話+email，屬可被逐 id 爬取的個資，若要收緊可改為需登入或加頻率限制 |
 
 ⚠️ Supabase advisor 對這些都有 `anon_security_definer_function_executable` warning，但部分函式**必須對 anon 開放**（如 LIFF 簽到流程的訪客）。動權限前要先確認流程不會壞。
 
@@ -229,6 +231,23 @@ npm run preview  # 本機預覽 build
 **Admin 介面：** `/admin/line-groups`（由 `pages/admin/LineGroupManager.tsx` 提供）— 群組清單、報名通知群組設定、群發公告（多選 + 全選 + 文字 + 圖片）、發送紀錄
 
 **報名通知流程：** `App.tsx::handleRegister` insert 完 `registrations` 後 fire-and-forget invoke `line-notify-registration`，失敗不影響使用者報名動作。
+
+### 會員電子名片（LINE Flex Message 分享）
+
+讓會員 / 夥伴在 **LINE App 內**把會員名片直接分享給好友或群組，**不經後台、不吃 OA 推播額度**（走 `liff.shareTargetPicker`，訊息由使用者本人送出）。
+
+**組成：**
+- `lib/memberCard.ts` — flex builder：`buildMemberCardMessage`（單張 bubble）、`buildMemberCarouselMessage`（多張 carousel，上限 12）。版型：大頭照 + 產業別/姓名/職稱·公司/簡介 + 底部按鈕（撥打電話 `tel:` / 看官網 `uri` / 寫信給我 `mailto:`，只顯示有資料的）。
+- `pages/LiffCard.tsx` — LIFF 頁，`liff.init` 後呼叫 `public_member_cards` RPC 取資料 → 預覽 → `shareTargetPicker`。
+- `pages/MemberList.tsx` — 每位會員一顆「分享電子名片」按鈕，deep link 到 `https://liff.line.me/<VITE_LIFF_CARD_ID>?member=<id>`（在 LINE 內開啟）。
+- `members.email` 欄位（新增）+ 後台 `MemberManager.tsx` Email 輸入欄；沒填 email 的會員，名片自動不顯示「寫信給我」。
+
+**需要的設定（只有你能做）：**
+- **新環境變數 `VITE_LIFF_CARD_ID`**（`.env.local` 與 Vercel 都要加）：一個**專用 LIFF app** 的 ID。
+- **LINE Developers Console**：為此 LIFF app 建立 → Endpoint URL 設為 `https://<你的網域>/liff/card` → **開啟 Share target picker**（`shareTargetPicker`）→ Scope 勾 `profile`。
+- `mailto:` 按鈕若日後發現 LINE 拒收，改成把 email 以文字列呈現即可（builder 內單點可調）。
+
+**判斷路由：** `App.tsx` 最前面的 LIFF 短路判斷**先判名片**（path `/liff/card` 或 `member`/`ids` 參數，含 `liff.state` 包裹），再判例會報到，避免參數被吃掉。
 
 ---
 

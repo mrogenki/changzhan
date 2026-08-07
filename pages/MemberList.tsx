@@ -1,10 +1,19 @@
 
 import React, { useState } from 'react';
-import { Globe, Building2, User, Tag } from 'lucide-react';
+import { Globe, Building2, User, Tag, Share2 } from 'lucide-react';
 import { Member } from '../types';
 
 interface MemberListProps {
   members: Member[];
+}
+
+// 名片 LIFF app id（在 LINE Console 開啟 shareTargetPicker）。
+// 產生的連結會在 LINE App 內開啟名片分享頁。
+const LIFF_CARD_ID = import.meta.env.VITE_LIFF_CARD_ID as string | undefined;
+
+function buildCardShareUrl(memberId: string | number): string | null {
+  if (!LIFF_CARD_ID) return null;
+  return `https://liff.line.me/${LIFF_CARD_ID}?member=${memberId}`;
 }
 
 const MemberList: React.FC<MemberListProps> = ({ members }) => {
@@ -156,11 +165,11 @@ const MemberList: React.FC<MemberListProps> = ({ members }) => {
                   )}
                 </div>
 
-                <div className="mt-auto pt-4 border-t border-black/5">
+                <div className="mt-auto pt-4 border-t border-black/5 space-y-2">
                   {member.website ? (
-                    <a 
-                      href={member.website} 
-                      target="_blank" 
+                    <a
+                      href={member.website}
+                      target="_blank"
                       rel="noopener noreferrer"
                       className={`flex items-center justify-center gap-2 w-full py-2.5 rounded-xl text-sm font-bold transition-all shadow-sm ${style.buttonBg}`}
                     >
@@ -172,6 +181,17 @@ const MemberList: React.FC<MemberListProps> = ({ members }) => {
                       <Globe size={16} />
                       暫無網站
                     </button>
+                  )}
+                  {buildCardShareUrl(member.id) && (
+                    <a
+                      href={buildCardShareUrl(member.id)!}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl text-sm font-bold transition-all bg-[#06C755] hover:bg-[#05b34c] text-white shadow-sm"
+                    >
+                      <Share2 size={16} />
+                      分享電子名片
+                    </a>
                   )}
                 </div>
               </div>

@@ -12,6 +12,7 @@ import RegularMeeting from './pages/RegularMeeting';
 import BusinessTraining from './pages/BusinessTraining';
 import CoffeeMeeting from './pages/CoffeeMeeting';
 import LiffCheckin from './pages/LiffCheckin';
+import LiffCard from './pages/LiffCard';
 import LineFloatingButton, { LineLogo, buildLineChatUrl } from './components/LineFloatingButton';
 import { Activity, ActivityType, Registration, AdminUser, Member, AttendanceRecord, AttendanceStatus, FinanceRecord, Milestone, ChapterDocument } from './types';
 import { INITIAL_ACTIVITIES } from './constants';
@@ -129,6 +130,17 @@ const App: React.FC = () => {
     if (typeof window !== 'undefined') {
         const path = window.location.pathname;
         const search = window.location.search;
+
+        // 電子名片 LIFF：先判斷（避免 card 參數被 checkin 的 liff.state 條件吃掉）
+        const isCardPath = path.startsWith('/liff/card');
+        const hasCardParams =
+            /[?&](member|ids)=/.test(search) ||
+            (search.includes('liff.state') && /(member|ids)(=|%3D)/.test(search));
+        if (isCardPath || hasCardParams) {
+            return <LiffCard />;
+        }
+
+        // 例會報到 LIFF
         const isLiffPath = path.startsWith('/liff/checkin');
         const hasLiffParams = search.includes('liff.state') || (search.includes('activity_id=') && search.includes('token='));
         if (isLiffPath || hasLiffParams) {

@@ -108,6 +108,7 @@ export interface Member {
     name: string;
     company: string;
     website?: string;
+    email?: string;
     intro?: string;
     status?: 'active' | 'inactive';
     join_date?: string;

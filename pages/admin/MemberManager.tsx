@@ -39,6 +39,7 @@ const MemberManager: React.FC<MemberManagerProps> = ({ members, onAddMember, onU
       name: formData.get('name') as string,
       company: formData.get('company') as string,
       website: formData.get('website') as string,
+      email: formData.get('email') as string,
       intro: formData.get('intro') as string,
       status: formData.get('status') as 'active' | 'inactive',
       join_date: formData.get('join_date') as string,
@@ -552,6 +553,12 @@ const MemberManager: React.FC<MemberManagerProps> = ({ members, onAddMember, onU
                   <label className="block text-sm font-bold text-gray-700 mb-1">室內電話 (選填)</label>
                   <input name="landline" type="tel" defaultValue={editingMember?.landline} className="w-full border rounded-lg px-3 py-3 outline-none focus:ring-2 focus:ring-red-500" placeholder="02-xxxx-xxxx" />
                 </div>
+              </div>
+
+              {/* Email（電子名片「寫信給我」按鈕用，選填；沒填則名片不顯示該按鈕） */}
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">Email (選填,電子名片用)</label>
+                <input name="email" type="email" defaultValue={editingMember?.email} className="w-full border rounded-lg px-3 py-3 outline-none focus:ring-2 focus:ring-red-500" placeholder="name@example.com" />
               </div>
 
               {/* 新增：地址 */}
