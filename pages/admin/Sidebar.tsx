@@ -1,7 +1,10 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Calendar, Users, LogOut, ClipboardList, Building2, Shield, Banknote, Award, Cake, CalendarClock, X, UserCheck, FolderOpen, MessageSquare } from 'lucide-react';
+import { LayoutDashboard, Calendar, Users, LogOut, ClipboardList, Building2, Shield, Banknote, Award, Cake, CalendarClock, X, UserCheck, FolderOpen, MessageSquare, BarChart3, ExternalLink } from 'lucide-react';
 import { AdminUser, UserRole } from '../../types';
+
+// 引薦單報告系統(bni-report)網址；未設定則不顯示入口
+const BNI_REPORT_URL = import.meta.env.VITE_BNI_REPORT_URL as string | undefined;
 
 interface SidebarProps {
   user: AdminUser;
@@ -129,6 +132,23 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout, isOpen, onClose }) =>
               <Shield size={20} />
               <span>人員權限</span>
             </Link>
+          )}
+
+          {/* 外部系統：引薦單報告(bni-report),共用同一 Supabase Auth 登入 */}
+          {BNI_REPORT_URL && (
+            <a
+              href={BNI_REPORT_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={handleNavClick}
+              className={`${linkClass(false)} justify-between`}
+            >
+              <span className="flex items-center gap-3">
+                <BarChart3 size={20} />
+                <span>引薦單報告</span>
+              </span>
+              <ExternalLink size={14} className="opacity-50" />
+            </a>
           )}
         </nav>
 

@@ -54,6 +54,10 @@
 
 ⚠️ **動 RLS 政策或 SECURITY DEFINER functions 前要先檢查 bni-report 是否依賴**，反之亦然。
 
+### 統一入口（不合併程式碼）
+
+兩系統共用同一 Supabase project 與 Supabase Auth，登入 session 相通。changzhan 後台側欄提供「**引薦單報告**」外部連結（新分頁開啟 bni-report），入口網址由環境變數 `VITE_BNI_REPORT_URL` 提供（未設定則不顯示）。**未把 bni-report 程式碼併入**——評估後確認合併不省 Supabase/Vercel 費用（已共用/非按專案計費），故只做統一入口。
+
 ### 各系統獨佔的 tables
 
 **本系統（changzhan）獨佔**：`activities`、`admins`、`registrations`、`members`、`attendance`、`finance_records`、`milestones`、`guests`、`app_settings`、`message_send_log`、`documents`、`line_groups`
