@@ -100,7 +100,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
                   onUploadImage={props.onUploadImage}
                 />
               } />
-              <Route path="/guests" element={<GuestManager currentUser={props.currentUser} />} />
+              <Route path="/guests" element={<GuestManager />} />
               <Route path="/birthdays" element={<BirthdayManager members={props.members} />} />
               <Route path="/membership-expiry" element={<MembershipExpiryManager members={props.members} />} />
               <Route path="/documents" element={

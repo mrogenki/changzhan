@@ -89,6 +89,7 @@ export interface Registration {
     check_in_status?: boolean;
     paid_amount?: number;
     guest_id?: number | null;
+    notes?: string | null;
     created_at: string;
 }
 
@@ -141,6 +142,7 @@ export interface Guest {
     phone: string;
     email?: string;
     company?: string;
+    notes?: string | null;
 }
 
 // 新增：文件管理

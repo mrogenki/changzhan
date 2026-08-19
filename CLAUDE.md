@@ -121,10 +121,10 @@
 |-------|------|
 | `activities` | 活動資料（id, title, date, time, location, picture 等） |
 | `admins` | 後台管理員（`name`/`email`/`role`；`email` 即登入帳號。`phone`、`password` 為舊欄位，已不再使用）|
-| `registrations` | 活動報名記錄 |
+| `registrations` | 活動報名記錄（含 `notes` 備註，供來賓管理裡尚未綁定 LINE 的列使用）|
 | `members` | 會員資料 |
 | `attendance` | 出席記錄（⚠️ 目前 **RLS 未啟用**，需修） |
-| `guests` | 訪客資料 |
+| `guests` | 訪客資料（含 `notes` 備註）|
 | `finance_records` | 財務記錄 |
 | `milestones` | 大事記 |
 | `app_settings` | 系統設定（key/value，例：`line_notify_registration_group_id`） |
@@ -181,7 +181,7 @@ npm run preview  # 本機預覽 build
 - 🔴 **`attendance` 表 RLS 未啟用**（advisor ERROR）— 任何人可直接修改出席記錄
 - 🟡 多張表是 `allow_all` 政策（activities、admins、documents、finance_records、members、milestones、registrations、**line_groups、app_settings(UPDATE/INSERT)**）— 需逐一 audit + 收緊。後台登入已改走 Supabase Auth（Email + 密碼），後續可依 `authenticated` 角色逐表收緊，不必再維持 `allow_all`。
 - 🟡 `guest_attendance_summary` view 是 SECURITY DEFINER（advisor ERROR）— 應改為 SECURITY INVOKER 或 revoke
-- 🟡 `guests` 與 `message_send_log` 允許 anon insert/update — 需評估是否真的需要
+- 🟡 `message_send_log` 允許 anon insert/update — 需評估是否真的需要（`guests`、`registrations` 已改為 `is_changzhan_admin()`，`registrations` 僅保留 anon insert 給公開報名）
 - 🟡 Storage buckets `activity-images`、`chapter-documents` 允許公開列檔 — 改為僅按 URL 存取
 - 🟡 Supabase Auth 「Leaked Password Protection」未啟用（5 秒 toggle）
 
@@ -256,6 +256,14 @@ npm run preview  # 本機預覽 build
 - `mailto:` 「寫信給我」按鈕實測可用（LINE 接受）；若日後某情境被拒，改成 email 文字列即可（builder 內單點可調）。
 
 **判斷路由：** `App.tsx` 最前面的 LIFF 短路判斷**先判名片**（path `/liff/card` 或 `member`/`ids` 參數，含 `liff.state` 包裹），再判例會報到，避免參數被吃掉。
+
+### 來賓管理（`/admin/guests`）
+
+`pages/admin/GuestManager.tsx`。清單是**兩種來源的聯合**：`guest_attendance_summary`（已綁 LINE 的 `guests`）＋ `registrations` 中 `guest_id is null` 的報名（未綁 LINE，實務上佔多數）。列的識別是 `(kind, id)`。
+
+- **不做 LINE 訊息發送**：單發 / 群發 / 勾選收件人 / 訊息發送紀錄都已移除。要推播請用「LINE 長展小幫手」(`/admin/line-groups`)。
+- **備註欄**：`guests.notes` 與 `registrations.notes` 兩張表都有此欄，前端依列的 `kind` 寫回對應表（因此同一人若有多筆未綁報名，備註是各自獨立的）。`guest_attendance_summary` view 已加上 `g.notes`。備註也納入搜尋範圍。
+- 兩張表的 RLS 皆為 `is_changzhan_admin()`（比對 JWT email 與 `admins.email`），所以備註只有後台登入者能改。
 
 ### 後台人員權限管理（Email + 密碼）
 
