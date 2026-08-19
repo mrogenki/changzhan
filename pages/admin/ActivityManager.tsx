@@ -48,11 +48,11 @@ const ActivityManager: React.FC<ActivityManagerProps> = ({ activities, onAddActi
 
   const defaultFormState = {
     title: '',
-    type: ActivityType.REGULAR,
+    type: ActivityType.REGULAR_MEETING,
     date: '',
     time: '06:30',
-    location: '88樂章（台北市內湖區民善街 88 號 5 樓）',
-    price: 500,
+    location: '88號樂章（臺北市內湖區民善街88號5樓）',
+    price: 800,
     picture: 'https://images.unsplash.com/photo-1517457373958-b7bdd4587205?q=80&w=2069&auto=format&fit=crop',
     description: '',
     guest_welcome_message: '',

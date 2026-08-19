@@ -8,7 +8,7 @@ export const INITIAL_ACTIVITIES: Activity[] = [
     title: '長展分會週二早晨會員專屬活動',
     date: '2026-06-16',
     time: '06:30',
-    location: '88樂章（台北市內湖區民善街 88 號 5 樓）',
+    location: '88號樂章（臺北市內湖區民善街88號5樓）',
     price: 500,
     picture: 'https://images.unsplash.com/photo-1517457373958-b7bdd4587205?q=80&w=2069&auto=format&fit=crop',
     description: '每週一次的能量交流，精準商務對接。歡迎各界菁英蒞臨指導。',
