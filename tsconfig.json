@@ -28,6 +28,5 @@
     "noEmit": true
   },
   "include": ["**/*.ts", "**/*.tsx"],
-  // server.ts 目前沒被任何 script 或 vercel.json 接上，express 也未安裝，先排除在型別檢查外
-  "exclude": ["node_modules", "dist", "server.ts"]
+  "exclude": ["node_modules", "dist"]
 }

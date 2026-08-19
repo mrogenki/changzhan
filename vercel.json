@@ -1,5 +1,11 @@
 {
+  "functions": {
+    "api/activity-og.ts": {
+      "includeFiles": "dist/index.html"
+    }
+  },
   "rewrites": [
+    { "source": "/activity/:id", "destination": "/api/activity-og?id=:id" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }

@@ -9,7 +9,7 @@ BNI 長展分會的對外活動報名 + LINE 簽到 + 後台管理系統。
 - **Frontend**: Vite + React + TailwindCSS 4
 - **Backend**: Supabase（與 `bni-report` 共用同一個 Supabase project）
 - **整合**: LINE LIFF（活動簽到）、EmailJS（通知）
-- **SSR**: Express server（`server.ts`，主要為 OG tags 動態渲染）
+- **動態 OG tags**: Vercel Serverless Function（`api/activity-og.ts`，讓活動連結在 LINE / FB 有正確預覽）
 - **部署**: Vercel
 
 ## 本機開發

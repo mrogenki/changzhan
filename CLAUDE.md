@@ -37,7 +37,7 @@
 | 後端 | Supabase（PostgreSQL + Auth + Storage） | ap-northeast-1（東京）|
 | LINE 整合 | @line/liff（LIFF SDK） | LINE Platform |
 | Email | @emailjs/browser | EmailJS |
-| SSR | ⚠️ `server.ts` **目前沒有被接上**（見第四節） | — |
+| 動態 OG tags | Vercel Serverless Function（`api/activity-og.ts`）| Vercel |
 | 動畫 / UI | framer-motion + motion + lucide-react + qrcode.react | — |
 | Excel | xlsx package（client-side parsing） | 瀏覽器 |
 | 原始碼 | GitHub | `github.com/mrogenki/changzhan`（public） |
@@ -99,22 +99,25 @@
 
 ---
 
-## 四、`server.ts` — 為什麼有 Express？（⚠️ 目前未啟用）
+## 四、動態 OG tags（`api/activity-og.ts`）
 
-> **現況**：`package.json` 的 `dev` 是純 `vite`、`build` 是 `vite build`，`vercel.json` 只有 SPA rewrite 到 `index.html`，`express` 也不在 dependencies 裡。也就是說**下面描述的 SSR 流程實際上沒有在跑**，貼到 LINE / Facebook 的活動連結拿到的是 `index.html` 的靜態 OG tags。要恢復需重新接上 script 與 Vercel 設定並安裝 express。以下保留原始設計說明。
+把 `/activity/:id` 貼到 LINE / Facebook 時，預覽要顯示**該場活動**的標題、時間地點與封面。本站是 SPA，爬蟲不執行 JS，所以必須在伺服器端把 meta 塞進 HTML。
 
+**怎麼運作：**
 
-主要原因：**動態 OG tags**。
+1. `vercel.json` 把 `/activity/:id` rewrite 到 `/api/activity-og?id=:id`（**這條要排在 SPA 的 catch-all rewrite 前面**，Vercel 是第一條命中優先）
+2. 函式讀 build 好的 `dist/index.html`（靠 `vercel.json` 的 `includeFiles` 帶進函式；讀不到時退而跟自己網域抓 `/index.html`）
+3. 用 Supabase REST 撈該活動（2.5 秒逾時），替換掉 head 裡的 `<title>` / `description` / `og:*` / `twitter:*`，並補上 `og:url`
+4. 原樣吐回同一份 index.html，所以**一般使用者拿到的仍是完整 SPA**，只有 meta 不同
 
-當有人把 `/activity/:id` 的連結貼到 LINE / Facebook，社群預覽（OG tag）需要顯示該活動的標題、描述、圖片。React SPA 預設只能用 static tags，所以這支 server.ts 在 SSR 階段：
+**注意事項：**
 
-1. 從 Supabase 抓 activity 資料
-2. 替換 `index.html` 內的 `__OG_TITLE__`、`__OG_DESCRIPTION__`、`__OG_IMAGE__`、`__OG_URL__` placeholder
-3. 再吐 HTML
+- **失敗一律 fallback 成原本的 index.html**：預覽圖不對只是不好看，活動頁打不開才是真的壞掉。
+- **`picture` 只認 `http(s)` 開頭**：早期 5 筆活動的 `picture` 存的是 base64 data URI（最大 200KB），爬蟲不吃 `data:` 當 og:image，塞進去只會讓 HTML 從 2.4KB 暴增到 400KB。非網址一律換成分會 logo。
+- **本機 `npm run dev` 不會跑這支函式**（純 vite dev server），本機看活動頁只會拿到 index.html 的預設 OG tags。要驗證請部署後用 `curl -s https://changzhan.vercel.app/activity/<id> | head -40` 看 meta。
+- 改完 OG 之後，LINE / Facebook 有快取，要用各自的 debugger 重新抓取才看得到新預覽。
 
-其餘流量則由 Vite middleware 處理（dev mode）或 static `dist/` 處理（production）。
-
----
+> 歷史：原本有一支 `server.ts`（Express + Vite middleware）想做這件事，但從來沒被接上——`dev`/`build` 都是純 vite、`vercel.json` 只有 SPA rewrite、`express` 連裝都沒裝，而且 `index.html` 早就沒有它要替換的 `__OG_TITLE__` placeholder 了。已刪除，改由本節的函式取代。
 
 ## 五、Supabase 資料表
 
