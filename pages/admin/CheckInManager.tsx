@@ -205,6 +205,7 @@ const CheckInManager: React.FC<CheckInManagerProps> = ({ activities, registratio
               <tr className="text-xs font-bold text-gray-400 uppercase tracking-widest">
                 <th className="px-6 py-4">姓名 / 公司</th>
                 <th className="px-6 py-4">聯絡資訊</th>
+                <th className="px-6 py-4">引薦人</th>
                 <th className="px-6 py-4">報到狀態</th>
                 <th className="px-6 py-4">繳費金額</th>
                 <th className="px-6 py-4 text-right">操作</th>
@@ -216,11 +217,15 @@ const CheckInManager: React.FC<CheckInManagerProps> = ({ activities, registratio
                   <td className="px-6 py-4">
                     <div className="font-bold text-gray-900">{reg.name}</div>
                     <div className="text-xs text-gray-500 mt-0.5">{reg.company} {reg.title && ` - ${reg.title}`}</div>
-                    {reg.referrer && <div className="text-xs text-red-400 mt-1">引薦人: {reg.referrer}</div>}
                   </td>
                   <td className="px-6 py-4">
                     <div className="text-sm font-mono text-gray-600">{reg.phone}</div>
                     <div className="text-xs text-gray-400">{reg.email}</div>
+                  </td>
+                  <td className="px-6 py-4">
+                    {reg.referrer
+                      ? <span className="text-sm text-gray-700">{reg.referrer}</span>
+                      : <span className="text-sm text-gray-300">—</span>}
                   </td>
                   <td className="px-6 py-4">
                     <button
