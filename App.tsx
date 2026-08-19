@@ -158,6 +158,7 @@ const App: React.FC = () => {
     const [documents, setDocuments] = useState<ChapterDocument[]>([]);
     const [loading, setLoading] = useState(true);
     const [currentUser, setCurrentUser] = useState<AdminUser | null>(null);
+    const [profileResolved, setProfileResolved] = useState(false);
     const [session, setSession] = useState<any>(null);
     const [authReady, setAuthReady] = useState(false);
 
@@ -276,10 +277,14 @@ const App: React.FC = () => {
     // 由 session email 對應到 admins 取得姓名/角色/權限
     useEffect(() => {
         const email = session?.user?.email?.toLowerCase();
-        if (email && users.length > 0) {
-            const me = users.find(u => ((u as any).email || '').toLowerCase() === email);
-            setCurrentUser(me ?? null);
+        if (!email) {
+            setProfileResolved(false);
+            return;
         }
+        if (users.length === 0) return; // admins 尚未載入
+        const me = users.find(u => ((u as any).email || '').toLowerCase() === email);
+        setCurrentUser(me ?? null);
+        setProfileResolved(true); // 對不到就是這個 Auth 帳號沒有後台權限（共用 Auth，可能只是 bni-report 使用者）
     }, [session?.user?.email, users]);
 
     const handleLogout = async () => {
@@ -368,24 +373,50 @@ const App: React.FC = () => {
         else fetchData();
     };
 
+    // functions.invoke 遇到 non-2xx 只回 FunctionsHttpError，訊息藏在 error.context（Response）裡，
+    // 這裡把 body 撈出來，才不會全部變成「Edge Function returned a non-2xx status code」。
+    const invokeManageAdmin = async (body: Record<string, any>): Promise<{ ok: boolean; code?: string; message?: string }> => {
+        const { data, error } = await supabase.functions.invoke('manage-admin', { body });
+        if (!error) {
+            if (data?.error) return { ok: false, code: data.error, message: data.message };
+            return { ok: true };
+        }
+        const res = (error as any)?.context;
+        if (res && typeof res.json === 'function') {
+            const payload = await res.json().catch(() => null);
+            if (payload) return { ok: false, code: payload.error, message: payload.message };
+        }
+        return { ok: false, message: error.message };
+    };
+
     const handleAddUser = async (newUser: AdminUser) => {
         const { name, email, password, role } = newUser as any;
         // 經 edge function 同時建立 Supabase Auth 帳號 + admins 資料（需總管理員身分）
-        const { data, error } = await supabase.functions.invoke('manage-admin', {
-            body: { action: 'create', name, email, password, role },
-        });
-        if (error || data?.error) alert('新增管理員失敗：' + (data?.message || error?.message || ''));
-        else fetchData();
+        const payload = { action: 'create', name, email, password, role };
+        let result = await invokeManageAdmin(payload);
+        // 共用 Auth：此信箱可能已有帳號（例：引薦單報告的使用者），確認後改為沿用
+        if (!result.ok && result.code === 'email_has_account') {
+            if (!window.confirm(`${result.message}\n\n要沿用既有帳號嗎？（密碼會一併更新為你剛才輸入的密碼）`)) return;
+            result = await invokeManageAdmin({ ...payload, adopt: true });
+        }
+        if (!result.ok) {
+            alert('新增管理員失敗：' + (result.message || ''));
+            return;
+        }
+        fetchData();
     };
 
     const handleUpdateUser = async (updated: AdminUser & { password?: string }) => {
         const { id, name, email, role, password } = updated as any;
         // 經 edge function 同步更新 Auth 帳號（信箱／密碼）+ admins 資料；password 未帶則不動
-        const { data, error } = await supabase.functions.invoke('manage-admin', {
-            body: { action: 'update', id, name, email, role, ...(password ? { password } : {}) },
-        });
-        if (error || data?.error) {
-            alert('更新人員失敗：' + (data?.message || error?.message || ''));
+        const payload = { action: 'update', id, name, email, role, ...(password ? { password } : {}) };
+        let result = await invokeManageAdmin(payload);
+        if (!result.ok && result.code === 'email_has_account') {
+            if (!window.confirm(`${result.message}\n\n要改為沿用既有帳號嗎？`)) return;
+            result = await invokeManageAdmin({ ...payload, adopt: true });
+        }
+        if (!result.ok) {
+            alert('更新人員失敗：' + (result.message || ''));
             return;
         }
         // 改到自己的 Email 時，手上的 session 仍帶舊 email，會對不到 admins 而卡在載入中；
@@ -407,14 +438,9 @@ const App: React.FC = () => {
 
     const handleDeleteUser = async (id: string | number) => {
         // 經 edge function 同時移除 Auth 帳號 + admins 資料
-        const { data, error } = await supabase.functions.invoke('manage-admin', {
-            body: { action: 'delete', id },
-        });
-        if (error || data?.error) {
-            alert('刪除人員失敗：' + (data?.message || error?.message || ''));
-        } else {
-            fetchData();
-        }
+        const result = await invokeManageAdmin({ action: 'delete', id });
+        if (!result.ok) alert('刪除人員失敗：' + (result.message || ''));
+        else fetchData();
     };
 
     const handleAddMember = async (newMember: Member) => {
@@ -630,9 +656,17 @@ const App: React.FC = () => {
                             !session ? (
                                 <Navigate to="/admin/login" />
                             ) : !currentUser ? (
-                                <div className="min-h-[60vh] flex items-center justify-center">
-                                    <Loader2 className="animate-spin text-red-600" size={40} />
-                                </div>
+                                profileResolved ? (
+                                    <div className="min-h-[60vh] flex flex-col items-center justify-center gap-4 text-center px-6">
+                                        <p className="text-lg font-bold text-gray-900">此帳號沒有後台權限</p>
+                                        <p className="text-sm text-gray-500">{session?.user?.email} 不在人員名單中，請聯絡總管理員開通。</p>
+                                        <button onClick={handleLogout} className="bg-red-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-red-700 transition-colors">登出</button>
+                                    </div>
+                                ) : (
+                                    <div className="min-h-[60vh] flex items-center justify-center">
+                                        <Loader2 className="animate-spin text-red-600" size={40} />
+                                    </div>
+                                )
                             ) : (
                                 <AdminDashboard
                                     currentUser={currentUser}

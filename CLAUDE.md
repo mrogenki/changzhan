@@ -264,7 +264,10 @@ npm run preview  # 本機預覽 build
 - **帳號 = Email**，新增時同步在 Supabase Auth 建帳號（`email_confirm: true`，不寄驗證信）。
 - **編輯**可改姓名 / Email / 權限角色，密碼欄留白＝不變更、填了就是重設密碼（至少 6 碼）。改 Email 會同步改 Auth 帳號的 email。
 - 既有人員的 email 是舊制手機衍生的 `<手機>@changzhan.local`，列表會標「舊帳號 · 建議改真實信箱」；用編輯功能換成真信箱即可，換完舊手機登入方式對該人員失效。
-- 全部經 Edge Function **`manage-admin`**（`verify_jwt: true`，service role），action：`create` / `update` / `delete`。呼叫者必須是 `admins` 表中 `role = '總管理員'`，與 UI 的 `canAccessUsers` 一致。repo 內無此 function 原始碼（部署於 Supabase）。
+- **⚠️ 共用 Auth 的陷阱**：changzhan 與 bni-report 共用同一組 Supabase Auth，`auth.users` 裡本來就有 bni-report 的真實信箱帳號（`mr.ogenki@gmail.com`、`yvonne10805@gmail.com`）。把人員信箱改成這種既存帳號時，GoTrue 會拒絕重複註冊。函式因此回 409 `email_has_account`，前端跳確認後帶 `adopt: true` 重送：**沿用既有 Auth 帳號**當登入帳號（同步 name/role 到 user_metadata、有填才改密碼），`admins.email` 指過去，再刪掉舊的手機衍生帳號。等於此人在兩系統共用同一組帳密。
+- 全部經 Edge Function **`manage-admin`**（`verify_jwt: true`，service role），action：`create` / `update` / `delete`，可帶 `adopt: true`。呼叫者必須是 `admins` 表中 `role = '總管理員'`，與 UI 的 `canAccessUsers` 一致。repo 內無此 function 原始碼（部署於 Supabase）。
+- 前端一律走 `App.tsx::invokeManageAdmin`：`functions.invoke` 在 non-2xx 時只給 `FunctionsHttpError`，真正訊息在 `error.context`（Response）裡，要自己 `.json()` 撈出來，否則畫面只會顯示「Edge Function returned a non-2xx status code」。
+- 登入的 Auth 帳號若不在 `admins` 表（例：只有 bni-report 權限的人），`/admin` 會顯示「此帳號沒有後台權限」+ 登出按鈕（由 `profileResolved` 區分「還在載入」與「查無此人」）。
 
 ---
 
