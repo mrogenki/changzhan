@@ -16,6 +16,7 @@ const SUPABASE_ANON_KEY =
 // 全站共用單一 client，登入 session 透過 localStorage 由各處共享
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// 管理員以「手機＋密碼」登入；帳號在 Supabase Auth 以電話衍生的 email 建立
+// 管理員現以「Email＋密碼」登入。
+// 舊帳號當初是用手機衍生的假信箱建立，登入頁在輸入未含 @ 時仍以此換算，作為向下相容。
 export const phoneToEmail = (phone: string): string =>
   `${(phone || '').replace(/\D/g, '')}@changzhan.local`;

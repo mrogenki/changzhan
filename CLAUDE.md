@@ -86,7 +86,7 @@
 | `MemberList.tsx` | 會員列表 |
 | `LiffCheckin.tsx` | LINE LIFF 內嵌簽到頁 |
 | `LiffCard.tsx` | LINE LIFF 電子名片分享頁（`/liff/card?member=<id>` 或 `?ids=1,2,3`，用 `liff.shareTargetPicker` 讓使用者把會員名片直接分享給 LINE 好友/群組）|
-| `LoginPage.tsx` | 後台登入 |
+| `LoginPage.tsx` | 後台登入（Supabase Auth，**Email + 密碼**；輸入未含 `@` 時會用手機衍生舊信箱 `<數字>@changzhan.local` 當向下相容）|
 | `AdminDashboard.tsx` | 後台主頁 |
 | `admin/` | 後台子頁面（待補充細節） |
 
@@ -120,7 +120,7 @@
 | Table | 說明 |
 |-------|------|
 | `activities` | 活動資料（id, title, date, time, location, picture 等） |
-| `admins` | 後台管理員 |
+| `admins` | 後台管理員（`name`/`email`/`role`；`email` 即登入帳號。`phone`、`password` 為舊欄位，已不再使用）|
 | `registrations` | 活動報名記錄 |
 | `members` | 會員資料 |
 | `attendance` | 出席記錄（⚠️ 目前 **RLS 未啟用**，需修） |
@@ -179,7 +179,7 @@ npm run preview  # 本機預覽 build
 
 ### 安全
 - 🔴 **`attendance` 表 RLS 未啟用**（advisor ERROR）— 任何人可直接修改出席記錄
-- 🟡 多張表是 `allow_all` 政策（activities、admins、documents、finance_records、members、milestones、registrations、**line_groups、app_settings(UPDATE/INSERT)**）— 需逐一 audit + 收緊。根因是後台登入是純前端 state（比對 `admins` 表密碼後 setState），沒走 Supabase Auth；所有 admin 寫操作都是 anon。等系統遷到 Supabase Auth 後可一次收緊所有 admin 表 RLS。
+- 🟡 多張表是 `allow_all` 政策（activities、admins、documents、finance_records、members、milestones、registrations、**line_groups、app_settings(UPDATE/INSERT)**）— 需逐一 audit + 收緊。後台登入已改走 Supabase Auth（Email + 密碼），後續可依 `authenticated` 角色逐表收緊，不必再維持 `allow_all`。
 - 🟡 `guest_attendance_summary` view 是 SECURITY DEFINER（advisor ERROR）— 應改為 SECURITY INVOKER 或 revoke
 - 🟡 `guests` 與 `message_send_log` 允許 anon insert/update — 需評估是否真的需要
 - 🟡 Storage buckets `activity-images`、`chapter-documents` 允許公開列檔 — 改為僅按 URL 存取
@@ -256,6 +256,15 @@ npm run preview  # 本機預覽 build
 - `mailto:` 「寫信給我」按鈕實測可用（LINE 接受）；若日後某情境被拒，改成 email 文字列即可（builder 內單點可調）。
 
 **判斷路由：** `App.tsx` 最前面的 LIFF 短路判斷**先判名片**（path `/liff/card` 或 `member`/`ids` 參數，含 `liff.state` 包裹），再判例會報到，避免參數被吃掉。
+
+### 後台人員權限管理（Email + 密碼）
+
+`/admin/users`（`pages/admin/UserManager.tsx`）。列表欄位：姓名 / 登入信箱 / 權限角色 / 操作（編輯・刪除）。
+
+- **帳號 = Email**，新增時同步在 Supabase Auth 建帳號（`email_confirm: true`，不寄驗證信）。
+- **編輯**可改姓名 / Email / 權限角色，密碼欄留白＝不變更、填了就是重設密碼（至少 6 碼）。改 Email 會同步改 Auth 帳號的 email。
+- 既有人員的 email 是舊制手機衍生的 `<手機>@changzhan.local`，列表會標「舊帳號 · 建議改真實信箱」；用編輯功能換成真信箱即可，換完舊手機登入方式對該人員失效。
+- 全部經 Edge Function **`manage-admin`**（`verify_jwt: true`，service role），action：`create` / `update` / `delete`。呼叫者必須是 `admins` 表中 `role = '總管理員'`，與 UI 的 `canAccessUsers` 一致。repo 內無此 function 原始碼（部署於 Supabase）。
 
 ---
 

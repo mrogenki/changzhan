@@ -369,13 +369,40 @@ const App: React.FC = () => {
     };
 
     const handleAddUser = async (newUser: AdminUser) => {
-        const { name, phone, password, role } = newUser as any;
-        // 經 edge function 同時建立 Supabase Auth 帳號 + admins 資料（需管理員身分）
+        const { name, email, password, role } = newUser as any;
+        // 經 edge function 同時建立 Supabase Auth 帳號 + admins 資料（需總管理員身分）
         const { data, error } = await supabase.functions.invoke('manage-admin', {
-            body: { action: 'create', name, phone, password, role },
+            body: { action: 'create', name, email, password, role },
         });
         if (error || data?.error) alert('新增管理員失敗：' + (data?.message || error?.message || ''));
         else fetchData();
+    };
+
+    const handleUpdateUser = async (updated: AdminUser & { password?: string }) => {
+        const { id, name, email, role, password } = updated as any;
+        // 經 edge function 同步更新 Auth 帳號（信箱／密碼）+ admins 資料；password 未帶則不動
+        const { data, error } = await supabase.functions.invoke('manage-admin', {
+            body: { action: 'update', id, name, email, role, ...(password ? { password } : {}) },
+        });
+        if (error || data?.error) {
+            alert('更新人員失敗：' + (data?.message || error?.message || ''));
+            return;
+        }
+        // 改到自己的 Email 時，手上的 session 仍帶舊 email，會對不到 admins 而卡在載入中；
+        // 先換發 token，換不到就登出請本人用新信箱重新登入。
+        const selfEmailChanged =
+            String(id) === String(currentUser?.id) &&
+            (email || '').toLowerCase() !== (session?.user?.email || '').toLowerCase();
+        if (selfEmailChanged) {
+            const { data: refreshed } = await supabase.auth.refreshSession();
+            if ((refreshed?.session?.user?.email || '').toLowerCase() !== (email || '').toLowerCase()) {
+                alert('登入信箱已更新，請以新信箱重新登入');
+                await handleLogout();
+                return;
+            }
+            setSession(refreshed.session);
+        }
+        fetchData();
     };
 
     const handleDeleteUser = async (id: string | number) => {
@@ -621,6 +648,7 @@ const App: React.FC = () => {
                                     onUpdateRegistration={handleUpdateRegistration}
                                     onDeleteRegistration={handleDeleteRegistration}
                                     onAddUser={handleAddUser}
+                                    onUpdateUser={handleUpdateUser}
                                     onDeleteUser={handleDeleteUser}
                                     onAddMember={handleAddMember}
                                     onUpdateMember={handleUpdateMember}

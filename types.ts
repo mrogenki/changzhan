@@ -95,8 +95,9 @@ export interface Registration {
 export interface AdminUser {
     id: string;
     name: string;
-    phone: string;
+    email: string;
     role: UserRole;
+    phone?: string;
     password?: string;
 }
 

@@ -30,6 +30,7 @@ interface AdminDashboardProps {
   onUpdateRegistration: (reg: Registration) => void;
   onDeleteRegistration: (id: string | number) => void;
   onAddUser: (user: AdminUser) => void;
+  onUpdateUser: (user: AdminUser & { password?: string }) => void;
   onDeleteUser: (id: string) => void;
   onAddMember: (member: Member) => void;
   onUpdateMember: (member: Member) => void;
@@ -123,7 +124,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
           )}
 
           {canAccessUsers && (
-            <Route path="/users" element={<UserManager users={props.users} onAddUser={props.onAddUser} onDeleteUser={props.onDeleteUser} currentUser={props.currentUser} />} />
+            <Route path="/users" element={<UserManager users={props.users} onAddUser={props.onAddUser} onUpdateUser={props.onUpdateUser} onDeleteUser={props.onDeleteUser} currentUser={props.currentUser} />} />
           )}
 
           <Route path="*" element={<Navigate to="/admin" replace />} />

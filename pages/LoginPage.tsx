@@ -1,11 +1,11 @@
 
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ShieldCheck, Lock, Smartphone } from 'lucide-react';
+import { ShieldCheck, Lock, Mail } from 'lucide-react';
 import { supabase, phoneToEmail } from '../supabaseClient';
 
 const LoginPage: React.FC = () => {
-  const [phone, setPhone] = useState('');
+  const [account, setAccount] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -14,14 +14,17 @@ const LoginPage: React.FC = () => {
     e.preventDefault();
     setError('');
     setLoading(true);
-    // 以「手機衍生 email + 密碼」向 Supabase Auth 登入；成功後由 App 的 onAuthStateChange 導向後台
+    // 以「Email + 密碼」向 Supabase Auth 登入；成功後由 App 的 onAuthStateChange 導向後台
+    // 舊帳號沿用手機衍生的 email，故輸入未含 @ 時仍自動換算，避免尚未改成信箱的人員被鎖在外面
+    const input = account.trim();
+    const email = input.includes('@') ? input.toLowerCase() : phoneToEmail(input);
     const { error: signInError } = await supabase.auth.signInWithPassword({
-      email: phoneToEmail(phone),
+      email,
       password,
     });
     setLoading(false);
     if (signInError) {
-      setError('帳號或密碼錯誤，請重新輸入');
+      setError('Email 或密碼錯誤，請重新輸入');
       setTimeout(() => setError(''), 3000);
     }
   };
@@ -40,16 +43,17 @@ const LoginPage: React.FC = () => {
         <div className="bg-white p-10 rounded-[40px] shadow-2xl shadow-gray-200/50 border border-gray-100 animate-in fade-in zoom-in duration-500">
           <form onSubmit={handleLoginSubmit} className="space-y-6">
             <div>
-              <label className="block text-sm font-bold text-gray-700 mb-2 px-1 uppercase tracking-widest text-[10px]">手機號碼</label>
+              <label className="block text-sm font-bold text-gray-700 mb-2 px-1 uppercase tracking-widest text-[10px]">電子信箱</label>
               <div className="relative">
-                <Smartphone className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
+                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
                 <input 
                   required
-                  type="tel" 
-                  value={phone}
-                  onChange={e => setPhone(e.target.value)}
+                  type="text" 
+                  autoComplete="username"
+                  value={account}
+                  onChange={e => setAccount(e.target.value)}
                   className="w-full pl-12 pr-4 py-4 rounded-2xl border border-gray-100 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all outline-none text-gray-700 font-medium"
-                  placeholder="09xx-xxx-xxx"
+                  placeholder="you@example.com"
                 />
               </div>
             </div>
@@ -61,6 +65,7 @@ const LoginPage: React.FC = () => {
                 <input 
                   required
                   type="password" 
+                  autoComplete="current-password"
                   value={password}
                   onChange={e => setPassword(e.target.value)}
                   className="w-full pl-12 pr-4 py-4 rounded-2xl border border-gray-100 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all outline-none text-gray-700 font-medium"
