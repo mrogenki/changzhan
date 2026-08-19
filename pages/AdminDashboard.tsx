@@ -29,6 +29,7 @@ interface AdminDashboardProps {
   onDeleteActivity: (id: string | number) => void;
   onUpdateRegistration: (reg: Registration) => void;
   onDeleteRegistration: (id: string | number) => void;
+  onAddRegistration: (reg: Partial<Registration>, notify: boolean) => Promise<boolean>;
   onAddUser: (user: AdminUser) => void;
   onUpdateUser: (user: AdminUser & { password?: string }) => void;
   onDeleteUser: (id: string) => void;
@@ -83,7 +84,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
 
         <Routes>
           <Route path="/" element={<DashboardHome activities={props.activities} registrations={props.registrations} />} />
-          <Route path="/check-in" element={<CheckInManager activities={props.activities} registrations={props.registrations} onUpdateRegistration={props.onUpdateRegistration} onDeleteRegistration={props.onDeleteRegistration} onRefreshRegistrations={props.onRefreshRegistrations} />} />
+          <Route path="/check-in" element={<CheckInManager activities={props.activities} registrations={props.registrations} onUpdateRegistration={props.onUpdateRegistration} onDeleteRegistration={props.onDeleteRegistration} onAddRegistration={props.onAddRegistration} onRefreshRegistrations={props.onRefreshRegistrations} />} />
           <Route path="/attendance" element={<AttendanceManager activities={props.activities} members={props.members} attendance={props.attendance} onUpdateAttendance={props.onUpdateAttendance} onDeleteAttendance={props.onDeleteAttendance} onRefreshAttendance={props.onRefreshAttendance} />} />
           <Route path="/finance" element={<FinanceManager activities={props.activities} financeRecords={props.financeRecords} onAddFinanceRecord={props.onAddFinanceRecord} onUpdateFinanceRecord={props.onUpdateFinanceRecord} onDeleteFinanceRecord={props.onDeleteFinanceRecord} />} />
           <Route path="/milestones" element={<MilestoneManager milestones={props.milestones} onAddMilestone={props.onAddMilestone} onUpdateMilestone={props.onUpdateMilestone} onDeleteMilestone={props.onDeleteMilestone} onUploadImage={props.onUploadImage} />} />

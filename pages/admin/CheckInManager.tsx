@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, FileDown, CheckCircle, XCircle, Trash2, RefreshCw } from 'lucide-react';
+import { Search, FileDown, CheckCircle, XCircle, Trash2, RefreshCw, UserPlus } from 'lucide-react';
 import { Activity, Registration } from '../../types';
 import PaidAmountInput from './PaidAmountInput';
 
@@ -8,13 +8,18 @@ interface CheckInManagerProps {
   registrations: Registration[];
   onUpdateRegistration: (reg: Registration) => void;
   onDeleteRegistration: (id: string | number) => void;
+  onAddRegistration: (reg: Partial<Registration>, notify: boolean) => Promise<boolean>;
   onRefreshRegistrations: () => Promise<void>;
 }
 
-const CheckInManager: React.FC<CheckInManagerProps> = ({ activities, registrations, onUpdateRegistration, onDeleteRegistration, onRefreshRegistrations }) => {
+const CheckInManager: React.FC<CheckInManagerProps> = ({ activities, registrations, onUpdateRegistration, onDeleteRegistration, onAddRegistration, onRefreshRegistrations }) => {
   const [selectedActivityId, setSelectedActivityId] = useState<string>(activities.length > 0 ? String(activities[0].id) : '');
   const [searchTerm, setSearchTerm] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+
+  // 代為報名（給不方便自行線上報名的來賓）
+  const [addOpen, setAddOpen] = useState(false);
+  const [adding, setAdding] = useState(false);
 
   useEffect(() => {
     if (!selectedActivityId && activities.length > 0) {
@@ -37,6 +42,39 @@ const CheckInManager: React.FC<CheckInManagerProps> = ({ activities, registratio
     } finally {
       setRefreshing(false);
     }
+  };
+
+  const handleAddSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const form = new FormData(e.currentTarget);
+    const activityId = String(form.get('activityId') || '');
+    if (!activityId) {
+      alert('請選擇活動');
+      return;
+    }
+    const name = String(form.get('name') || '').trim();
+    const phone = String(form.get('phone') || '').trim();
+    const dup = registrations.find(r => String(r.activityId) === activityId && r.phone === phone);
+    if (dup && !window.confirm(`此活動已有相同電話的報名紀錄（${dup.name}），仍要新增嗎？`)) return;
+
+    setAdding(true);
+    const ok = await onAddRegistration(
+      {
+        activityId,
+        name,
+        phone,
+        email: String(form.get('email') || '').trim(),
+        company: String(form.get('company') || '').trim(),
+        title: String(form.get('title') || '').trim(),
+        referrer: String(form.get('referrer') || '').trim(),
+        paid_amount: Number(form.get('paid_amount') || 0),
+        check_in_status: form.get('check_in_status') === 'on',
+        notes: String(form.get('notes') || '').trim(),
+      } as Partial<Registration>,
+      form.get('notify') === 'on'
+    );
+    setAdding(false);
+    if (ok) setAddOpen(false);
   };
 
   const handleExport = () => {
@@ -116,6 +154,13 @@ const CheckInManager: React.FC<CheckInManagerProps> = ({ activities, registratio
           >
             <RefreshCw size={18} className={refreshing ? 'animate-spin' : ''}/>
             {refreshing ? '更新中...' : '重整報到'}
+          </button>
+          <button
+            onClick={() => setAddOpen(true)}
+            className="flex items-center gap-2 bg-red-600 text-white px-4 py-3 rounded-xl hover:bg-red-700 transition-all shadow-sm active:scale-95 whitespace-nowrap"
+            title="幫不方便線上報名的來賓建立報名資料"
+          >
+            <UserPlus size={18}/> 代為報名
           </button>
           <button
             onClick={handleExport}
@@ -216,6 +261,82 @@ const CheckInManager: React.FC<CheckInManagerProps> = ({ activities, registratio
           )}
         </div>
       </div>
+
+      {/* 代為報名 Modal */}
+      {addOpen && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white w-full max-w-lg rounded-2xl p-6 my-8">
+            <h2 className="text-xl font-bold mb-1">代為報名</h2>
+            <p className="text-xs text-gray-500 mb-5">幫不方便線上報名的來賓建立報名資料，效果與來賓自行報名相同。</p>
+            <form onSubmit={handleAddSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">活動 *</label>
+                <select
+                  name="activityId"
+                  required
+                  defaultValue={selectedActivityId !== 'all' ? selectedActivityId : ''}
+                  className="w-full border rounded-lg px-3 py-3 bg-white outline-none focus:ring-2 focus:ring-red-500"
+                >
+                  <option value="">請選擇活動</option>
+                  {activities.map(a => (
+                    <option key={a.id} value={a.id}>{a.date} {a.title}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">姓名 *</label>
+                  <input name="name" required className="w-full border rounded-lg px-3 py-3 outline-none focus:ring-2 focus:ring-red-500" placeholder="來賓姓名" />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">電話 *</label>
+                  <input name="phone" required className="w-full border rounded-lg px-3 py-3 outline-none focus:ring-2 focus:ring-red-500" placeholder="09xx-xxx-xxx" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">Email</label>
+                <input name="email" type="email" className="w-full border rounded-lg px-3 py-3 outline-none focus:ring-2 focus:ring-red-500" placeholder="沒有可留空" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">公司</label>
+                  <input name="company" className="w-full border rounded-lg px-3 py-3 outline-none focus:ring-2 focus:ring-red-500" />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">職稱</label>
+                  <input name="title" className="w-full border rounded-lg px-3 py-3 outline-none focus:ring-2 focus:ring-red-500" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">引薦人</label>
+                  <input name="referrer" className="w-full border rounded-lg px-3 py-3 outline-none focus:ring-2 focus:ring-red-500" placeholder="邀請的會員" />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">繳費金額</label>
+                  <input name="paid_amount" type="number" min={0} defaultValue={0} className="w-full border rounded-lg px-3 py-3 outline-none focus:ring-2 focus:ring-red-500" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">備註</label>
+                <textarea name="notes" rows={2} className="w-full border rounded-lg px-3 py-3 outline-none focus:ring-2 focus:ring-red-500" placeholder="例：電話報名，由王大明代為登記（會顯示在來賓管理）" />
+              </div>
+              <label className="flex items-center gap-2 text-sm text-gray-600">
+                <input type="checkbox" name="check_in_status" /> 同時標記為已報到
+              </label>
+              <label className="flex items-center gap-2 text-sm text-gray-600">
+                <input type="checkbox" name="notify" defaultChecked /> 發送 LINE 報名通知到群組（補登舊資料時請取消）
+              </label>
+              <div className="flex gap-4 pt-2">
+                <button type="button" onClick={() => setAddOpen(false)} disabled={adding} className="flex-1 border py-3 rounded-lg font-bold text-gray-500 hover:bg-gray-50 disabled:opacity-50">取消</button>
+                <button type="submit" disabled={adding} className="flex-1 bg-red-600 text-white py-3 rounded-lg font-bold shadow-lg shadow-red-100 hover:bg-red-700 active:scale-95 transition-all disabled:opacity-50">
+                  {adding ? '新增中…' : '確認新增'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -257,6 +257,15 @@ npm run preview  # 本機預覽 build
 
 **判斷路由：** `App.tsx` 最前面的 LIFF 短路判斷**先判名片**（path `/liff/card` 或 `member`/`ids` 參數，含 `liff.state` 包裹），再判例會報到，避免參數被吃掉。
 
+### 代為報名（`/admin/check-in`）
+
+有來賓（尤其年長者）不方便線上報名時，幹部可在「報到管理 (訪客)」按右上角「**代為報名**」直接建資料，不必替對方去填公開表單。
+
+- 表單欄位＝公開報名表的欄位＋繳費金額／已報到／備註。Email 可留空（DB 為 NOT NULL，`App.tsx::handleAddRegistration` 會補 `''`）。
+- 同一活動出現相同電話會先跳確認，避免重複登記。
+- 「發送 LINE 報名通知到群組」預設勾選，行為與來賓自行報名一致（invoke `line-notify-registration`）；**補登舊資料時記得取消**。
+- 走 `supabase.from('registrations').insert()`（authenticated，RLS `is_changzhan_admin()`），不經公開的 `public_create_registration` RPC。
+
 ### 來賓管理（`/admin/guests`）
 
 `pages/admin/GuestManager.tsx`。清單是**兩種來源的聯合**：`guest_attendance_summary`（`guests` 表，早期有綁 LINE 的來賓）＋ `registrations` 中 `guest_id is null` 的報名（實務上佔絕大多數）。列的識別是 `(kind, id)`。

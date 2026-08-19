@@ -367,6 +367,26 @@ const App: React.FC = () => {
         else fetchData();
     };
 
+    // 代為報名：幹部在後台幫不方便線上報名的來賓建立報名（走 authenticated，RLS 為 is_changzhan_admin）
+    const handleAddRegistration = async (reg: Partial<Registration>, notify: boolean): Promise<boolean> => {
+        const { data, error } = await supabase
+            .from('registrations')
+            .insert([{ ...reg, email: reg.email || '' }])
+            .select('id')
+            .single();
+        if (error) {
+            alert('新增報名失敗：' + error.message);
+            return false;
+        }
+        if (notify && data?.id) {
+            supabase.functions
+                .invoke('line-notify-registration', { body: { registrationId: data.id } })
+                .catch((err) => console.warn('line-notify-registration failed:', err));
+        }
+        await fetchData();
+        return true;
+    };
+
     const handleUpdateRegistration = async (updated: Registration) => {
         const { error } = await supabase.from('registrations').update(updated).eq('id', updated.id);
         if (error) alert('更新報名狀態失敗:' + error.message);
@@ -681,6 +701,7 @@ const App: React.FC = () => {
                                     onDeleteActivity={handleDeleteActivity}
                                     onUpdateRegistration={handleUpdateRegistration}
                                     onDeleteRegistration={handleDeleteRegistration}
+                                    onAddRegistration={handleAddRegistration}
                                     onAddUser={handleAddUser}
                                     onUpdateUser={handleUpdateUser}
                                     onDeleteUser={handleDeleteUser}
