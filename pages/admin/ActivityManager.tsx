@@ -51,7 +51,7 @@ const ActivityManager: React.FC<ActivityManagerProps> = ({ activities, onAddActi
     type: ActivityType.REGULAR,
     date: '',
     time: '06:30',
-    location: '台北市大安區忠孝東路四段 218 號 (阿波羅大廈)',
+    location: '88樂章（台北市內湖區民善街 88 號 5 樓）',
     price: 500,
     picture: 'https://images.unsplash.com/photo-1517457373958-b7bdd4587205?q=80&w=2069&auto=format&fit=crop',
     description: '',
