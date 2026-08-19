@@ -113,7 +113,8 @@
 **注意事項：**
 
 - **失敗一律 fallback 成原本的 index.html**：預覽圖不對只是不好看，活動頁打不開才是真的壞掉。
-- **`picture` 只認 `http(s)` 開頭**：早期 5 筆活動的 `picture` 存的是 base64 data URI（最大 200KB），爬蟲不吃 `data:` 當 og:image，塞進去只會讓 HTML 從 2.4KB 暴增到 400KB。非網址一律換成分會 logo。
+- **走 `activity_og` view 而不是 `activities`**：早期 5 筆活動的 `picture` 存的是 base64 data URI（最大 200KB），爬蟲不吃 `data:` 當 og:image。view 直接在 DB 端把非 `http(s)` 的值濾成 null（`security_invoker = true`，沿用 activities 自己的 RLS），回應從 203KB 降到 153 bytes。**實測**：原本直接查 `activities` 時，冷啟動撈 200KB 會超過 2.5 秒逾時而退回預設 OG。
+- **撈不到活動時只快取 30 秒**（撈到才 `s-maxage=300`）。否則一次逾時就會讓錯誤的預覽在 CDN 上黏 5 分鐘——這個坑實際踩過。
 - **本機 `npm run dev` 不會跑這支函式**（純 vite dev server），本機看活動頁只會拿到 index.html 的預設 OG tags。要驗證請部署後用 `curl -s https://changzhan.vercel.app/activity/<id> | head -40` 看 meta。
 - 改完 OG 之後，LINE / Facebook 有快取，要用各自的 debugger 重新抓取才看得到新預覽。
 
@@ -125,7 +126,7 @@
 
 | Table | 說明 |
 |-------|------|
-| `activities` | 活動資料（id, title, date, time, location, picture 等） |
+| `activities` | 活動資料（id, title, date, time, location, picture 等）。另有 `activity_og` view 供 OG function 用，見第四節 |
 | `admins` | 後台管理員（`name`/`email`/`role`；`email` 即登入帳號。`phone`、`password` 為舊欄位，已不再使用）|
 | `registrations` | 活動報名記錄（含 `notes` 備註，供來賓管理裡尚未綁定 LINE 的列使用）|
 | `members` | 會員資料 |

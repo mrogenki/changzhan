@@ -57,10 +57,12 @@ async function fetchTemplate(host: string): Promise<string | null> {
   }
 }
 
+// 用 activity_og view 而不是 activities：view 已在 DB 端把非網址的 picture 濾成 null。
+// 早期活動的 picture 是 200KB 的 base64，整包拉下來曾讓冷啟動時撈資料逾時。
 async function fetchActivity(id: string) {
   const url =
-    `${SUPABASE_URL}/rest/v1/activities` +
-    `?id=eq.${encodeURIComponent(id)}&select=title,date,time,location,description,picture&limit=1`;
+    `${SUPABASE_URL}/rest/v1/activity_og` +
+    `?id=eq.${encodeURIComponent(id)}&select=title,date,time,location,picture&limit=1`;
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 2500);
   try {
@@ -130,9 +132,7 @@ export default async function handler(req: any, res: any) {
   let html = template;
   const activity = id ? await fetchActivity(String(id)) : null;
   if (activity) {
-    // 早期活動的 picture 存的是 base64 data URI（最大 200KB）。爬蟲不吃 data: 當 og:image，
-    // 塞進去只會讓 HTML 暴增又拿不到預覽圖，所以只認 http(s) 開頭的網址。
-    const picture = /^https?:\/\//i.test(activity.picture || '') ? activity.picture : DEFAULT_IMAGE;
+    const picture = activity.picture || DEFAULT_IMAGE;
     const parts = [activity.date, activity.time].filter(Boolean).join(' ');
     const description = [parts, activity.location ? `地點：${activity.location}` : '']
       .filter(Boolean)
@@ -147,7 +147,13 @@ export default async function handler(req: any, res: any) {
 
   res.status(200);
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
-  // 活動內容不常改，讓 CDN 擋掉大部分爬蟲流量
-  res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=3600');
+  // 撈到活動才長快取；沒撈到（查無此活動，或撈取失敗退回預設 OG）只快取 30 秒，
+  // 免得一次逾時就讓錯的預覽在 CDN 上黏 5 分鐘。
+  res.setHeader(
+    'Cache-Control',
+    activity
+      ? 'public, s-maxage=300, stale-while-revalidate=3600'
+      : 'public, s-maxage=30, stale-while-revalidate=60'
+  );
   res.end(html);
 }
