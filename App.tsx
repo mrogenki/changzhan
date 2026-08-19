@@ -11,7 +11,7 @@ import Milestones from './pages/Milestones';
 import Calendar from './pages/Calendar';
 import RegularMeeting from './pages/RegularMeeting';
 import BusinessTraining from './pages/BusinessTraining';
-import CoffeeMeeting from './pages/CoffeeMeeting';
+import GroupMeeting from './pages/GroupMeeting';
 import LiffCheckin from './pages/LiffCheckin';
 import LiffCard from './pages/LiffCard';
 import LineFloatingButton, { LineLogo, buildLineChatUrl } from './components/LineFloatingButton';
@@ -65,7 +65,7 @@ const Header: React.FC = () => {
                         <Link to="/" className="text-gray-700 hover:text-red-600 transition-colors font-medium">首頁</Link>
                         <Link to="/regular-meeting" className="text-gray-700 hover:text-red-600 transition-colors font-medium">例會活動</Link>
                         <Link to="/training" className="text-gray-700 hover:text-red-600 transition-colors font-medium">商務培訓</Link>
-                        <Link to="/coffee" className="text-gray-700 hover:text-red-600 transition-colors font-medium">咖啡會議</Link>
+                        <Link to="/group-meeting" className="text-gray-700 hover:text-red-600 transition-colors font-medium">組聚</Link>
                         <Link to="/members" className="text-gray-700 hover:text-red-600 transition-colors font-medium">產業資源</Link>
                         <Link to="/calendar" className="text-gray-700 hover:text-red-600 transition-colors font-medium">行事曆</Link>
                         <Link to="/milestones" className="text-gray-700 hover:text-red-600 transition-colors font-medium">長展大事記</Link>
@@ -83,7 +83,7 @@ const Header: React.FC = () => {
                     <Link to="/" onClick={() => setIsOpen(false)} className="block text-gray-700 font-bold">首頁</Link>
                     <Link to="/regular-meeting" onClick={() => setIsOpen(false)} className="block text-gray-700 font-bold">例會活動</Link>
                     <Link to="/training" onClick={() => setIsOpen(false)} className="block text-gray-700 font-bold">商務培訓</Link>
-                    <Link to="/coffee" onClick={() => setIsOpen(false)} className="block text-gray-700 font-bold">咖啡會議</Link>
+                    <Link to="/group-meeting" onClick={() => setIsOpen(false)} className="block text-gray-700 font-bold">組聚</Link>
                     <Link to="/members" onClick={() => setIsOpen(false)} className="block text-gray-700 font-bold">產業資源</Link>
                     <Link to="/calendar" onClick={() => setIsOpen(false)} className="block text-gray-700 font-bold">行事曆</Link>
                     <Link to="/milestones" onClick={() => setIsOpen(false)} className="block text-gray-700 font-bold">長展大事記</Link>
@@ -686,7 +686,9 @@ const App: React.FC = () => {
                         <Route path="/" element={<Home activities={activities} />} />
                         <Route path="/regular-meeting" element={<RegularMeeting activities={activities} />} />
                         <Route path="/training" element={<BusinessTraining activities={activities} />} />
-                        <Route path="/coffee" element={<CoffeeMeeting activities={activities} />} />
+                        <Route path="/group-meeting" element={<GroupMeeting activities={activities} />} />
+                        {/* 舊路徑轉址，避免先前分享出去的連結失效 */}
+                        <Route path="/coffee" element={<Navigate to="/group-meeting" replace />} />
                         <Route path="/members" element={<MemberList members={members} />} />
                         <Route path="/calendar" element={<Calendar activities={activities} />} />
                         <Route path="/milestones" element={<Milestones milestones={milestones} />} />

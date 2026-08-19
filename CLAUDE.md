@@ -80,7 +80,7 @@
 | `Home.tsx` | 首頁，公開瀏覽 |
 | `ActivityDetail.tsx` | 活動詳情頁（`/activity/:id`，server.ts 會動態注入 OG tags） |
 | `RegularMeeting.tsx` | 商務例會頁面 |
-| `CoffeeMeeting.tsx` | 咖啡會議頁面 |
+| `GroupMeeting.tsx` | 組聚頁面（`/group-meeting`；舊路徑 `/coffee` 轉址過來）|
 | `BusinessTraining.tsx` | 商務培訓頁面 |
 | `Calendar.tsx` | 公開活動行事曆（`/calendar`，月曆格狀）|
 | `Milestones.tsx` | 大事記 |

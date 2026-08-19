@@ -3,7 +3,7 @@ export enum ActivityType {
     SPECIAL = '一般活動',
     REGULAR_MEETING = '例會活動',
     BUSINESS_TRAINING = '商務培訓',
-    COFFEE_MEETING = '咖啡會議'
+    GROUP_MEETING = '組聚'
 }
 
 export enum UserRole {

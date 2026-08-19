@@ -25,7 +25,7 @@ const TYPE_BADGE_COLORS: Record<string, string> = {
   [ActivityType.SPECIAL]: 'bg-gray-800 text-white',          // 一般活動
   [ActivityType.REGULAR_MEETING]: 'bg-amber-500 text-white', // 例會活動
   [ActivityType.BUSINESS_TRAINING]: 'bg-blue-600 text-white',// 商務培訓
-  [ActivityType.COFFEE_MEETING]: 'bg-emerald-600 text-white',// 咖啡會議
+  [ActivityType.GROUP_MEETING]: 'bg-emerald-600 text-white',// 組聚
 };
 
 const ActivityManager: React.FC<ActivityManagerProps> = ({ activities, onAddActivity, onUpdateActivity, onDeleteActivity, onUploadImage }) => {
@@ -228,7 +228,7 @@ const ActivityManager: React.FC<ActivityManagerProps> = ({ activities, onAddActi
                      <option value={ActivityType.SPECIAL}>一般活動</option>
                      <option value={ActivityType.REGULAR_MEETING}>例會活動</option>
                      <option value={ActivityType.BUSINESS_TRAINING}>商務培訓</option>
-                     <option value={ActivityType.COFFEE_MEETING}>咖啡會議</option>
+                     <option value={ActivityType.GROUP_MEETING}>組聚</option>
                    </select>
                 </div>
                 <div>

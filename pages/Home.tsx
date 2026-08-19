@@ -238,9 +238,9 @@ const TYPE_SECTIONS: Array<{
     barColor: 'bg-orange-500',
   },
   {
-    type: ActivityType.COFFEE_MEETING,
-    title: '咖啡會議',
-    subtitle: '（輕鬆交流的會員聚會）',
+    type: ActivityType.GROUP_MEETING,
+    title: '組聚',
+    subtitle: '（小組夥伴的定期聚會）',
     barColor: 'bg-amber-700',
   },
   {

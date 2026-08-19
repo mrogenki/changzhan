@@ -13,7 +13,7 @@ const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六'];
 const TYPE_STYLE: Record<string, { chip: string; dot: string; label: string }> = {
   [ActivityType.REGULAR_MEETING]: { chip: 'bg-red-100 text-red-700', dot: 'bg-red-500', label: '例會活動' },
   [ActivityType.BUSINESS_TRAINING]: { chip: 'bg-blue-100 text-blue-700', dot: 'bg-blue-500', label: '商務培訓' },
-  [ActivityType.COFFEE_MEETING]: { chip: 'bg-amber-100 text-amber-700', dot: 'bg-amber-500', label: '咖啡會議' },
+  [ActivityType.GROUP_MEETING]: { chip: 'bg-amber-100 text-amber-700', dot: 'bg-amber-500', label: '組聚' },
   [ActivityType.REGULAR]: { chip: 'bg-purple-100 text-purple-700', dot: 'bg-purple-500', label: '會員專屬' },
   [ActivityType.SPECIAL]: { chip: 'bg-emerald-100 text-emerald-700', dot: 'bg-emerald-500', label: '一般活動' },
 };

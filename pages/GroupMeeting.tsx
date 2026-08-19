@@ -6,11 +6,11 @@ interface Props {
     activities: Activity[];
 }
 
-const CoffeeMeeting: React.FC<Props> = ({ activities }) => {
+const GroupMeeting: React.FC<Props> = ({ activities }) => {
     const now = new Date();
     const filtered = activities
         .filter(a => {
-            if (a.type !== ActivityType.COFFEE_MEETING) return false;
+            if (a.type !== ActivityType.GROUP_MEETING) return false;
             const isActive = a.status === 'active' || !a.status;
             if (!isActive) return false;
             const fullDate = new Date(`${a.date.replace(/-/g, '/')} ${a.time}`);
@@ -23,12 +23,12 @@ const CoffeeMeeting: React.FC<Props> = ({ activities }) => {
         });
     return (
         <ActivityListView
-            title="咖啡會議"
-            subtitle="一對一深度交流,建立可信賴的合作關係"
+            title="組聚"
+            subtitle="小組夥伴定期聚會,深化彼此的商務連結"
             activities={filtered}
-            emptyMessage="目前沒有咖啡會議"
+            emptyMessage="目前沒有組聚"
         />
     );
 };
 
-export default CoffeeMeeting;
+export default GroupMeeting;
