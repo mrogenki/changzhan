@@ -161,11 +161,12 @@ export default function LiffCheckin() {
         let data: any, error: any;
         try {
           const result = await withTimeout(
-            supabase.rpc('line_checkin', {
+            // rpc() 回傳的是 thenable 的 PostgrestFilterBuilder，包成 Promise 才符合 withTimeout 的型別
+            Promise.resolve(supabase.rpc('line_checkin', {
               p_activity_id: activityId,
               p_token: token,
               p_line_user_id: profile.userId,
-            }),
+            })),
             10000,
             '報到請求逾時'
           );

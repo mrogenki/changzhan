@@ -37,7 +37,7 @@
 | 後端 | Supabase（PostgreSQL + Auth + Storage） | ap-northeast-1（東京）|
 | LINE 整合 | @line/liff（LIFF SDK） | LINE Platform |
 | Email | @emailjs/browser | EmailJS |
-| SSR | Express + Vite middleware（`server.ts`，僅用於動態 OG tags） | Vercel Functions |
+| SSR | ⚠️ `server.ts` **目前沒有被接上**（見第四節） | — |
 | 動畫 / UI | framer-motion + motion + lucide-react + qrcode.react | — |
 | Excel | xlsx package（client-side parsing） | 瀏覽器 |
 | 原始碼 | GitHub | `github.com/mrogenki/changzhan`（public） |
@@ -99,7 +99,10 @@
 
 ---
 
-## 四、`server.ts` — 為什麼有 Express？
+## 四、`server.ts` — 為什麼有 Express？（⚠️ 目前未啟用）
+
+> **現況**：`package.json` 的 `dev` 是純 `vite`、`build` 是 `vite build`，`vercel.json` 只有 SPA rewrite 到 `index.html`，`express` 也不在 dependencies 裡。也就是說**下面描述的 SSR 流程實際上沒有在跑**，貼到 LINE / Facebook 的活動連結拿到的是 `index.html` 的靜態 OG tags。要恢復需重新接上 script 與 Vercel 設定並安裝 express。以下保留原始設計說明。
+
 
 主要原因：**動態 OG tags**。
 
@@ -166,10 +169,13 @@
 
 ```bash
 npm install
-npm run dev      # 本機 http://localhost:3001（用 server.ts，含 OG tags）
-npm run build    # 產出 dist/
-npm run preview  # 本機預覽 build
+npm run dev        # 本機 http://localhost:3001（純 vite dev server）
+npm run typecheck  # tsc --noEmit，只檢查型別不產檔
+npm run build      # 先 tsc --noEmit，通過才 vite build 產出 dist/
+npm run preview    # 本機預覽 build
 ```
+
+⚠️ **build 會先跑型別檢查**：`vite build` 本身不做型別檢查，過去因此漏掉過「元件必填 prop 沒傳」這種會在執行期炸掉的錯。現在 `build` 前置 `tsc --noEmit`，型別不過就不會產檔。`tsconfig.json` 已加 `vite/client` 型別（`import.meta.env`）並排除 `server.ts`。
 
 部署：push 到 `main` 分支 → Vercel 自動部署。
 

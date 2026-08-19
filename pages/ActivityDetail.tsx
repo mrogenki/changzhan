@@ -47,7 +47,9 @@ const ActivityDetail: React.FC<ActivityDetailProps> = ({ activities, registratio
     (m.company && m.company.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
-  const displayOptions = [
+  // 下拉選項＝「BNI長展分會」官方選項 + 會員；兩者欄位不同，用共同型別描述
+  type ReferrerOption = { id: string | number; name: string; company?: string; isSpecial?: boolean };
+  const displayOptions: ReferrerOption[] = [
     ...(searchTerm === '' || 'BNI長展分會'.toLowerCase().includes(searchTerm.toLowerCase()) 
       ? [{ id: 'special-bni', name: 'BNI長展分會', company: '網路資訊 / 無特定引薦人', isSpecial: true }] 
       : []),

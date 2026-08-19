@@ -476,6 +476,22 @@ const App: React.FC = () => {
         else fetchData();
     };
 
+    // Excel 批次匯入：toAdd 無 id、toUpdate 由既有資料展開而來（含 id）。
+    // 失敗時 throw，讓 MemberImportModal 自己顯示錯誤並退回預覽步驟。
+    const handleBatchImportMembers = async (toAdd: Member[], toUpdate: Member[]) => {
+        if (toAdd.length > 0) {
+            const rows = toAdd.map(({ id, ...rest }: any) => rest);
+            const { error } = await supabase.from('members').insert(rows);
+            if (error) throw new Error('新增會員失敗：' + error.message);
+        }
+        for (const m of toUpdate) {
+            const { id, ...rest } = m as any;
+            const { error } = await supabase.from('members').update(rest).eq('id', id);
+            if (error) throw new Error(`更新會員「${m.name}」失敗：` + error.message);
+        }
+        await fetchData();
+    };
+
     const handleDeleteMember = async (id: string | number) => {
         const { error } = await supabase.from('members').delete().eq('id', id);
         if (error) alert('刪除會員失敗:' + error.message);
@@ -708,6 +724,7 @@ const App: React.FC = () => {
                                     onAddMember={handleAddMember}
                                     onUpdateMember={handleUpdateMember}
                                     onDeleteMember={handleDeleteMember}
+                                    onBatchImportMembers={handleBatchImportMembers}
                                     onUpdateAttendance={handleUpdateAttendance}
                                     onDeleteAttendance={handleDeleteAttendance}
                                     onRefreshAttendance={refreshAttendance}

@@ -36,6 +36,7 @@ interface AdminDashboardProps {
   onAddMember: (member: Member) => void;
   onUpdateMember: (member: Member) => void;
   onDeleteMember: (id: string | number) => void;
+  onBatchImportMembers: (toAdd: Member[], toUpdate: Member[]) => Promise<void>;
   onUpdateAttendance: (activityId: string, memberId: string, status: AttendanceStatus) => void;
   onDeleteAttendance: (activityId: string, memberId: string) => void;
   onRefreshAttendance: () => Promise<void>;
@@ -98,6 +99,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
                   onAddMember={props.onAddMember}
                   onUpdateMember={props.onUpdateMember}
                   onDeleteMember={props.onDeleteMember}
+                  onBatchImportMembers={props.onBatchImportMembers}
                   onUploadImage={props.onUploadImage}
                 />
               } />
