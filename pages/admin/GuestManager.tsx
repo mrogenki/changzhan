@@ -63,7 +63,6 @@ const GuestManager: React.FC = () => {
   const [activities, setActivities] = useState<ActivityLite[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filter, setFilter] = useState<'all' | 'bound' | 'unbound'>('all');
 
   const [expandedGuestId, setExpandedGuestId] = useState<number | null>(null);
   const [expandedAttendance, setExpandedAttendance] = useState<AttendanceItem[]>([]);
@@ -95,7 +94,8 @@ const GuestManager: React.FC = () => {
     }
   }
 
-  // 聯合清單(來賓 + 未綁 LINE 的 registrations 摺成 pseudo-guest 顯示)
+  // 聯合清單：來賓不再做 LINE 綁定，但早期綁過的 guests 仍要顯示，
+  // 因此 guests 與「沒對應 guest_id 的 registrations」合併成同一份名單。
   const unifiedRows = useMemo(() => {
     const boundRows = guests.map(g => ({
       kind: 'guest' as const,
@@ -107,8 +107,6 @@ const GuestManager: React.FC = () => {
       referrers: g.referrers,
       attendance_count: g.attendance_count,
       last_attended_date: g.last_attended_date,
-      bound: !!g.line_user_id,
-      line_user_id: g.line_user_id,
       notes: g.notes ?? '',
       raw: g,
     }));
@@ -122,8 +120,6 @@ const GuestManager: React.FC = () => {
       referrers: r.referrer ?? '',
       attendance_count: r.check_in_status ? 1 : 0,
       last_attended_date: null as string | null,
-      bound: false,
-      line_user_id: null as string | null,
       notes: r.notes ?? '',
       raw: r as any,
     }));
@@ -131,8 +127,6 @@ const GuestManager: React.FC = () => {
   }, [guests, unboundRegs]);
 
   const filteredRows = unifiedRows.filter(row => {
-    if (filter === 'bound' && !row.bound) return false;
-    if (filter === 'unbound' && row.bound) return false;
     if (!searchTerm) return true;
     const t = searchTerm.toLowerCase();
     return row.name.toLowerCase().includes(t)
@@ -143,6 +137,7 @@ const GuestManager: React.FC = () => {
   });
 
   const notedCount = unifiedRows.filter(r => r.notes.trim()).length;
+  const attendedCount = unifiedRows.filter(r => r.attendance_count > 0).length;
 
   async function expandGuest(guestId: number) {
     if (expandedGuestId === guestId) {
@@ -220,18 +215,14 @@ const GuestManager: React.FC = () => {
       </div>
 
       {/* 統計卡片 */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-3 gap-3">
         <div className="bg-white p-4 rounded-xl border">
           <div className="text-xs text-gray-400 font-bold uppercase">總來賓</div>
           <div className="text-2xl font-bold text-gray-800">{unifiedRows.length}</div>
         </div>
         <div className="bg-green-50 p-4 rounded-xl border border-green-100">
-          <div className="text-xs text-green-600 font-bold uppercase">已綁 LINE</div>
-          <div className="text-2xl font-bold text-green-700">{guests.filter(g => g.line_user_id).length}</div>
-        </div>
-        <div className="bg-yellow-50 p-4 rounded-xl border border-yellow-100">
-          <div className="text-xs text-yellow-600 font-bold uppercase">未綁 LINE</div>
-          <div className="text-2xl font-bold text-yellow-700">{unboundRegs.length}</div>
+          <div className="text-xs text-green-600 font-bold uppercase">曾出席</div>
+          <div className="text-2xl font-bold text-green-700">{attendedCount}</div>
         </div>
         <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
           <div className="text-xs text-blue-600 font-bold uppercase">已備註</div>
@@ -239,8 +230,8 @@ const GuestManager: React.FC = () => {
         </div>
       </div>
 
-      {/* 篩選與搜尋 */}
-      <div className="flex flex-col md:flex-row gap-3 bg-white p-4 rounded-xl border">
+      {/* 搜尋 */}
+      <div className="flex gap-3 bg-white p-4 rounded-xl border">
         <div className="flex items-center gap-2 flex-grow">
           <Search size={18} className="text-gray-400" />
           <input
@@ -250,19 +241,6 @@ const GuestManager: React.FC = () => {
             onChange={e => setSearchTerm(e.target.value)}
             className="bg-transparent outline-none w-full text-sm"
           />
-        </div>
-        <div className="flex gap-1">
-          {(['all', 'bound', 'unbound'] as const).map(f => (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
-                filter === f ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-            >
-              {f === 'all' ? '全部' : f === 'bound' ? '已綁' : '未綁'}
-            </button>
-          ))}
         </div>
       </div>
 
@@ -277,7 +255,6 @@ const GuestManager: React.FC = () => {
                 <th className="px-4 py-3">引薦人</th>
                 <th className="px-4 py-3 text-center">出席</th>
                 <th className="px-4 py-3">最後參加</th>
-                <th className="px-4 py-3">狀態</th>
                 <th className="px-4 py-3 min-w-[200px]">備註</th>
                 <th className="px-4 py-3 text-right">操作</th>
               </tr>
@@ -297,17 +274,6 @@ const GuestManager: React.FC = () => {
                     <td className="px-4 py-3 text-xs text-gray-600">{row.referrers || '—'}</td>
                     <td className="px-4 py-3 text-center font-bold text-gray-700">{row.attendance_count}</td>
                     <td className="px-4 py-3 text-xs text-gray-500">{row.last_attended_date || '—'}</td>
-                    <td className="px-4 py-3">
-                      {row.bound ? (
-                        <span className="px-2 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700">
-                          已綁
-                        </span>
-                      ) : (
-                        <span className="px-2 py-1 rounded-full text-xs font-bold bg-yellow-100 text-yellow-700">
-                          未綁定
-                        </span>
-                      )}
-                    </td>
                     <td className="px-4 py-3">
                       <button
                         onClick={() => openNoteEditor(row)}
@@ -343,7 +309,7 @@ const GuestManager: React.FC = () => {
                   {/* 展開區塊 */}
                   {expandedGuestId === row.id && row.kind === 'guest' && (
                     <tr>
-                      <td colSpan={8} className="bg-blue-50/30 px-6 py-4">
+                      <td colSpan={7} className="bg-blue-50/30 px-6 py-4">
                         {expandedLoading ? (
                           <p className="text-sm text-gray-400">載入中...</p>
                         ) : (

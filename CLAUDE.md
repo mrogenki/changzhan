@@ -259,9 +259,10 @@ npm run preview  # 本機預覽 build
 
 ### 來賓管理（`/admin/guests`）
 
-`pages/admin/GuestManager.tsx`。清單是**兩種來源的聯合**：`guest_attendance_summary`（已綁 LINE 的 `guests`）＋ `registrations` 中 `guest_id is null` 的報名（未綁 LINE，實務上佔多數）。列的識別是 `(kind, id)`。
+`pages/admin/GuestManager.tsx`。清單是**兩種來源的聯合**：`guest_attendance_summary`（`guests` 表，早期有綁 LINE 的來賓）＋ `registrations` 中 `guest_id is null` 的報名（實務上佔絕大多數）。列的識別是 `(kind, id)`。
 
 - **不做 LINE 訊息發送**：單發 / 群發 / 勾選收件人 / 訊息發送紀錄都已移除。要推播請用「LINE 長展小幫手」(`/admin/line-groups`)。
+- **來賓不再做 LINE 綁定**：頁面上的「已綁 / 未綁 LINE」統計卡、狀態欄與篩選鈕都已移除，統計改為 總來賓 / 曾出席 / 已備註。`guests.line_user_id` 與 LIFF 的 `guest_bind_and_checkin()` 流程**尚未拆除**（既有 2 筆綁定資料仍在），若確定要停用需另外處理 `pages/LiffCheckin.tsx` 的訪客分支。
 - **備註欄**：`guests.notes` 與 `registrations.notes` 兩張表都有此欄，前端依列的 `kind` 寫回對應表（因此同一人若有多筆未綁報名，備註是各自獨立的）。`guest_attendance_summary` view 已加上 `g.notes`。備註也納入搜尋範圍。
 - 兩張表的 RLS 皆為 `is_changzhan_admin()`（比對 JWT email 與 `admins.email`），所以備註只有後台登入者能改。
 
