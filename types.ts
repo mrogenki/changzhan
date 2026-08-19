@@ -169,3 +169,42 @@ export interface ChapterDocument {
     created_at?: string;
     updated_at?: string;
 }
+
+// 收款工具：一個「收款項目」（每月餐費、某場活動…）底下掛多筆「明細」
+export type PaymentMethod = 'cash' | 'linepay' | 'transfer';
+
+export const PAYMENT_METHOD_LABEL: Record<PaymentMethod, string> = {
+    cash: '現金',
+    linepay: 'LINE Pay',
+    transfer: '匯款',
+};
+
+export interface PaymentBatch {
+    id: number;
+    title: string;
+    default_amount: number;
+    period?: string | null;        // '2026-09'，只有每月餐費會填
+    activity_id?: number | null;
+    due_date?: string | null;
+    finance_category: string;      // 寫入收支時的分類
+    status: 'open' | 'closed';
+    note?: string | null;
+    created_by?: string | null;
+    created_at?: string;
+}
+
+export interface PaymentItem {
+    id: number;
+    batch_id: number;
+    payee_name: string;            // 姓名快照，來賓／家屬也一定有
+    payee_phone?: string | null;
+    member_id?: number | null;
+    guest_id?: number | null;
+    registration_id?: number | null;
+    amount_due: number;
+    amount_paid: number;
+    method?: PaymentMethod | null;
+    paid_at?: string | null;
+    note?: string | null;
+    recorded_by?: string | null;
+}

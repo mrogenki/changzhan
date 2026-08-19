@@ -133,7 +133,9 @@
 | `members` | 會員資料 |
 | `attendance` | 出席記錄（⚠️ 目前 **RLS 未啟用**，需修） |
 | `guests` | 訪客資料（含 `notes` 備註）|
-| `finance_records` | 財務記錄 |
+| `finance_records` | 財務記錄（多一個 `payment_batch_id`，供收款工具寫入時識別是哪個收款項目）|
+| `payment_batches` | 收款項目（每月餐費、某場活動收費…），見第九之三節 |
+| `payment_items` | 收款明細，每人一筆，掛在 `payment_batches` 底下 |
 | `milestones` | 大事記 |
 | `app_settings` | 系統設定（key/value，例：`line_notify_registration_group_id`） |
 | `message_send_log` | LINE 訊息發送記錄（`recipient_kind`: member / guest / **group**） |
@@ -267,6 +269,28 @@ npm run preview    # 本機預覽 build
 - `mailto:` 「寫信給我」按鈕實測可用（LINE 接受）；若日後某情境被拒，改成 email 文字列即可（builder 內單點可調）。
 
 **判斷路由：** `App.tsx` 最前面的 LIFF 短路判斷**先判名片**（path `/liff/card` 或 `member`/`ids` 參數，含 `liff.state` 包裹），再判例會報到，避免參數被吃掉。
+
+### 收款管理（`/admin/payments`）
+
+`pages/admin/PaymentManager.tsx`（項目列表）+ `PaymentBatchDetail.tsx`（單一項目的收款明細）。
+
+**兩層結構**：`payment_batches`（收款項目）→ `payment_items`（每人一筆）。每月餐費只是「每個月開一個項目」，活動收費就是另開項目、名單與金額自訂。
+
+**明細為什麼要存姓名快照**：收款對象包含來賓，而來賓身分在系統裡是散的——只有 2 位在 `guests` 表，46 位只存在於 `registrations`，家屬則完全不在任何名單。所以 `payee_name`/`payee_phone` 一定會存，`member_id`/`guest_id`/`registration_id` 三個關聯欄位「有的話才連」，且用 check constraint 限制最多只能設一個。
+
+**資料庫層的防呆**（都實測過會擋下）：
+- `payment_items` 三組 partial unique index → 同一項目不會重複收同一位會員／來賓
+- `payment_items_single_ref` check → 不會同時指向會員又指向來賓
+- `payment_items_method_valid` check → 方式只能是 `cash`/`linepay`/`transfer`
+- `payment_batches_period_uniq` → 同一個月份只會有一個餐費項目，「建立本月餐費」可安全重複按
+
+**繳費狀態不存欄位**，由 `amount_paid` 對 `amount_due` 推導（0＝未繳、不足＝部分、足額＝已繳），避免改了金額狀態沒跟著對。
+
+**名單來源**（建立項目時可混用，之後也能用「加入名單」追加）：全體在籍會員 / 依組別 / 搜尋手動勾選（會員＋來賓）/ 從某場活動的出席名單帶入（會員取自 `attendance`、來賓取自已報到的 `registrations`）/ 直接打名字（家屬這類不在任何名單的人）。
+
+**寫入收支**：一個項目對應 `finance_records` 一筆，靠 `payment_batch_id` 識別，重複寫入是**更新金額**而不是新增。刪除收款項目時明細會連動刪除，但收支那筆會保留（`on delete set null`）——帳不會憑空消失。
+
+**未做**：LINE 催繳、CSV 匯出、線上金流（LINE Pay 只記錄方式，不串接）。
 
 ### 公開活動行事曆（`/calendar`）
 

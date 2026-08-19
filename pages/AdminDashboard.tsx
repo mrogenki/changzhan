@@ -13,6 +13,8 @@ import MilestoneManager from './admin/MilestoneManager';
 import BirthdayManager from './admin/BirthdayManager';
 import MembershipExpiryManager from './admin/MembershipExpiryManager';
 import GuestManager from './admin/GuestManager';
+import PaymentManager from './admin/PaymentManager';
+import PaymentBatchDetail from './admin/PaymentBatchDetail';
 import DocumentManager from './admin/DocumentManager';
 import LineGroupManager from './admin/LineGroupManager';
 
@@ -87,6 +89,22 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
           <Route path="/" element={<DashboardHome activities={props.activities} registrations={props.registrations} />} />
           <Route path="/check-in" element={<CheckInManager activities={props.activities} registrations={props.registrations} onUpdateRegistration={props.onUpdateRegistration} onDeleteRegistration={props.onDeleteRegistration} onAddRegistration={props.onAddRegistration} onRefreshRegistrations={props.onRefreshRegistrations} />} />
           <Route path="/attendance" element={<AttendanceManager activities={props.activities} members={props.members} attendance={props.attendance} onUpdateAttendance={props.onUpdateAttendance} onDeleteAttendance={props.onDeleteAttendance} onRefreshAttendance={props.onRefreshAttendance} />} />
+          <Route path="/payments" element={
+            <PaymentManager
+              members={props.members}
+              activities={props.activities}
+              attendance={props.attendance}
+              registrations={props.registrations}
+              currentUser={props.currentUser}
+            />
+          } />
+          <Route path="/payments/:batchId" element={
+            <PaymentBatchDetail
+              members={props.members}
+              registrations={props.registrations}
+              currentUser={props.currentUser}
+            />
+          } />
           <Route path="/finance" element={<FinanceManager activities={props.activities} financeRecords={props.financeRecords} onAddFinanceRecord={props.onAddFinanceRecord} onUpdateFinanceRecord={props.onUpdateFinanceRecord} onDeleteFinanceRecord={props.onDeleteFinanceRecord} />} />
           <Route path="/milestones" element={<MilestoneManager milestones={props.milestones} onAddMilestone={props.onAddMilestone} onUpdateMilestone={props.onUpdateMilestone} onDeleteMilestone={props.onDeleteMilestone} onUploadImage={props.onUploadImage} />} />
 
