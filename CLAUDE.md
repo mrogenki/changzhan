@@ -82,7 +82,7 @@
 | `RegularMeeting.tsx` | 商務例會頁面 |
 | `CoffeeMeeting.tsx` | 咖啡會議頁面 |
 | `BusinessTraining.tsx` | 商務培訓頁面 |
-| `Calendar.tsx` | 公開活動行事曆（`/calendar`，月曆格狀，含活動與會員生日）|
+| `Calendar.tsx` | 公開活動行事曆（`/calendar`，月曆格狀）|
 | `Milestones.tsx` | 大事記 |
 | `MemberList.tsx` | 會員列表 |
 | `LiffCheckin.tsx` | LINE LIFF 內嵌簽到頁 |
@@ -164,7 +164,6 @@
 | `line_checkin(p_activity_id, p_token, p_line_user_id)` | LINE 簽到主流程 |
 | `sync_role_to_jwt()` | 把角色同步到 JWT |
 | `check_message_recently_sent(p_line_user_id, p_message_hash, p_window_hours)` | 訊息防重複發送 |
-| `public_member_birthdays()` | 公開行事曆用：回傳在籍會員的 `id`/`name`/`picture` 與生日的**月、日**（`birth_month`/`birth_day`）。**刻意不回傳年份**，也沒有電話/Email。`members.birthday` 是 text（`YYYY-MM-DD`，年份是佔位值，12 筆為空字串），故以 regex 過濾格式 |
 | `public_member_cards(p_ids bigint[])` | 電子名片：回傳指定會員的名片欄位（含 `mobile_phone`/`email`，僅 active，依傳入順序）。供 `LiffCard.tsx`（anon）取單/多位會員資料。⚠️ 對 anon 開放電話+email，屬可被逐 id 爬取的個資，若要收緊可改為需登入或加頻率限制 |
 
 ⚠️ Supabase advisor 對這些都有 `anon_security_definer_function_executable` warning，但部分函式**必須對 anon 開放**（如 LIFF 簽到流程的訪客）。動權限前要先確認流程不會壞。
@@ -271,10 +270,11 @@ npm run preview    # 本機預覽 build
 
 ### 公開活動行事曆（`/calendar`）
 
-`pages/Calendar.tsx`，導覽列「行事曆」。月曆格狀，顯示**活動**與**會員生日**。
+`pages/Calendar.tsx`，導覽列「行事曆」。月曆格狀，只顯示**活動**。
+
+> 曾一併顯示會員生日（`public_member_birthdays()` RPC，只回月／日），後來決定取消，前端與該 RPC 都已移除。若日後要加回來，記得生日對 anon 是額外的個資揭露，優先考慮只給登入者看。
 
 - **活動**由 `App.tsx` 既有的公開 activities state 傳入（只顯示 `status = 'active'`），依 `type` 上色，圖例只列出當月出現的類型。點日期看當天詳情，點活動卡進 `/activity/:id` 報名。
-- **生日**走 `public_member_birthdays()`，**只拿月／日不拿年份**。名字本來就在公開名錄裡，但生日屬額外揭露——若要收斂成只給登入者看，改成需要 session 即可。
 - **時區**：`activities.date` 是純日期字串，`new Date('2026-08-20')` 會被當 UTC 而在台北時間差一天。頁面用 `Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Taipei' })` 取今天、其餘一律以 `YYYY-MM-DD` 字串比對，不進 Date 物件。
 - 手機版格子放不下活動名稱，改以顏色圓點表示，點下去看下方詳情。
 

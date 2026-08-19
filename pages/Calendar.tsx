@@ -1,20 +1,11 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, MapPin, Clock, Cake, CalendarDays } from 'lucide-react';
+import { ChevronLeft, ChevronRight, MapPin, Clock, CalendarDays } from 'lucide-react';
 import { Activity, ActivityType } from '../types';
-import { supabase } from '../supabaseClient';
 
 interface Props {
   activities: Activity[];
 }
-
-type Birthday = {
-  id: number;
-  name: string;
-  picture: string | null;
-  birth_month: number;
-  birth_day: number;
-};
 
 const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六'];
 
@@ -50,14 +41,6 @@ const Calendar: React.FC<Props> = ({ activities }) => {
   const [year, setYear] = useState(todayY);
   const [month, setMonth] = useState(todayM); // 1–12
   const [selected, setSelected] = useState<string>(today);
-  const [birthdays, setBirthdays] = useState<Birthday[]>([]);
-
-  useEffect(() => {
-    // 只拿得到月／日，沒有年份與聯絡資訊（public_member_birthdays）
-    supabase.rpc('public_member_birthdays').then(({ data }) => {
-      if (data) setBirthdays(data as Birthday[]);
-    });
-  }, []);
 
   // 只顯示上架中的活動，與其他公開頁一致
   const activitiesByDate = useMemo(() => {
@@ -73,17 +56,6 @@ const Calendar: React.FC<Props> = ({ activities }) => {
     map.forEach(list => list.sort((x, y) => (x.time || '').localeCompare(y.time || '')));
     return map;
   }, [activities]);
-
-  const birthdaysByMonthDay = useMemo(() => {
-    const map = new Map<string, Birthday[]>();
-    birthdays.forEach(b => {
-      const k = `${pad(b.birth_month)}-${pad(b.birth_day)}`;
-      const list = map.get(k) ?? [];
-      list.push(b);
-      map.set(k, list);
-    });
-    return map;
-  }, [birthdays]);
 
   // 月曆格子：補滿前後空白，湊成完整的週
   const cells = useMemo(() => {
@@ -113,7 +85,6 @@ const Calendar: React.FC<Props> = ({ activities }) => {
   };
 
   const selectedActivities = activitiesByDate.get(selected) ?? [];
-  const selectedBirthdays = birthdaysByMonthDay.get(selected.slice(5)) ?? [];
 
   // 這個月有出現的活動類型，圖例只列出用得到的
   const legendTypes = useMemo(() => {
@@ -131,7 +102,7 @@ const Calendar: React.FC<Props> = ({ activities }) => {
         <h1 className="text-3xl font-bold text-gray-900 tracking-tight flex items-center justify-center gap-2">
           <CalendarDays className="text-red-600" size={30} /> 活動行事曆
         </h1>
-        <p className="text-gray-400 mt-2 font-medium">長展分會的例會、培訓與夥伴生日，一次看清楚</p>
+        <p className="text-gray-400 mt-2 font-medium">長展分會的例會、培訓與精選活動，一次看清楚</p>
       </div>
 
       {/* 月份切換 */}
@@ -180,7 +151,6 @@ const Calendar: React.FC<Props> = ({ activities }) => {
             if (!cell) return <div key={`empty-${i}`} className="min-h-[76px] sm:min-h-[104px] bg-gray-50/40 border-b border-r border-gray-50" />;
 
             const acts = activitiesByDate.get(cell.key) ?? [];
-            const cakes = birthdaysByMonthDay.get(cell.key.slice(5)) ?? [];
             const isToday = cell.key === today;
             const isSelected = cell.key === selected;
 
@@ -192,7 +162,7 @@ const Calendar: React.FC<Props> = ({ activities }) => {
                   isSelected ? 'bg-red-50/70 ring-2 ring-inset ring-red-400' : 'hover:bg-gray-50'
                 }`}
               >
-                <div className="flex items-center justify-between mb-1">
+                <div className="mb-1">
                   <span
                     className={`text-xs sm:text-sm font-bold w-6 h-6 flex items-center justify-center rounded-full ${
                       isToday ? 'bg-red-600 text-white' : 'text-gray-700'
@@ -200,12 +170,6 @@ const Calendar: React.FC<Props> = ({ activities }) => {
                   >
                     {cell.day}
                   </span>
-                  {cakes.length > 0 && (
-                    <span className="flex items-center gap-0.5 text-pink-500" title={`${cakes.length} 位夥伴生日`}>
-                      <Cake size={12} />
-                      <span className="text-[10px] font-bold">{cakes.length}</span>
-                    </span>
-                  )}
                 </div>
 
                 {/* 手機版空間不夠，只點出顏色圓點；桌機才顯示活動名稱 */}
@@ -241,9 +205,6 @@ const Calendar: React.FC<Props> = ({ activities }) => {
               <span className={`w-2.5 h-2.5 rounded-full ${styleOf(t).dot}`} /> {styleOf(t).label}
             </span>
           ))}
-          <span className="flex items-center gap-1.5 text-xs text-gray-500 font-medium">
-            <Cake size={12} className="text-pink-500" /> 夥伴生日
-          </span>
         </div>
       )}
 
@@ -254,7 +215,7 @@ const Calendar: React.FC<Props> = ({ activities }) => {
           {selected === today && <span className="ml-2 text-xs bg-red-600 text-white px-2 py-0.5 rounded-full align-middle">今天</span>}
         </h3>
 
-        {selectedActivities.length === 0 && selectedBirthdays.length === 0 ? (
+        {selectedActivities.length === 0 ? (
           <p className="text-gray-400 text-sm bg-white border border-gray-100 rounded-2xl p-8 text-center">
             這天沒有安排活動
           </p>
@@ -293,27 +254,6 @@ const Calendar: React.FC<Props> = ({ activities }) => {
               </Link>
             ))}
 
-            {selectedBirthdays.length > 0 && (
-              <div className="bg-pink-50/60 border border-pink-100 rounded-2xl p-4">
-                <p className="text-sm font-bold text-pink-700 flex items-center gap-1.5 mb-3">
-                  <Cake size={15} /> {selected === today ? '今日壽星' : '當天壽星'}
-                </p>
-                <div className="flex flex-wrap gap-3">
-                  {selectedBirthdays.map(b => (
-                    <div key={b.id} className="flex items-center gap-2 bg-white rounded-full pl-1 pr-3 py-1 border border-pink-100">
-                      {b.picture ? (
-                        <img src={b.picture} alt={b.name} className="w-7 h-7 rounded-full object-cover" />
-                      ) : (
-                        <span className="w-7 h-7 rounded-full bg-pink-100 text-pink-500 flex items-center justify-center text-xs font-bold">
-                          {b.name.slice(0, 1)}
-                        </span>
-                      )}
-                      <span className="text-sm font-bold text-gray-700">{b.name}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
         )}
       </div>
