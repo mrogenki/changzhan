@@ -8,6 +8,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import LoginPage from './pages/LoginPage';
 import MemberList from './pages/MemberList';
 import Milestones from './pages/Milestones';
+import Calendar from './pages/Calendar';
 import RegularMeeting from './pages/RegularMeeting';
 import BusinessTraining from './pages/BusinessTraining';
 import CoffeeMeeting from './pages/CoffeeMeeting';
@@ -66,6 +67,7 @@ const Header: React.FC = () => {
                         <Link to="/training" className="text-gray-700 hover:text-red-600 transition-colors font-medium">商務培訓</Link>
                         <Link to="/coffee" className="text-gray-700 hover:text-red-600 transition-colors font-medium">咖啡會議</Link>
                         <Link to="/members" className="text-gray-700 hover:text-red-600 transition-colors font-medium">產業資源</Link>
+                        <Link to="/calendar" className="text-gray-700 hover:text-red-600 transition-colors font-medium">行事曆</Link>
                         <Link to="/milestones" className="text-gray-700 hover:text-red-600 transition-colors font-medium">長展大事記</Link>
                         <Link to="/admin" className="text-gray-500 hover:text-gray-900 flex items-center gap-1 border border-gray-200 px-3 py-1 rounded-full text-sm font-bold">後台管理</Link>
                     </div>
@@ -83,6 +85,7 @@ const Header: React.FC = () => {
                     <Link to="/training" onClick={() => setIsOpen(false)} className="block text-gray-700 font-bold">商務培訓</Link>
                     <Link to="/coffee" onClick={() => setIsOpen(false)} className="block text-gray-700 font-bold">咖啡會議</Link>
                     <Link to="/members" onClick={() => setIsOpen(false)} className="block text-gray-700 font-bold">產業資源</Link>
+                    <Link to="/calendar" onClick={() => setIsOpen(false)} className="block text-gray-700 font-bold">行事曆</Link>
                     <Link to="/milestones" onClick={() => setIsOpen(false)} className="block text-gray-700 font-bold">長展大事記</Link>
                     <Link to="/admin" onClick={() => setIsOpen(false)} className="block text-gray-500 text-sm font-bold">後台管理</Link>
                 </div>
@@ -685,6 +688,7 @@ const App: React.FC = () => {
                         <Route path="/training" element={<BusinessTraining activities={activities} />} />
                         <Route path="/coffee" element={<CoffeeMeeting activities={activities} />} />
                         <Route path="/members" element={<MemberList members={members} />} />
+                        <Route path="/calendar" element={<Calendar activities={activities} />} />
                         <Route path="/milestones" element={<Milestones milestones={milestones} />} />
                         <Route path="/activity/:id" element={<ActivityDetail activities={activities} onRegister={handleRegister} registrations={registrations} members={members} />} />
                         <Route path="/admin/login" element={session ? <Navigate to="/admin" /> : <LoginPage />} />
