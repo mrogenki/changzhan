@@ -245,7 +245,17 @@ npm run preview    # 本機預覽 build
 - Allow bot to join group chats：ON
 - 把 bot 加到群組後，bot 收到 `join` 事件就會自動進 `line_groups` 表
 
-**Admin 介面：** `/admin/line-groups`（由 `pages/admin/LineGroupManager.tsx` 提供）— 群組清單、報名通知群組設定、群發公告（多選 + 全選 + 文字 + 圖片）、發送紀錄
+**Admin 介面：** `/admin/line-groups`（由 `pages/admin/LineGroupManager.tsx` 提供）— 群組清單、報名通知群組設定、自動回覆公告、發送紀錄、本月額度
+
+⚠️ **後台的手動推播已停用**（避免誤觸消耗 LINE 額度）：
+- 「群發公告」UI 與 `handleSend` 已移除，`components/LineMessageTester.tsx` 已刪除
+- `line-broadcast` edge function **仍部署著**（只是沒有介面呼叫它），且已加上「呼叫者必須是可編輯的後台人員」檢查
+- 要恢復請看 git 歷史（commit 訊息含「群發」）
+
+**仍會自動送出、會消耗額度的路徑**（不是誤觸，但要知道）：
+- **報名通知**：每有人報名就推一則到 `app_settings.line_notify_registration_group_id` 指定的群組。把該設定清空即可停用。
+- **訪客報到歡迎訊息**：LIFF 報到成功後推給該位訪客本人（`LiffCheckin.tsx` → `send-line-message`）。
+- 自動回覆公告（`!公告`）走 LINE 的 reply API，**不計入推播額度**。
 
 **報名通知流程：** `App.tsx::handleRegister` insert 完 `registrations` 後 fire-and-forget invoke `line-notify-registration`，失敗不影響使用者報名動作。
 

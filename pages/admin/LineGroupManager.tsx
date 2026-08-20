@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import {
   MessageSquare,
-  Send,
   Users,
   CheckSquare,
   Square,
@@ -82,13 +81,6 @@ const LineGroupManager: React.FC<Props> = ({ canEdit, currentUser, onUploadImage
   const [announcement, setAnnouncement] = useState('');
   const [announcementUpdatedAt, setAnnouncementUpdatedAt] = useState<string>('');
   const [savingBot, setSavingBot] = useState(false);
-
-  // Broadcast composer
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [text, setText] = useState('');
-  const [imageUrl, setImageUrl] = useState('');
-  const [uploading, setUploading] = useState(false);
-  const [sending, setSending] = useState(false);
 
   // 編輯群組名稱
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -268,101 +260,8 @@ const LineGroupManager: React.FC<Props> = ({ canEdit, currentUser, onUploadImage
     }
   };
 
-  // === 群發 ===
-  const toggleSelect = (gid: string) => {
-    setSelected(prev => {
-      const next = new Set(prev);
-      if (next.has(gid)) next.delete(gid);
-      else next.add(gid);
-      return next;
-    });
-  };
-  const selectAll = () => setSelected(new Set(activeGroups.map(g => g.line_group_id)));
-  const clearAll = () => setSelected(new Set());
+  // 群發相關的 state 與 handler 已隨「群發公告」一併移除（避免誤觸消耗推播額度）
 
-  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setUploading(true);
-    try {
-      const url = await onUploadImage(file);
-      setImageUrl(url);
-    } catch (err: any) {
-      alert('圖片上傳失敗：' + (err.message || err));
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  const handleSend = async () => {
-    if (!canEdit) {
-      alert('你的帳號為「僅檢視」權限，無法執行此操作。');
-      return;
-    }
-
-    if (selected.size === 0) {
-      alert('請至少選一個群組');
-      return;
-    }
-    if (!text.trim() && !imageUrl) {
-      alert('請輸入文字或上傳圖片');
-      return;
-    }
-
-    // 額度預警：群數 > 剩餘額度
-    if (quota?.type === 'limited' && quota.remaining !== null && selected.size > quota.remaining) {
-      const cont = confirm(
-        `⚠️ 額度警告\n\n` +
-        `本月剩餘 ${quota.remaining} 則，但你選了 ${selected.size} 個群組。\n` +
-        `送出後會有 ${selected.size - quota.remaining} 個群組失敗（LINE 會回 429）。\n\n` +
-        `仍要繼續嗎？`,
-      );
-      if (!cont) return;
-    } else if (!confirm(`確定要發送給 ${selected.size} 個群組？`)) {
-      return;
-    }
-
-    setSending(true);
-    try {
-      const messages: any[] = [];
-      if (text.trim()) messages.push({ type: 'text', text: text.trim() });
-      if (imageUrl) {
-        messages.push({
-          type: 'image',
-          originalContentUrl: imageUrl,
-          previewImageUrl: imageUrl,
-        });
-      }
-
-      const { data, error } = await supabase.functions.invoke('line-broadcast', {
-        body: {
-          groupIds: Array.from(selected),
-          messages,
-          sentBy: currentUser.name,
-        },
-      });
-
-      if (error) {
-        alert('發送失敗：' + error.message);
-        return;
-      }
-      if (data?.summary) {
-        const { sent, failed, total } = data.summary;
-        alert(`發送完成：${sent}/${total} 成功，${failed} 失敗`);
-        setText('');
-        setImageUrl('');
-        setSelected(new Set());
-        fetchAll();
-        fetchQuota();
-      } else {
-        alert('發送回應異常：' + JSON.stringify(data));
-      }
-    } catch (err: any) {
-      alert('發送失敗：' + (err.message || err));
-    } finally {
-      setSending(false);
-    }
-  };
 
   return (
     <div className="space-y-8">
@@ -602,130 +501,9 @@ const LineGroupManager: React.FC<Props> = ({ canEdit, currentUser, onUploadImage
         )}
       </section>
 
-      {/* === 區塊 3: 群發公告 === */}
-      <section className="bg-white rounded-xl shadow p-6">
-        <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-          <Send size={20} className="text-red-600" />
-          群發公告
-        </h2>
-
-        {activeGroups.length === 0 ? (
-          <div className="py-6 text-center text-gray-500 bg-gray-50 rounded-lg">
-            目前沒有可發送的群組
-          </div>
-        ) : (
-          <>
-            <div className="mb-4">
-              <div className="flex items-center justify-between mb-2">
-                <label className="font-medium">選擇群組（{selected.size} / {activeGroups.length}）</label>
-                <div className="flex gap-2">
-                  <button
-                    onClick={selectAll}
-                    className="text-xs px-2 py-1 bg-gray-100 rounded hover:bg-gray-200"
-                  >
-                    全選
-                  </button>
-                  <button
-                    onClick={clearAll}
-                    className="text-xs px-2 py-1 bg-gray-100 rounded hover:bg-gray-200"
-                  >
-                    清除
-                  </button>
-                </div>
-              </div>
-              <div className="max-h-64 overflow-y-auto border rounded-lg divide-y">
-                {activeGroups.map(g => {
-                  const checked = selected.has(g.line_group_id);
-                  return (
-                    <button
-                      key={g.id}
-                      type="button"
-                      onClick={() => toggleSelect(g.line_group_id)}
-                      className={`w-full flex items-center gap-3 px-3 py-2 text-left hover:bg-gray-50 ${
-                        checked ? 'bg-blue-50' : ''
-                      }`}
-                    >
-                      {checked ? (
-                        <CheckSquare size={18} className="text-blue-600 flex-shrink-0" />
-                      ) : (
-                        <Square size={18} className="text-gray-400 flex-shrink-0" />
-                      )}
-                      <span className="font-medium">{g.name || '(未命名)'}</span>
-                      <span className="text-xs text-gray-400 ml-auto font-mono">
-                        {g.line_group_id.slice(0, 8)}…
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="mb-4">
-              <label className="block font-medium mb-2">訊息文字</label>
-              <textarea
-                value={text}
-                onChange={e => setText(e.target.value)}
-                rows={5}
-                placeholder="輸入要發送的文字（可空，但需至少有圖片）"
-                className="w-full border rounded-lg px-3 py-2"
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                建議單則訊息不超過 500 字。LINE 群組內 bot 訊息會直接顯示。
-              </p>
-            </div>
-
-            <div className="mb-4">
-              <label className="block font-medium mb-2">圖片（選填）</label>
-              {imageUrl ? (
-                <div className="relative inline-block">
-                  <img src={imageUrl} alt="預覽" className="max-h-48 rounded-lg border" />
-                  <button
-                    onClick={() => setImageUrl('')}
-                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
-                    title="移除圖片"
-                  >
-                    <X size={14} />
-                  </button>
-                </div>
-              ) : (
-                <label className="inline-flex items-center gap-2 px-4 py-2 border-2 border-dashed rounded-lg cursor-pointer hover:bg-gray-50">
-                  {uploading ? (
-                    <Loader2 size={18} className="animate-spin" />
-                  ) : (
-                    <ImageIcon size={18} />
-                  )}
-                  <span className="text-sm">{uploading ? '上傳中…' : '選擇圖片'}</span>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageChange}
-                    className="hidden"
-                    disabled={uploading}
-                  />
-                </label>
-              )}
-            </div>
-
-            <button
-              onClick={handleSend}
-              disabled={sending || selected.size === 0 || (!text.trim() && !imageUrl)}
-              className="w-full sm:w-auto px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {sending ? (
-                <>
-                  <Loader2 size={18} className="animate-spin" />
-                  發送中…
-                </>
-              ) : (
-                <>
-                  <Send size={18} />
-                  發送到 {selected.size} 個群組
-                </>
-              )}
-            </button>
-          </>
-        )}
-      </section>
+      {/* 群發公告已停用：避免誤觸消耗 LINE 推播額度。
+          UI 與 handleSend 一併移除，line-broadcast edge function 仍在（未刪），
+          要恢復請看 git 歷史（commit 訊息含「群發」）。 */}
 
       {/* === 區塊 4: 發送紀錄 === */}
       <section className="bg-white rounded-xl shadow p-6">
