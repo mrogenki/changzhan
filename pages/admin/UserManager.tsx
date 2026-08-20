@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { UserPlus, Trash2, Pencil } from 'lucide-react';
+import { UserPlus, Trash2, Pencil, Eye, PencilLine } from 'lucide-react';
 import { AdminUser, UserRole } from '../../types';
 
 interface UserManagerProps {
@@ -30,12 +30,13 @@ const UserManager: React.FC<UserManagerProps> = ({ users, onAddUser, onUpdateUse
     const email = (formData.get('email') as string).trim().toLowerCase();
     const password = (formData.get('password') as string) || '';
     const role = formData.get('role') as UserRole;
+    const can_edit = formData.get('can_edit') === 'edit';
 
     if (editingUser) {
       // 密碼留白代表不變更
-      onUpdateUser({ ...editingUser, name, email, role, password: password || undefined });
+      onUpdateUser({ ...editingUser, name, email, role, can_edit, password: password || undefined });
     } else {
-      onAddUser({ id: Date.now().toString(), name, email, password, role });
+      onAddUser({ id: Date.now().toString(), name, email, password, role, can_edit });
     }
     closeModal();
   };
@@ -66,6 +67,7 @@ const UserManager: React.FC<UserManagerProps> = ({ users, onAddUser, onUpdateUse
                         <th className="px-6 py-4">姓名</th>
                         <th className="px-6 py-4">登入信箱</th>
                         <th className="px-6 py-4">權限角色</th>
+                        <th className="px-6 py-4">操作權限</th>
                         <th className="px-6 py-4 text-right">操作</th>
                     </tr>
                 </thead>
@@ -90,6 +92,17 @@ const UserManager: React.FC<UserManagerProps> = ({ users, onAddUser, onUpdateUse
                                 }`}>
                                     {user.role}
                                 </span>
+                            </td>
+                            <td className="px-6 py-4">
+                                {user.can_edit === false ? (
+                                    <span className="px-2 py-1 rounded text-xs font-bold bg-amber-100 text-amber-700 inline-flex items-center gap-1">
+                                        <Eye size={12} /> 僅檢視
+                                    </span>
+                                ) : (
+                                    <span className="px-2 py-1 rounded text-xs font-bold bg-green-100 text-green-700 inline-flex items-center gap-1">
+                                        <PencilLine size={12} /> 可編輯
+                                    </span>
+                                )}
                             </td>
                             <td className="px-6 py-4 text-right whitespace-nowrap">
                                 <button onClick={() => { setEditingUser(user); setIsModalOpen(true); }} className="text-gray-400 hover:text-blue-600 p-2 hover:bg-blue-50 rounded-lg transition-colors" title="編輯信箱／密碼／角色">
@@ -131,6 +144,14 @@ const UserManager: React.FC<UserManagerProps> = ({ users, onAddUser, onUpdateUse
                                 <option value={UserRole.MANAGER}>管理員 (可管理活動與會員)</option>
                                 <option value={UserRole.SUPER_ADMIN}>總管理員 (完全權限)</option>
                             </select>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-bold text-gray-700 mb-1">操作權限</label>
+                            <select name="can_edit" defaultValue={editingUser?.can_edit === false ? 'view' : 'edit'} className="w-full border rounded-lg px-3 py-3 bg-white outline-none focus:ring-2 focus:ring-red-500">
+                                <option value="edit">可編輯（可新增、修改、刪除資料）</option>
+                                <option value="view">僅檢視（只能查看，不能修改任何資料）</option>
+                            </select>
+                            <p className="text-xs text-gray-400 mt-1">角色決定「看得到哪些頁」，這裡決定「能不能改」。</p>
                         </div>
                         <div className="flex gap-4 pt-4">
                             <button type="button" onClick={closeModal} className="flex-1 border py-3 rounded-lg font-bold text-gray-500 hover:bg-gray-50 transition-colors">取消</button>

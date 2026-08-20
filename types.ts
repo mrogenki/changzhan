@@ -98,6 +98,9 @@ export interface AdminUser {
     name: string;
     email: string;
     role: UserRole;
+    // 可編輯／僅檢視的總開關。角色決定「看得到哪些頁」，這個決定「能不能改」。
+    // 未設定時一律視為可編輯，與舊資料相容。
+    can_edit?: boolean;
     phone?: string;
     password?: string;
 }

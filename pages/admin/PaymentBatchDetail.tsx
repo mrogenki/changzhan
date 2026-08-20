@@ -13,6 +13,7 @@ import {
 } from '../../types';
 
 interface Props {
+  canEdit: boolean;
   members: Member[];
   registrations: Registration[];
   currentUser: AdminUser;
@@ -39,7 +40,7 @@ const taipeiToday = () =>
 const fmtDateTime = (iso?: string | null) =>
   iso ? new Date(iso).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', dateStyle: 'short', timeStyle: 'short' }) : '';
 
-const PaymentBatchDetail: React.FC<Props> = ({ members, registrations, currentUser }) => {
+const PaymentBatchDetail: React.FC<Props> = ({ canEdit, members, registrations, currentUser }) => {
   const { batchId } = useParams<{ batchId: string }>();
   const [batch, setBatch] = useState<PaymentBatch | null>(null);
   const [items, setItems] = useState<PaymentItem[]>([]);
@@ -209,7 +210,7 @@ const PaymentBatchDetail: React.FC<Props> = ({ members, registrations, currentUs
               {batch.status === 'closed' && ' · 已結清'}
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className={`flex flex-wrap gap-2 ${canEdit ? '' : 'hidden'}`}>
             <button
               onClick={() => setAddOpen(true)}
               className="flex items-center gap-2 border border-gray-200 px-4 py-2.5 rounded-xl hover:bg-gray-50 font-bold text-gray-700"
@@ -340,13 +341,17 @@ const PaymentBatchDetail: React.FC<Props> = ({ members, registrations, currentUs
                             {fmtDateTime(it.paid_at)}
                             {it.recorded_by && ` · ${it.recorded_by}`}
                           </span>
-                          <button
-                            onClick={() => undoPaid(it)}
-                            className="text-[11px] text-gray-300 hover:text-red-500 font-bold"
-                          >
-                            撤銷
-                          </button>
+                          {canEdit && (
+                            <button
+                              onClick={() => undoPaid(it)}
+                              className="text-[11px] text-gray-300 hover:text-red-500 font-bold"
+                            >
+                              撤銷
+                            </button>
+                          )}
                         </div>
+                      ) : !canEdit ? (
+                        <span className="text-xs text-gray-300 font-bold">未繳</span>
                       ) : (
                         <div className="flex gap-1">
                           {METHODS.map(m => (
@@ -366,19 +371,23 @@ const PaymentBatchDetail: React.FC<Props> = ({ members, registrations, currentUs
                       <span className="line-clamp-2">{it.note || '—'}</span>
                     </td>
                     <td className="px-6 py-4 text-right whitespace-nowrap">
-                      <button
-                        onClick={() => setEditing(it)}
-                        className="text-xs font-bold text-gray-500 hover:text-red-600 px-2 py-1"
-                      >
-                        編輯
-                      </button>
-                      <button
-                        onClick={() => removeItem(it)}
-                        className="text-gray-400 hover:text-red-600 p-2 hover:bg-red-50 rounded-lg transition-colors align-middle"
-                        title="從名單移除"
-                      >
-                        <Trash2 size={16} />
-                      </button>
+                      {canEdit && (
+                        <>
+                          <button
+                            onClick={() => setEditing(it)}
+                            className="text-xs font-bold text-gray-500 hover:text-red-600 px-2 py-1"
+                          >
+                            編輯
+                          </button>
+                          <button
+                            onClick={() => removeItem(it)}
+                            className="text-gray-400 hover:text-red-600 p-2 hover:bg-red-50 rounded-lg transition-colors align-middle"
+                            title="從名單移除"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </>
+                      )}
                     </td>
                   </tr>
                 );
@@ -387,7 +396,7 @@ const PaymentBatchDetail: React.FC<Props> = ({ members, registrations, currentUs
           </table>
           {visible.length === 0 && (
             <div className="p-10 text-center text-gray-400">
-              {items.length === 0 ? '這個項目還沒有名單，點右上角「加入名單」。' : '沒有符合條件的資料'}
+              {items.length === 0 ? (canEdit ? '這個項目還沒有名單，點右上角「加入名單」。' : '這個項目還沒有名單。') : '沒有符合條件的資料'}
             </div>
           )}
         </div>

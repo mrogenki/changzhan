@@ -128,7 +128,7 @@
 | Table | 說明 |
 |-------|------|
 | `activities` | 活動資料（id, title, date, time, location, picture 等）。另有 `activity_og` view 供 OG function 用，見第四節 |
-| `admins` | 後台管理員（`name`/`email`/`role`；`email` 即登入帳號。`phone`、`password` 為舊欄位，已不再使用）|
+| `admins` | 後台管理員（`name`/`email`/`role`/`can_edit`；`email` 即登入帳號。`phone`、`password` 為舊欄位，已不再使用）|
 | `registrations` | 活動報名記錄（含 `notes` 備註，供來賓管理裡尚未綁定 LINE 的列使用）|
 | `members` | 會員資料 |
 | `attendance` | 出席記錄（⚠️ 目前 **RLS 未啟用**，需修） |
@@ -269,6 +269,24 @@ npm run preview    # 本機預覽 build
 - `mailto:` 「寫信給我」按鈕實測可用（LINE 接受）；若日後某情境被拒，改成 email 文字列即可（builder 內單點可調）。
 
 **判斷路由：** `App.tsx` 最前面的 LIFF 短路判斷**先判名片**（path `/liff/card` 或 `member`/`ids` 參數，含 `liff.state` 包裹），再判例會報到，避免參數被吃掉。
+
+### 後台的「可編輯 / 僅檢視」
+
+`admins.can_edit`（boolean，預設 true）。**角色決定「看得到哪些頁」，`can_edit` 決定「能不能改」**，兩者互相獨立——所以會有「僅檢視的總管理員」這種組合。
+
+**三層都要擋，缺一不可：**
+
+1. **RLS（真正的防線）**：12 張後台表的政策已從 `FOR ALL` 拆成
+   - SELECT → `is_changzhan_admin()`（在 admins 表裡就能讀）
+   - INSERT / UPDATE / DELETE → `is_changzhan_editor()`（還要 `can_edit`）
+
+   只在前端藏按鈕等於沒鎖，因為 anon key 是公開的、任何人都能直接打 REST API。
+2. **前端攔截**：`App.tsx` 的 `g()` 把 26 個寫入型 handler 包起來，唯讀時跳提示而不是讓使用者看到 RLS 的英文錯誤。直接寫 DB 的頁面（GuestManager／PaymentManager／PaymentBatchDetail／LineGroupManager）各自收 `canEdit` prop。
+3. **Edge Functions**：`manage-admin` 與 `line-broadcast` 都會查 `admins.can_edit`。service role 會繞過 RLS，所以函式必須自己檢查。
+
+**⚠️ 已知仍未覆蓋的路徑**（動到相關功能時要留意）：
+- `line_groups` 有一條 `anon` 的 `FOR ALL` 政策，唯讀帳號仍可繞過前端直接改群組資料。要收緊得先確認 `line-webhook` 是用哪個 key 寫入。
+- `send-line-message` 不檢查呼叫者，**且不能檢查**——LIFF 訪客報到的歡迎訊息是以 anon 身分呼叫它的。
 
 ### 收款管理（`/admin/payments`）
 

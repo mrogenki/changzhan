@@ -5,6 +5,7 @@ import { supabase } from '../../supabaseClient';
 import { Activity, AdminUser, AttendanceRecord, Member, PaymentBatch, Registration } from '../../types';
 
 interface Props {
+  canEdit: boolean;
   members: Member[];
   activities: Activity[];
   attendance: AttendanceRecord[];
@@ -41,7 +42,7 @@ const currentPeriod = () => taipeiToday().slice(0, 7); // YYYY-MM
 
 const money = (n: number) => `NT$ ${n.toLocaleString('zh-TW')}`;
 
-const PaymentManager: React.FC<Props> = ({ members, activities, attendance, registrations, currentUser }) => {
+const PaymentManager: React.FC<Props> = ({ canEdit, members, activities, attendance, registrations, currentUser }) => {
   const [batches, setBatches] = useState<PaymentBatch[]>([]);
   const [stats, setStats] = useState<ItemStat[]>([]);
   const [loading, setLoading] = useState(true);
@@ -193,7 +194,7 @@ const PaymentManager: React.FC<Props> = ({ members, activities, attendance, regi
           </h1>
           <p className="text-gray-500 text-sm">每月餐費與各項活動收費，記錄繳費進度與方式。</p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className={`flex flex-wrap gap-2 ${canEdit ? '' : 'hidden'}`}>
           <button
             onClick={createMonthlyMealFee}
             disabled={creating}
@@ -280,7 +281,8 @@ const PaymentManager: React.FC<Props> = ({ members, activities, attendance, regi
                     </td>
                     <td className="px-6 py-4">
                       <button
-                        onClick={() => toggleStatus(b)}
+                        onClick={() => canEdit && toggleStatus(b)}
+                        disabled={!canEdit}
                         className={`px-2 py-1 rounded text-xs font-bold ${
                           b.status === 'open' ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-500'
                         }`}
@@ -294,15 +296,17 @@ const PaymentManager: React.FC<Props> = ({ members, activities, attendance, regi
                         to={`/admin/payments/${b.id}`}
                         className="inline-flex items-center gap-1 text-sm font-bold text-red-600 hover:underline mr-2"
                       >
-                        收款 <ChevronRight size={14} />
+                        {canEdit ? '收款' : '查看'} <ChevronRight size={14} />
                       </Link>
-                      <button
-                        onClick={() => deleteBatch(b)}
-                        className="text-gray-400 hover:text-red-600 p-2 hover:bg-red-50 rounded-lg transition-colors align-middle"
-                        title="刪除項目"
-                      >
-                        <Trash2 size={16} />
-                      </button>
+                      {canEdit && (
+                        <button
+                          onClick={() => deleteBatch(b)}
+                          className="text-gray-400 hover:text-red-600 p-2 hover:bg-red-50 rounded-lg transition-colors align-middle"
+                          title="刪除項目"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      )}
                     </td>
                   </tr>
                 );
@@ -311,7 +315,7 @@ const PaymentManager: React.FC<Props> = ({ members, activities, attendance, regi
           </table>
           {batches.length === 0 && (
             <div className="p-10 text-center text-gray-400">
-              還沒有收款項目。點右上角「建立本月餐費」開始。
+              {canEdit ? '還沒有收款項目。點右上角「建立本月餐費」開始。' : '目前沒有收款項目。'}
             </div>
           )}
         </div>

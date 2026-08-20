@@ -1,4 +1,5 @@
 import React from 'react';
+import { Eye } from 'lucide-react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { Activity, Registration, AdminUser, UserRole, Member, AttendanceRecord, AttendanceStatus, FinanceRecord, Milestone, ChapterDocument } from '../types';
 import Sidebar from './admin/Sidebar';
@@ -19,6 +20,7 @@ import DocumentManager from './admin/DocumentManager';
 import LineGroupManager from './admin/LineGroupManager';
 
 interface AdminDashboardProps {
+  canEdit: boolean;
   currentUser: AdminUser;
   onLogout: () => void;
   activities: Activity[];
@@ -85,12 +87,30 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
           ☰ 選單
         </button>
 
+        {!props.canEdit && (
+
+
+          <div className="mb-4 flex items-center gap-2 bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 rounded-xl text-sm font-bold">
+
+
+            <Eye size={16} className="shrink-0" />
+
+
+            你的帳號為「僅檢視」權限，可以查看所有資料但無法修改。
+
+
+          </div>
+
+
+        )}
+
         <Routes>
           <Route path="/" element={<DashboardHome activities={props.activities} registrations={props.registrations} />} />
           <Route path="/check-in" element={<CheckInManager activities={props.activities} registrations={props.registrations} onUpdateRegistration={props.onUpdateRegistration} onDeleteRegistration={props.onDeleteRegistration} onAddRegistration={props.onAddRegistration} onRefreshRegistrations={props.onRefreshRegistrations} />} />
           <Route path="/attendance" element={<AttendanceManager activities={props.activities} members={props.members} attendance={props.attendance} onUpdateAttendance={props.onUpdateAttendance} onDeleteAttendance={props.onDeleteAttendance} onRefreshAttendance={props.onRefreshAttendance} />} />
           <Route path="/payments" element={
             <PaymentManager
+              canEdit={props.canEdit}
               members={props.members}
               activities={props.activities}
               attendance={props.attendance}
@@ -100,6 +120,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
           } />
           <Route path="/payments/:batchId" element={
             <PaymentBatchDetail
+              canEdit={props.canEdit}
               members={props.members}
               registrations={props.registrations}
               currentUser={props.currentUser}
@@ -121,7 +142,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
                   onUploadImage={props.onUploadImage}
                 />
               } />
-              <Route path="/guests" element={<GuestManager />} />
+              <Route path="/guests" element={<GuestManager canEdit={props.canEdit} />} />
               <Route path="/birthdays" element={<BirthdayManager members={props.members} />} />
               <Route path="/membership-expiry" element={<MembershipExpiryManager members={props.members} />} />
               <Route path="/documents" element={
@@ -137,6 +158,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
               } />
               <Route path="/line-groups" element={
                 <LineGroupManager
+                  canEdit={props.canEdit}
                   currentUser={props.currentUser}
                   onUploadImage={props.onUploadImage}
                 />

@@ -57,6 +57,7 @@ interface QuotaInfo {
 }
 
 interface Props {
+  canEdit: boolean;
   currentUser: AdminUser;
   onUploadImage: (file: File) => Promise<string>;
 }
@@ -66,7 +67,7 @@ const BOT_ENABLED_KEY = 'bot_reply_enabled';
 const BOT_ANNOUNCEMENT_KEY = 'bot_reply_announcement_text';
 const BOT_ANNOUNCEMENT_UPDATED_KEY = 'bot_reply_announcement_updated_at';
 
-const LineGroupManager: React.FC<Props> = ({ currentUser, onUploadImage }) => {
+const LineGroupManager: React.FC<Props> = ({ canEdit, currentUser, onUploadImage }) => {
   const [groups, setGroups] = useState<LineGroup[]>([]);
   const [logs, setLogs] = useState<SendLogRow[]>([]);
   const [notifyGroupId, setNotifyGroupId] = useState<string>('');
@@ -180,6 +181,11 @@ const LineGroupManager: React.FC<Props> = ({ currentUser, onUploadImage }) => {
     setEditDesc('');
   };
   const saveEdit = async (id: number) => {
+    if (!canEdit) {
+      alert('你的帳號為「僅檢視」權限，無法執行此操作。');
+      return;
+    }
+
     const { error } = await supabase
       .from('line_groups')
       .update({ name: editName.trim() || null, description: editDesc.trim() || null })
@@ -192,6 +198,11 @@ const LineGroupManager: React.FC<Props> = ({ currentUser, onUploadImage }) => {
     fetchAll();
   };
   const toggleActive = async (g: LineGroup) => {
+    if (!canEdit) {
+      alert('你的帳號為「僅檢視」權限，無法執行此操作。');
+      return;
+    }
+
     const { error } = await supabase
       .from('line_groups')
       .update({ is_active: !g.is_active, left_at: g.is_active ? new Date().toISOString() : null })
@@ -205,6 +216,11 @@ const LineGroupManager: React.FC<Props> = ({ currentUser, onUploadImage }) => {
 
   // === 自動回覆公告設定 ===
   const saveBotSettings = async () => {
+    if (!canEdit) {
+      alert('你的帳號為「僅檢視」權限，無法執行此操作。');
+      return;
+    }
+
     setSavingBot(true);
     try {
       const nowIso = new Date().toISOString();
@@ -229,6 +245,11 @@ const LineGroupManager: React.FC<Props> = ({ currentUser, onUploadImage }) => {
 
   // === 報名通知群組設定 ===
   const saveNotifySetting = async () => {
+    if (!canEdit) {
+      alert('你的帳號為「僅檢視」權限，無法執行此操作。');
+      return;
+    }
+
     setSavingNotify(true);
     try {
       const { error } = await supabase
@@ -274,6 +295,11 @@ const LineGroupManager: React.FC<Props> = ({ currentUser, onUploadImage }) => {
   };
 
   const handleSend = async () => {
+    if (!canEdit) {
+      alert('你的帳號為「僅檢視」權限，無法執行此操作。');
+      return;
+    }
+
     if (selected.size === 0) {
       alert('請至少選一個群組');
       return;

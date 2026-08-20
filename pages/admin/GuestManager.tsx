@@ -57,7 +57,7 @@ type NoteTarget = {
   notes: string;
 };
 
-const GuestManager: React.FC = () => {
+const GuestManager: React.FC<{ canEdit: boolean }> = ({ canEdit }) => {
   const [guests, setGuests] = useState<GuestSummary[]>([]);
   const [unboundRegs, setUnboundRegs] = useState<RegistrationRow[]>([]); // 沒對應 guest_id 的 registrations
   const [activities, setActivities] = useState<ActivityLite[]>([]);
@@ -276,9 +276,10 @@ const GuestManager: React.FC = () => {
                     <td className="px-4 py-3 text-xs text-gray-500">{row.last_attended_date || '—'}</td>
                     <td className="px-4 py-3">
                       <button
-                        onClick={() => openNoteEditor(row)}
-                        className="text-left w-full group"
-                        title="編輯備註"
+                        onClick={() => canEdit && openNoteEditor(row)}
+                        disabled={!canEdit}
+                        className="text-left w-full group disabled:cursor-default"
+                        title={canEdit ? '編輯備註' : '僅檢視權限'}
                       >
                         {row.notes ? (
                           <span className="text-xs text-gray-700 whitespace-pre-wrap line-clamp-3 group-hover:text-blue-600">
@@ -286,7 +287,7 @@ const GuestManager: React.FC = () => {
                           </span>
                         ) : (
                           <span className="text-xs text-gray-300 group-hover:text-blue-600 flex items-center gap-1">
-                            <StickyNote size={13} /> 新增備註
+                            {canEdit ? <><StickyNote size={13} /> 新增備註</> : '—'}
                           </span>
                         )}
                       </button>

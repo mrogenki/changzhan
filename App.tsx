@@ -290,6 +290,16 @@ const App: React.FC = () => {
         setProfileResolved(true); // 對不到就是這個 Auth 帳號沒有後台權限（共用 Auth，可能只是 bni-report 使用者）
     }, [session?.user?.email, users]);
 
+    // 「僅檢視」帳號：RLS 已在資料庫層擋住寫入，這裡再攔一層並給出清楚訊息，
+    // 而不是讓使用者按了按鈕卻只看到 RLS 的英文錯誤。
+    const canEdit = currentUser?.can_edit !== false;
+    const blockedByReadOnly = (): any => {
+        alert('你的帳號為「僅檢視」權限，無法修改資料。\n需要編輯權限請聯絡總管理員。');
+        return Promise.resolve(false);
+    };
+    const g = <T extends (...args: any[]) => any>(fn: T): T =>
+        (canEdit ? fn : (blockedByReadOnly as unknown as T));
+
     const handleLogout = async () => {
         await supabase.auth.signOut();
         setCurrentUser(null);
@@ -413,9 +423,9 @@ const App: React.FC = () => {
     };
 
     const handleAddUser = async (newUser: AdminUser) => {
-        const { name, email, password, role } = newUser as any;
+        const { name, email, password, role, can_edit } = newUser as any;
         // 經 edge function 同時建立 Supabase Auth 帳號 + admins 資料（需總管理員身分）
-        const payload = { action: 'create', name, email, password, role };
+        const payload = { action: 'create', name, email, password, role, can_edit };
         let result = await invokeManageAdmin(payload);
         // 共用 Auth：此信箱可能已有帳號（例：引薦單報告的使用者），確認後改為沿用
         if (!result.ok && result.code === 'email_has_account') {
@@ -430,9 +440,9 @@ const App: React.FC = () => {
     };
 
     const handleUpdateUser = async (updated: AdminUser & { password?: string }) => {
-        const { id, name, email, role, password } = updated as any;
+        const { id, name, email, role, password, can_edit } = updated as any;
         // 經 edge function 同步更新 Auth 帳號（信箱／密碼）+ admins 資料；password 未帶則不動
-        const payload = { action: 'update', id, name, email, role, ...(password ? { password } : {}) };
+        const payload = { action: 'update', id, name, email, role, can_edit, ...(password ? { password } : {}) };
         let result = await invokeManageAdmin(payload);
         if (!result.ok && result.code === 'email_has_account') {
             if (!window.confirm(`${result.message}\n\n要改為沿用既有帳號嗎？`)) return;
@@ -711,6 +721,7 @@ const App: React.FC = () => {
                                 )
                             ) : (
                                 <AdminDashboard
+                                    canEdit={canEdit}
                                     currentUser={currentUser}
                                     onLogout={handleLogout}
                                     activities={activities}
@@ -718,38 +729,38 @@ const App: React.FC = () => {
                                     users={users}
                                     members={members}
                                     attendance={attendance}
-                                    onUpdateActivity={handleUpdateActivity}
-                                    onAddActivity={handleAddActivity}
-                                    onDeleteActivity={handleDeleteActivity}
-                                    onUpdateRegistration={handleUpdateRegistration}
-                                    onDeleteRegistration={handleDeleteRegistration}
-                                    onAddRegistration={handleAddRegistration}
-                                    onAddUser={handleAddUser}
-                                    onUpdateUser={handleUpdateUser}
-                                    onDeleteUser={handleDeleteUser}
-                                    onAddMember={handleAddMember}
-                                    onUpdateMember={handleUpdateMember}
-                                    onDeleteMember={handleDeleteMember}
-                                    onBatchImportMembers={handleBatchImportMembers}
-                                    onUpdateAttendance={handleUpdateAttendance}
-                                    onDeleteAttendance={handleDeleteAttendance}
+                                    onUpdateActivity={g(handleUpdateActivity)}
+                                    onAddActivity={g(handleAddActivity)}
+                                    onDeleteActivity={g(handleDeleteActivity)}
+                                    onUpdateRegistration={g(handleUpdateRegistration)}
+                                    onDeleteRegistration={g(handleDeleteRegistration)}
+                                    onAddRegistration={g(handleAddRegistration)}
+                                    onAddUser={g(handleAddUser)}
+                                    onUpdateUser={g(handleUpdateUser)}
+                                    onDeleteUser={g(handleDeleteUser)}
+                                    onAddMember={g(handleAddMember)}
+                                    onUpdateMember={g(handleUpdateMember)}
+                                    onDeleteMember={g(handleDeleteMember)}
+                                    onBatchImportMembers={g(handleBatchImportMembers)}
+                                    onUpdateAttendance={g(handleUpdateAttendance)}
+                                    onDeleteAttendance={g(handleDeleteAttendance)}
                                     onRefreshAttendance={refreshAttendance}
                                     onRefreshRegistrations={refreshRegistrations}
-                                    onAddFinanceRecord={handleAddFinanceRecord}
-                                    onUpdateFinanceRecord={handleUpdateFinanceRecord}
-                                    onDeleteFinanceRecord={handleDeleteFinanceRecord}
+                                    onAddFinanceRecord={g(handleAddFinanceRecord)}
+                                    onUpdateFinanceRecord={g(handleUpdateFinanceRecord)}
+                                    onDeleteFinanceRecord={g(handleDeleteFinanceRecord)}
                                     financeRecords={financeRecords}
                                     milestones={milestones}
-                                    onAddMilestone={handleAddMilestone}
-                                    onUpdateMilestone={handleUpdateMilestone}
-                                    onDeleteMilestone={handleDeleteMilestone}
+                                    onAddMilestone={g(handleAddMilestone)}
+                                    onUpdateMilestone={g(handleUpdateMilestone)}
+                                    onDeleteMilestone={g(handleDeleteMilestone)}
                                     documents={documents}
-                                    onAddDocument={handleAddDocument}
-                                    onUpdateDocument={handleUpdateDocument}
-                                    onDeleteDocument={handleDeleteDocument}
-                                    onUploadDocumentFile={handleUploadDocumentFile}
+                                    onAddDocument={g(handleAddDocument)}
+                                    onUpdateDocument={g(handleUpdateDocument)}
+                                    onDeleteDocument={g(handleDeleteDocument)}
+                                    onUploadDocumentFile={g(handleUploadDocumentFile)}
                                     onGetDocumentDownloadUrl={handleGetDocumentDownloadUrl}
-                                    onUploadImage={handleUploadImage}
+                                    onUploadImage={g(handleUploadImage)}
                                 />
                             )
                         } />
