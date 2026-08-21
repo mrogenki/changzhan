@@ -552,6 +552,20 @@ const SheetDetail: React.FC<{
 
 /* ---------------- 建立接龍 ---------------- */
 
+// DB 的 timestamptz → datetime-local 要的「台北當地時間」字串
+const toLocalInput = (iso?: string | null): string => {
+  if (!iso) return '';
+  const parts = new Intl.DateTimeFormat('sv-SE', {
+    timeZone: 'Asia/Taipei',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(iso));
+  return parts.replace(' ', 'T'); // sv-SE 給的是 'YYYY-MM-DD HH:mm'
+};
+
 const SheetFormModal: React.FC<{
   sheet: Sheet | null; // null = 建立，有值 = 編輯
   activities: Activity[];
@@ -562,36 +576,40 @@ const SheetFormModal: React.FC<{
   const [saving, setSaving] = useState(false);
   const isEdit = !!sheet;
 
-  // datetime-local 要的是「本地時間」字串，DB 存的是 UTC，回填時要換算回台北時間
-  const deadlineLocal = (() => {
-    if (!sheet?.deadline) return '';
-    const parts = new Intl.DateTimeFormat('sv-SE', {
-      timeZone: 'Asia/Taipei',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-    }).format(new Date(sheet.deadline));
-    return parts.replace(' ', 'T'); // sv-SE 給的是 'YYYY-MM-DD HH:mm'
-  })();
+  // 這幾個欄位會被「綁定活動」連動，所以要用受控元件
+  const [title, setTitle] = useState(sheet?.title ?? '');
+  const [activityId, setActivityId] = useState(sheet?.activity_id ? String(sheet.activity_id) : '');
+  const [fee, setFee] = useState(String(sheet?.fee ?? 0));
+  const [deadline, setDeadline] = useState(toLocalInput(sheet?.deadline));
+
+  const boundActivity = activities.find(a => String(a.id) === activityId);
+  // 幹部可能刻意改成跟活動不同的金額（例如只收餐費），所以不鎖死，只在不一致時提醒
+  const feeDiffers = !!boundActivity && Number(fee || 0) !== Number(boundActivity.price ?? 0);
+
+  // 選了活動就把活動資訊帶過來，避免接龍與活動各說各話
+  const pickActivity = (id: string) => {
+    setActivityId(id);
+    const act = activities.find(a => String(a.id) === id);
+    if (!act) return;
+    setFee(String(act.price ?? 0));
+    if (act.date) setDeadline(`${act.date}T${act.time || '00:00'}`);
+    if (!title.trim()) setTitle(act.title);
+  };
 
   const submit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const f = new FormData(e.currentTarget);
-    const title = String(f.get('title') || '').trim();
-    if (!title) return;
+    if (!title.trim()) return;
     const maxRaw = String(f.get('max_people') || '').trim();
-    const deadlineRaw = String(f.get('deadline') || '').trim();
 
     const payload = {
-      title,
+      title: title.trim(),
       description: String(f.get('description') || '').trim() || null,
-      activity_id: f.get('activity_id') ? Number(f.get('activity_id')) : null,
+      activity_id: activityId ? Number(activityId) : null,
       // datetime-local 沒有時區，會以瀏覽器所在時區解讀（幹部都在台灣，等同台北時間）
-      deadline: deadlineRaw ? new Date(deadlineRaw).toISOString() : null,
+      deadline: deadline ? new Date(deadline).toISOString() : null,
       max_people: maxRaw ? Number(maxRaw) : null,
-      fee: Number(f.get('fee') || 0),
+      fee: Number(fee || 0),
       allow_guests: f.get('allow_guests') === 'on',
       allow_non_members: f.get('allow_non_members') === 'on',
     };
@@ -631,30 +649,10 @@ const SheetFormModal: React.FC<{
 
         <form onSubmit={submit} className="space-y-4">
           <div>
-            <label className="block text-sm font-bold text-gray-700 mb-1">主題 *</label>
-            <input
-              name="title"
-              required
-              defaultValue={sheet?.title ?? ''}
-              className="w-full border rounded-lg px-3 py-3 outline-none focus:ring-2 focus:ring-red-500"
-              placeholder="例：9/5 例會後聚餐"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-bold text-gray-700 mb-1">說明</label>
-            <textarea
-              name="description"
-              rows={2}
-              defaultValue={sheet?.description ?? ''}
-              className="w-full border rounded-lg px-3 py-3 outline-none focus:ring-2 focus:ring-red-500"
-              placeholder="時間地點、注意事項…"
-            />
-          </div>
-          <div>
             <label className="block text-sm font-bold text-gray-700 mb-1">綁定活動（選填）</label>
             <select
-              name="activity_id"
-              defaultValue={sheet?.activity_id ? String(sheet.activity_id) : ''}
+              value={activityId}
+              onChange={e => pickActivity(e.target.value)}
               className="w-full border rounded-lg px-3 py-3 bg-white outline-none focus:ring-2 focus:ring-red-500"
             >
               <option value="">不綁定（自由主題）</option>
@@ -664,18 +662,46 @@ const SheetFormModal: React.FC<{
                 </option>
               ))}
             </select>
+            {boundActivity && (
+              <p className="text-[11px] text-gray-400 mt-1.5 leading-relaxed">
+                報名頁會直接顯示活動的日期時間與地點：
+                {boundActivity.date} {boundActivity.time} · {boundActivity.location}
+              </p>
+            )}
           </div>
+
+          <div>
+            <label className="block text-sm font-bold text-gray-700 mb-1">主題 *</label>
+            <input
+              value={title}
+              onChange={e => setTitle(e.target.value)}
+              required
+              className="w-full border rounded-lg px-3 py-3 outline-none focus:ring-2 focus:ring-red-500"
+              placeholder="例：9/5 例會後聚餐"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-bold text-gray-700 mb-1">說明</label>
+            <textarea
+              name="description"
+              rows={2}
+              defaultValue={sheet?.description ?? ''}
+              className="w-full border rounded-lg px-3 py-3 outline-none focus:ring-2 focus:ring-red-500"
+              placeholder="注意事項、集合方式…（時間地點費用不用重打，會自動顯示）"
+            />
+          </div>
+
           <div className="grid grid-cols-3 gap-3">
             <div>
               <label className="block text-sm font-bold text-gray-700 mb-1">每人費用</label>
               <input
-                name="fee"
                 type="number"
                 min={0}
-                defaultValue={sheet?.fee ?? 0}
+                value={fee}
+                onChange={e => setFee(e.target.value)}
                 className="w-full border rounded-lg px-3 py-3 outline-none focus:ring-2 focus:ring-red-500"
               />
-              <p className="text-[11px] text-gray-400 mt-1">0 = 免費</p>
             </div>
             <div>
               <label className="block text-sm font-bold text-gray-700 mb-1">人數上限</label>
@@ -691,19 +717,30 @@ const SheetFormModal: React.FC<{
             <div>
               <label className="block text-sm font-bold text-gray-700 mb-1">截止時間</label>
               <input
-                name="deadline"
                 type="datetime-local"
-                defaultValue={deadlineLocal}
+                value={deadline}
+                onChange={e => setDeadline(e.target.value)}
                 className="w-full border rounded-lg px-3 py-3 outline-none focus:ring-2 focus:ring-red-500"
               />
             </div>
           </div>
+
+          {feeDiffers ? (
+            <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+              ⚠️ 活動「{boundActivity!.title}」的金額是 NT$ {Number(boundActivity!.price ?? 0).toLocaleString('zh-TW')}，
+              這裡設定的是 NT$ {Number(fee || 0).toLocaleString('zh-TW')}。報名頁會顯示這裡的金額。
+            </p>
+          ) : (
+            <p className="text-[11px] text-gray-400">每人費用填 0 就是免費，報名頁不會顯示金額。</p>
+          )}
+
           <label className="flex items-center gap-2 text-sm text-gray-600">
             <input type="checkbox" name="allow_guests" defaultChecked={sheet ? sheet.allow_guests : true} /> 可以帶眷屬／朋友
           </label>
           <label className="flex items-center gap-2 text-sm text-gray-600">
             <input type="checkbox" name="allow_non_members" defaultChecked={sheet ? sheet.allow_non_members : true} /> 非會員也能報名（需填姓名電話）
           </label>
+
           <div className="flex gap-3 pt-2">
             <button
               type="button"
