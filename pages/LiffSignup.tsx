@@ -11,6 +11,9 @@ const supabase = createClient(
 // 接龍報名專用 LIFF app
 const LIFF_SIGNUP_ID = import.meta.env.VITE_LIFF_SIGNUP_ID as string;
 
+// OAuth 導轉可能把 ?sheet= 弄丟，先暫存一份
+const TOKEN_STORAGE_KEY = 'changzhan_signup_token';
+
 type Entry = {
   id: number;
   real_name: string;
@@ -79,7 +82,9 @@ const fmtDeadline = (iso: string) =>
 
 const LiffSignup: React.FC = () => {
   const [phase, setPhase] = useState<Phase>({ kind: 'loading', msg: '載入中…' });
-  const [token] = useState(parseToken());
+  // ⚠️ token 不能在第一次 render 就判定：外部瀏覽器走 OAuth 回來時網址只有 code/state，
+  // 原本的 ?sheet= 要等 liff.init() 跑完才會被還原。
+  const [token, setToken] = useState('');
   const [data, setData] = useState<SheetData | null>(null);
   const [lineUserId, setLineUserId] = useState('');
   const [displayName, setDisplayName] = useState('');
@@ -105,21 +110,32 @@ const LiffSignup: React.FC = () => {
   }, []);
 
   async function init() {
-    if (!token) {
-      setPhase({ kind: 'error', msg: '缺少接龍代碼，請從主辦人分享的連結進入。' });
-      return;
-    }
     if (!LIFF_SIGNUP_ID) {
       setPhase({ kind: 'error', msg: '系統尚未設定 LIFF ID，請聯絡幹部。' });
       return;
     }
+    // 進 OAuth 前先把 token 存起來，萬一導回來時網址沒還原也救得回來
+    const beforeLogin = parseToken();
+    if (beforeLogin) sessionStorage.setItem(TOKEN_STORAGE_KEY, beforeLogin);
+
     try {
       setPhase({ kind: 'loading', msg: '連線 LINE…' });
       await withTimeout(liff.init({ liffId: LIFF_SIGNUP_ID }), 8000, 'LINE 初始化逾時');
       if (!liff.isLoggedIn()) {
-        liff.login();
+        // 帶上目前網址，登入完才回得到同一張接龍
+        liff.login({ redirectUri: window.location.href });
         return;
       }
+
+      // init 之後 LIFF 才會把原本的 query 還原回來
+      const t = parseToken() || sessionStorage.getItem(TOKEN_STORAGE_KEY) || '';
+      if (!t) {
+        setPhase({ kind: 'error', msg: '缺少接龍代碼，請從主辦人分享的連結進入。' });
+        return;
+      }
+      sessionStorage.setItem(TOKEN_STORAGE_KEY, t);
+      setToken(t);
+
       const profile = await withTimeout(liff.getProfile(), 5000, '取得 LINE 資料逾時');
       setLineUserId(profile.userId);
       setDisplayName(profile.displayName);
@@ -136,16 +152,16 @@ const LiffSignup: React.FC = () => {
         setReferrer(pre.referrer ?? '');
       }
 
-      await loadSheet(profile.userId);
+      await loadSheet(profile.userId, t);
       setPhase({ kind: 'ready' });
     } catch (e: any) {
       setPhase({ kind: 'error', msg: e?.message ?? String(e) });
     }
   }
 
-  async function loadSheet(uid: string) {
+  async function loadSheet(uid: string, tk?: string) {
     const { data: res, error } = await supabase.rpc('public_signup_sheet', {
-      p_token: token,
+      p_token: tk ?? token,
       p_viewer_line_user_id: uid,
     });
     if (error) throw new Error('讀取接龍失敗：' + error.message);
