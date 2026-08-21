@@ -86,6 +86,7 @@
 | `Milestones.tsx` | 大事記 |
 | `MemberList.tsx` | 會員列表 |
 | `LiffCheckin.tsx` | LINE LIFF 內嵌簽到頁 |
+| `LiffSignup.tsx` | 接龍報名 LIFF 頁（`/liff/signup?sheet=<token>`），見第九之四節 |
 | `LiffCard.tsx` | LINE LIFF 電子名片分享頁（`/liff/card?member=<id>` 或 `?ids=1,2,3`，用 `liff.shareTargetPicker` 讓使用者把會員名片直接分享給 LINE 好友/群組）|
 | `LoginPage.tsx` | 後台登入（Supabase Auth，**Email + 密碼**；輸入未含 `@` 時會用手機衍生舊信箱 `<數字>@changzhan.local` 當向下相容）|
 | `AdminDashboard.tsx` | 後台主頁 |
@@ -134,6 +135,8 @@
 | `attendance` | 出席記錄（⚠️ 目前 **RLS 未啟用**，需修） |
 | `guests` | 訪客資料（含 `notes` 備註）|
 | `finance_records` | 財務記錄（多一個 `payment_batch_id`，供收款工具寫入時識別是哪個收款項目）|
+| `signup_sheets` | 接龍（含公開連結用的隨機 `token`）|
+| `signup_entries` | 接龍的每筆報名 |
 | `payment_batches` | 收款項目（每月餐費、某場活動收費…），見第九之三節 |
 | `payment_items` | 收款明細，每人一筆，掛在 `payment_batches` 底下 |
 | `milestones` | 大事記 |
@@ -166,6 +169,10 @@
 | `line_checkin(p_activity_id, p_token, p_line_user_id)` | LINE 簽到主流程 |
 | `sync_role_to_jwt()` | 把角色同步到 JWT |
 | `check_message_recently_sent(p_line_user_id, p_message_hash, p_window_hours)` | 訊息防重複發送 |
+| `public_signup_sheet(p_token, p_viewer_line_user_id)` | 接龍公開頁：回傳接龍資訊與名單。**只回姓名與帶幾位**，不回電話；也不回其他人的 `line_user_id`（改回 `is_me` 布林值） |
+| `public_signup_join(...)` | 接龍報名／修改。檢查截止、人數上限（以總人頭計）、限會員設定、非會員必填電話 |
+| `public_signup_cancel(p_token, p_line_user_id)` | 取消報名 |
+| `public_signup_prefill(p_line_user_id)` | 帶入這個人先前填過的姓名電話（會員直接用會員資料），免得每次重打 |
 | `public_member_cards(p_ids bigint[])` | 電子名片：回傳指定會員的名片欄位（含 `mobile_phone`/`email`，僅 active，依傳入順序）。供 `LiffCard.tsx`（anon）取單/多位會員資料。⚠️ 對 anon 開放電話+email，屬可被逐 id 爬取的個資，若要收緊可改為需登入或加頻率限制 |
 
 ⚠️ Supabase advisor 對這些都有 `anon_security_definer_function_executable` warning，但部分函式**必須對 anon 開放**（如 LIFF 簽到流程的訪客）。動權限前要先確認流程不會壞。
@@ -297,6 +304,25 @@ npm run preview    # 本機預覽 build
 **⚠️ 已知仍未覆蓋的路徑**（動到相關功能時要留意）：
 - `line_groups` 有一條 `anon` 的 `FOR ALL` 政策，唯讀帳號仍可繞過前端直接改群組資料。要收緊得先確認 `line-webhook` 是用哪個 key 寫入。
 - `send-line-message` 不檢查呼叫者，**且不能檢查**——LIFF 訪客報到的歡迎訊息是以 anon 身分呼叫它的。
+
+### 接龍報名（`/admin/signups` + `/liff/signup`）
+
+貼一個連結到 LINE 群組，成員點開一鍵 +1，名單即時顯示。**不花 LINE 推播額度**。
+
+**兩張表**：`signup_sheets`（接龍）→ `signup_entries`（每筆報名）。
+
+- **連結用隨機 `token` 不用流水號 id**：不然把網址數字加一就能看到別人的接龍。token 預設值用 URL-safe base64（`translate(..., '+/', '-_')`）——原本用一般 base64，`+` 在 query string 會被解成空白導致 token 對不上。
+- **anon 完全沒有這兩張表的 RLS 權限**，LIFF 頁一律走上面那四支 SECURITY DEFINER function。
+- **參加者**：會員（LIFF 自動對 `members.line_user_id`）、非會員（必填姓名電話，公司引薦人選填）、會員代帶的眷屬（`extra_count` + `extra_names`）。每張接龍可個別設定是否開放非會員、是否可帶人。
+- **人數上限以「總人頭」計**（含眷屬），修改自己的報名時會先扣掉自己原本佔的位子再判斷。
+- **後台代報**的 `line_user_id` 是 null，不受「一個 LINE 帳號一筆」的 unique index 限制。
+- **轉成收款**：本人一筆，帶的每一位也各一筆（有填同行者姓名就用名字，沒填記成「○○○ 的同行者 N」），這樣收款筆數跟實際人頭對得起來。
+
+**LINE 指令 `!名單`**：回覆最近一張進行中且未過截止的接龍名單與報名連結，走 reply API 不計額度。截止時間在程式裡篩，不用 PostgREST 的 `or()` 帶 ISO 時間字串（解析容易出意外）。
+
+**環境變數 `VITE_LIFF_SIGNUP_ID`**（`.env.local` 與 Vercel 都要，Vercel 改完需重新 deploy）：目前值 `2009854899-KEtH0Qad`，Endpoint 應設為 `https://changzhan.vercel.app/liff/signup`。webhook 裡也寫了同一組 ID（`line-webhook` 的 `LIFF_SIGNUP_ID` 常數），**換 LIFF app 時兩邊都要改**。
+
+**判斷路由**：`App.tsx` 最前面的 LIFF 短路判斷**先判接龍**（path `/liff/signup` 或有 `sheet` 參數，含 `liff.state` 包裹），再判名片、例會報到。
 
 ### 收款管理（`/admin/payments`）
 

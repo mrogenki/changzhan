@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Calendar, Users, LogOut, ClipboardList, Building2, Shield, Banknote, Award, Cake, CalendarClock, X, UserCheck, FolderOpen, MessageSquare, BarChart3, ExternalLink, Wallet } from 'lucide-react';
+import { LayoutDashboard, Calendar, Users, LogOut, ClipboardList, Building2, Shield, Banknote, Award, Cake, CalendarClock, X, UserCheck, FolderOpen, MessageSquare, BarChart3, ExternalLink, Wallet, ListOrdered } from 'lucide-react';
 import { AdminUser, UserRole } from '../../types';
 
 // 引薦單報告系統(bni-report)網址；未設定則不顯示入口
@@ -82,6 +82,11 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout, isOpen, onClose }) =>
           <Link to="/admin/attendance" onClick={handleNavClick} className={linkClass(location.pathname.startsWith('/admin/attendance'))}>
             <ClipboardList size={20} />
             <span>會員報到 (會員專屬)</span>
+          </Link>
+
+          <Link to="/admin/signups" onClick={handleNavClick} className={linkClass(location.pathname.startsWith('/admin/signups'))}>
+            <ListOrdered size={20} />
+            <span>接龍報名</span>
           </Link>
 
           <Link to="/admin/payments" onClick={handleNavClick} className={linkClass(location.pathname.startsWith('/admin/payments'))}>

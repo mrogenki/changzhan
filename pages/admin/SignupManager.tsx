@@ -1,0 +1,832 @@
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+  ListOrdered,
+  Plus,
+  Link2,
+  Trash2,
+  Users,
+  Wallet,
+  X,
+  ArrowLeft,
+  UserPlus,
+  Check,
+} from 'lucide-react';
+import { supabase } from '../../supabaseClient';
+import { Activity, AdminUser, Member } from '../../types';
+
+interface Props {
+  canEdit: boolean;
+  activities: Activity[];
+  members: Member[];
+  currentUser: AdminUser;
+}
+
+type Sheet = {
+  id: number;
+  token: string;
+  title: string;
+  description: string | null;
+  activity_id: number | null;
+  deadline: string | null;
+  max_people: number | null;
+  allow_guests: boolean;
+  allow_non_members: boolean;
+  status: 'open' | 'closed';
+  created_by: string | null;
+  created_at: string;
+};
+
+type Entry = {
+  id: number;
+  sheet_id: number;
+  line_user_id: string | null;
+  member_id: number | null;
+  display_name: string | null;
+  real_name: string;
+  phone: string | null;
+  company: string | null;
+  referrer: string | null;
+  extra_count: number;
+  extra_names: string | null;
+  note: string | null;
+  created_at: string;
+};
+
+const SIGNUP_LIFF_ID = import.meta.env.VITE_LIFF_SIGNUP_ID as string | undefined;
+
+const sheetUrl = (token: string) =>
+  SIGNUP_LIFF_ID
+    ? `https://liff.line.me/${SIGNUP_LIFF_ID}?sheet=${encodeURIComponent(token)}`
+    : `${window.location.origin}/liff/signup?sheet=${encodeURIComponent(token)}`;
+
+const fmt = (iso?: string | null) =>
+  iso ? new Date(iso).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', dateStyle: 'short', timeStyle: 'short' }) : '';
+
+const SignupManager: React.FC<Props> = ({ canEdit, activities, members, currentUser }) => {
+  const [sheets, setSheets] = useState<Sheet[]>([]);
+  const [entries, setEntries] = useState<Entry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [openSheet, setOpenSheet] = useState<Sheet | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  async function load() {
+    setLoading(true);
+    try {
+      const [s, e] = await Promise.all([
+        supabase.from('signup_sheets').select('*').order('created_at', { ascending: false }),
+        supabase.from('signup_entries').select('*').order('created_at'),
+      ]);
+      setSheets((s.data ?? []) as Sheet[]);
+      setEntries((e.data ?? []) as Entry[]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const headCount = (sheetId: number) =>
+    entries.filter(e => e.sheet_id === sheetId).reduce((sum, e) => sum + 1 + e.extra_count, 0);
+
+  async function copyLink(sheet: Sheet) {
+    const url = sheetUrl(sheet.token);
+    try {
+      await navigator.clipboard.writeText(url);
+      alert('連結已複製，可以貼到 LINE 群組了：\n\n' + url);
+    } catch {
+      window.prompt('複製這個連結貼到 LINE 群組：', url);
+    }
+  }
+
+  async function toggleStatus(sheet: Sheet) {
+    const next = sheet.status === 'open' ? 'closed' : 'open';
+    const { error } = await supabase.from('signup_sheets').update({ status: next }).eq('id', sheet.id);
+    if (error) alert('更新失敗：' + error.message);
+    else load();
+  }
+
+  async function removeSheet(sheet: Sheet) {
+    const n = entries.filter(e => e.sheet_id === sheet.id).length;
+    if (!window.confirm(`確定要刪除「${sheet.title}」嗎？\n\n底下 ${n} 筆報名會一併刪除，無法復原。`)) return;
+    const { error } = await supabase.from('signup_sheets').delete().eq('id', sheet.id);
+    if (error) alert('刪除失敗：' + error.message);
+    else {
+      setOpenSheet(null);
+      load();
+    }
+  }
+
+  if (loading) return <div className="p-10 text-center text-gray-400">載入接龍資料中...</div>;
+
+  if (openSheet) {
+    const current = sheets.find(s => s.id === openSheet.id) ?? openSheet;
+    return (
+      <SheetDetail
+        canEdit={canEdit}
+        sheet={current}
+        entries={entries.filter(e => e.sheet_id === current.id)}
+        activities={activities}
+        members={members}
+        currentUser={currentUser}
+        onBack={() => setOpenSheet(null)}
+        onChanged={load}
+        onCopyLink={() => copyLink(current)}
+        onToggleStatus={() => toggleStatus(current)}
+        onDelete={() => removeSheet(current)}
+      />
+    );
+  }
+
+  return (
+    <div className="space-y-6 text-gray-900">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            <ListOrdered size={24} className="text-red-600" /> 接龍報名
+          </h1>
+          <p className="text-gray-500 text-sm">建立接龍後把連結貼到 LINE 群組，成員點開一鍵報名。</p>
+        </div>
+        {canEdit && (
+          <button
+            onClick={() => setCreateOpen(true)}
+            className="flex items-center gap-2 bg-red-600 text-white px-4 py-2.5 rounded-xl hover:bg-red-700 shadow-sm"
+          >
+            <Plus size={18} /> 建立接龍
+          </button>
+        )}
+      </div>
+
+      {!SIGNUP_LIFF_ID && (
+        <div className="bg-amber-50 border border-amber-200 text-amber-800 text-sm rounded-xl p-4">
+          尚未設定 <code className="font-mono">VITE_LIFF_SIGNUP_ID</code>，複製出來的連結會是網頁版而不是 LIFF，
+          在 LINE 裡打不開。請在 Vercel 環境變數補上後重新部署。
+        </div>
+      )}
+
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead className="bg-gray-50 border-b border-gray-100">
+              <tr className="text-xs font-bold text-gray-400 uppercase tracking-widest">
+                <th className="px-6 py-4">接龍</th>
+                <th className="px-6 py-4">人數</th>
+                <th className="px-6 py-4">截止</th>
+                <th className="px-6 py-4">狀態</th>
+                <th className="px-6 py-4 text-right">操作</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {sheets.map(s => {
+                const activity = activities.find(a => String(a.id) === String(s.activity_id));
+                return (
+                  <tr key={s.id} className="hover:bg-gray-50/50">
+                    <td className="px-6 py-4">
+                      <button
+                        onClick={() => setOpenSheet(s)}
+                        className="font-bold text-gray-900 hover:text-red-600 text-left"
+                      >
+                        {s.title}
+                      </button>
+                      <div className="text-xs text-gray-400 mt-0.5">
+                        {activity ? `活動：${activity.title}` : '自由主題'}
+                        {s.max_people !== null && ` · 上限 ${s.max_people} 人`}
+                        {!s.allow_non_members && ' · 限會員'}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 font-bold text-gray-700 whitespace-nowrap">
+                      {headCount(s.id)}
+                      {s.max_people !== null && <span className="text-gray-300"> / {s.max_people}</span>}
+                    </td>
+                    <td className="px-6 py-4 text-xs text-gray-500 whitespace-nowrap">
+                      {s.deadline ? fmt(s.deadline) : '不限'}
+                    </td>
+                    <td className="px-6 py-4">
+                      <button
+                        onClick={() => canEdit && toggleStatus(s)}
+                        className={`px-2 py-1 rounded text-xs font-bold ${
+                          s.status === 'open' ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-500'
+                        }`}
+                      >
+                        {s.status === 'open' ? '進行中' : '已結束'}
+                      </button>
+                    </td>
+                    <td className="px-6 py-4 text-right whitespace-nowrap">
+                      <button
+                        onClick={() => copyLink(s)}
+                        className="text-gray-400 hover:text-red-600 p-2 hover:bg-red-50 rounded-lg"
+                        title="複製連結"
+                      >
+                        <Link2 size={16} />
+                      </button>
+                      <button
+                        onClick={() => setOpenSheet(s)}
+                        className="text-xs font-bold text-red-600 hover:underline px-2"
+                      >
+                        名單
+                      </button>
+                      {canEdit && (
+                        <button
+                          onClick={() => removeSheet(s)}
+                          className="text-gray-400 hover:text-red-600 p-2 hover:bg-red-50 rounded-lg align-middle"
+                          title="刪除"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          {sheets.length === 0 && (
+            <div className="p-10 text-center text-gray-400">
+              還沒有接龍。點右上角「建立接龍」開始。
+            </div>
+          )}
+        </div>
+      </div>
+
+      {createOpen && (
+        <CreateSheetModal
+          activities={activities}
+          currentUser={currentUser}
+          onClose={() => setCreateOpen(false)}
+          onCreated={async () => {
+            setCreateOpen(false);
+            await load();
+          }}
+        />
+      )}
+    </div>
+  );
+};
+
+/* ---------------- 名單詳情 ---------------- */
+
+const SheetDetail: React.FC<{
+  canEdit: boolean;
+  sheet: Sheet;
+  entries: Entry[];
+  activities: Activity[];
+  members: Member[];
+  currentUser: AdminUser;
+  onBack: () => void;
+  onChanged: () => void;
+  onCopyLink: () => void;
+  onToggleStatus: () => void;
+  onDelete: () => void;
+}> = ({ canEdit, sheet, entries, activities, members, currentUser, onBack, onChanged, onCopyLink, onToggleStatus, onDelete }) => {
+  const [addOpen, setAddOpen] = useState(false);
+  const [converting, setConverting] = useState(false);
+
+  const head = entries.reduce((s, e) => s + 1 + e.extra_count, 0);
+  const activity = activities.find(a => String(a.id) === String(sheet.activity_id));
+
+  async function removeEntry(e: Entry) {
+    if (!window.confirm(`確定要移除「${e.real_name}」的報名嗎？`)) return;
+    const { error } = await supabase.from('signup_entries').delete().eq('id', e.id);
+    if (error) alert('移除失敗：' + error.message);
+    else onChanged();
+  }
+
+  // 轉成收款項目：本人一筆，帶的每一位也各一筆（人頭數與收款筆數對得起來）
+  async function convertToPayment() {
+    const amountStr = window.prompt(`要向這 ${head} 位收多少錢？（每人金額）`, '0');
+    if (amountStr === null) return;
+    const amount = Number(amountStr);
+    if (!Number.isFinite(amount) || amount < 0) {
+      alert('金額不正確');
+      return;
+    }
+    if (!window.confirm(`建立收款項目「${sheet.title}」\n\n對象：${head} 位\n每人：NT$ ${amount.toLocaleString('zh-TW')}\n\n確定嗎？`))
+      return;
+
+    setConverting(true);
+    try {
+      const { data: batch, error } = await supabase
+        .from('payment_batches')
+        .insert([
+          {
+            title: sheet.title,
+            default_amount: amount,
+            activity_id: sheet.activity_id,
+            finance_category: sheet.activity_id ? '活動費用' : '其他',
+            status: 'open',
+            note: '由接龍名單建立',
+            created_by: currentUser.name,
+          },
+        ])
+        .select()
+        .single();
+      if (error || !batch) {
+        alert('建立收款項目失敗：' + (error?.message ?? ''));
+        return;
+      }
+
+      const rows: any[] = [];
+      entries.forEach(e => {
+        rows.push({
+          batch_id: batch.id,
+          payee_name: e.real_name,
+          payee_phone: e.phone,
+          member_id: e.member_id,
+          amount_due: amount,
+          amount_paid: 0,
+        });
+        // 同行者：有填名字就用名字拆開，沒填就標成「○○○ 的同行者 N」
+        const names = (e.extra_names ?? '')
+          .split(/[,，、\s]+/)
+          .map(s => s.trim())
+          .filter(Boolean);
+        for (let i = 0; i < e.extra_count; i++) {
+          rows.push({
+            batch_id: batch.id,
+            payee_name: names[i] ?? `${e.real_name} 的同行者 ${i + 1}`,
+            payee_phone: null,
+            amount_due: amount,
+            amount_paid: 0,
+          });
+        }
+      });
+
+      if (rows.length > 0) {
+        const { error: itemErr } = await supabase.from('payment_items').insert(rows);
+        if (itemErr) {
+          alert(`收款項目已建立，但名單寫入失敗：${itemErr.message}`);
+          return;
+        }
+      }
+      alert(`已建立收款項目「${sheet.title}」，共 ${rows.length} 筆。\n請到「收款管理」進行收款。`);
+    } finally {
+      setConverting(false);
+    }
+  }
+
+  return (
+    <div className="space-y-6 text-gray-900">
+      <div>
+        <button onClick={onBack} className="text-sm text-gray-400 hover:text-red-600 flex items-center gap-1 mb-2">
+          <ArrowLeft size={14} /> 接龍報名
+        </button>
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold">{sheet.title}</h1>
+            <p className="text-gray-500 text-sm mt-1">
+              {activity ? `${activity.date} ${activity.title}` : '自由主題'}
+              {sheet.deadline && ` · 截止 ${fmt(sheet.deadline)}`}
+              {sheet.status === 'closed' && ' · 已結束'}
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={onCopyLink}
+              className="flex items-center gap-2 border border-gray-200 px-4 py-2.5 rounded-xl hover:bg-gray-50 font-bold text-gray-700"
+            >
+              <Link2 size={18} /> 複製連結
+            </button>
+            {canEdit && (
+              <>
+                <button
+                  onClick={() => setAddOpen(true)}
+                  className="flex items-center gap-2 border border-gray-200 px-4 py-2.5 rounded-xl hover:bg-gray-50 font-bold text-gray-700"
+                >
+                  <UserPlus size={18} /> 代為報名
+                </button>
+                <button
+                  onClick={convertToPayment}
+                  disabled={converting || entries.length === 0}
+                  className="flex items-center gap-2 bg-green-600 text-white px-4 py-2.5 rounded-xl hover:bg-green-700 disabled:opacity-50"
+                >
+                  <Wallet size={18} /> 轉成收款
+                </button>
+                <button
+                  onClick={onToggleStatus}
+                  className="border border-gray-200 px-4 py-2.5 rounded-xl hover:bg-gray-50 font-bold text-gray-700"
+                >
+                  {sheet.status === 'open' ? '結束接龍' : '重新開放'}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-3 gap-3">
+        <div className="bg-white p-4 rounded-xl border">
+          <div className="text-xs text-gray-400 font-bold uppercase">總人頭</div>
+          <div className="text-2xl font-bold text-gray-800">
+            {head}
+            {sheet.max_people !== null && <span className="text-base text-gray-300"> / {sheet.max_people}</span>}
+          </div>
+        </div>
+        <div className="bg-white p-4 rounded-xl border">
+          <div className="text-xs text-gray-400 font-bold uppercase">報名筆數</div>
+          <div className="text-2xl font-bold text-gray-800">{entries.length}</div>
+        </div>
+        <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
+          <div className="text-xs text-blue-600 font-bold uppercase">來賓</div>
+          <div className="text-2xl font-bold text-blue-700">{entries.filter(e => !e.member_id).length}</div>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead className="bg-gray-50 border-b border-gray-100">
+              <tr className="text-xs font-bold text-gray-400 uppercase tracking-widest">
+                <th className="px-6 py-4 w-12">#</th>
+                <th className="px-6 py-4">姓名</th>
+                <th className="px-6 py-4">聯絡資訊</th>
+                <th className="px-6 py-4">同行</th>
+                <th className="px-6 py-4">備註</th>
+                <th className="px-6 py-4">報名時間</th>
+                <th className="px-6 py-4 text-right">操作</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {entries.map((e, i) => {
+                const member = members.find(m => String(m.id) === String(e.member_id));
+                return (
+                  <tr key={e.id} className="hover:bg-gray-50/50">
+                    <td className="px-6 py-4 text-gray-300 font-bold">{i + 1}</td>
+                    <td className="px-6 py-4">
+                      <div className="font-bold text-gray-900 flex items-center gap-2">
+                        {e.real_name}
+                        {!e.member_id && (
+                          <span className="text-[10px] bg-blue-50 text-blue-600 px-2 py-0.5 rounded font-bold">來賓</span>
+                        )}
+                      </div>
+                      <div className="text-xs text-gray-400 mt-0.5">
+                        {member?.group_name || e.company || '—'}
+                        {e.referrer && ` · 引薦：${e.referrer}`}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-xs">
+                      <div className="font-mono text-gray-600">{e.phone || member?.mobile_phone || '—'}</div>
+                      {e.display_name && e.display_name !== e.real_name && (
+                        <div className="text-gray-300">LINE：{e.display_name}</div>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 text-sm">
+                      {e.extra_count > 0 ? (
+                        <>
+                          <span className="font-bold text-gray-700">+{e.extra_count}</span>
+                          {e.extra_names && <div className="text-xs text-gray-400">{e.extra_names}</div>}
+                        </>
+                      ) : (
+                        <span className="text-gray-300">—</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 text-xs text-gray-500 max-w-[160px]">{e.note || '—'}</td>
+                    <td className="px-6 py-4 text-xs text-gray-400 whitespace-nowrap">{fmt(e.created_at)}</td>
+                    <td className="px-6 py-4 text-right">
+                      {canEdit && (
+                        <button
+                          onClick={() => removeEntry(e)}
+                          className="text-gray-400 hover:text-red-600 p-2 hover:bg-red-50 rounded-lg"
+                          title="移除"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          {entries.length === 0 && <div className="p-10 text-center text-gray-400">還沒有人報名</div>}
+        </div>
+      </div>
+
+      {canEdit && (
+        <button onClick={onDelete} className="text-xs text-gray-300 hover:text-red-500 font-bold">
+          刪除這個接龍
+        </button>
+      )}
+
+      {addOpen && (
+        <ManualEntryModal
+          sheet={sheet}
+          members={members}
+          onClose={() => setAddOpen(false)}
+          onAdded={() => {
+            setAddOpen(false);
+            onChanged();
+          }}
+        />
+      )}
+    </div>
+  );
+};
+
+/* ---------------- 建立接龍 ---------------- */
+
+const CreateSheetModal: React.FC<{
+  activities: Activity[];
+  currentUser: AdminUser;
+  onClose: () => void;
+  onCreated: () => void;
+}> = ({ activities, currentUser, onClose, onCreated }) => {
+  const [saving, setSaving] = useState(false);
+
+  const submit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const f = new FormData(e.currentTarget);
+    const title = String(f.get('title') || '').trim();
+    if (!title) return;
+    const maxRaw = String(f.get('max_people') || '').trim();
+    const deadlineRaw = String(f.get('deadline') || '').trim();
+
+    setSaving(true);
+    try {
+      const { error } = await supabase.from('signup_sheets').insert([
+        {
+          title,
+          description: String(f.get('description') || '').trim() || null,
+          activity_id: f.get('activity_id') ? Number(f.get('activity_id')) : null,
+          // datetime-local 沒有時區，使用者輸入的是台北時間
+          deadline: deadlineRaw ? new Date(deadlineRaw).toISOString() : null,
+          max_people: maxRaw ? Number(maxRaw) : null,
+          allow_guests: f.get('allow_guests') === 'on',
+          allow_non_members: f.get('allow_non_members') === 'on',
+          status: 'open',
+          created_by: currentUser.name,
+        },
+      ]);
+      if (error) {
+        alert('建立失敗：' + error.message);
+        return;
+      }
+      onCreated();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-start justify-center p-4 overflow-y-auto">
+      <div className="bg-white w-full max-w-lg rounded-2xl p-6 my-8">
+        <div className="flex items-center justify-between mb-5">
+          <h2 className="text-xl font-bold">建立接龍</h2>
+          <button onClick={onClose} className="text-gray-300 hover:text-gray-500">
+            <X size={22} />
+          </button>
+        </div>
+        <form onSubmit={submit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-bold text-gray-700 mb-1">主題 *</label>
+            <input
+              name="title"
+              required
+              className="w-full border rounded-lg px-3 py-3 outline-none focus:ring-2 focus:ring-red-500"
+              placeholder="例：9/5 例會後聚餐"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-bold text-gray-700 mb-1">說明</label>
+            <textarea
+              name="description"
+              rows={2}
+              className="w-full border rounded-lg px-3 py-3 outline-none focus:ring-2 focus:ring-red-500"
+              placeholder="時間地點、費用、注意事項…"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-bold text-gray-700 mb-1">綁定活動（選填）</label>
+            <select
+              name="activity_id"
+              className="w-full border rounded-lg px-3 py-3 bg-white outline-none focus:ring-2 focus:ring-red-500"
+            >
+              <option value="">不綁定（自由主題）</option>
+              {activities.map(a => (
+                <option key={a.id} value={a.id}>
+                  {a.date} {a.title}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-1">截止時間</label>
+              <input
+                name="deadline"
+                type="datetime-local"
+                className="w-full border rounded-lg px-3 py-3 outline-none focus:ring-2 focus:ring-red-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-1">人數上限</label>
+              <input
+                name="max_people"
+                type="number"
+                min={1}
+                placeholder="不限"
+                className="w-full border rounded-lg px-3 py-3 outline-none focus:ring-2 focus:ring-red-500"
+              />
+            </div>
+          </div>
+          <label className="flex items-center gap-2 text-sm text-gray-600">
+            <input type="checkbox" name="allow_guests" defaultChecked /> 可以帶眷屬／朋友
+          </label>
+          <label className="flex items-center gap-2 text-sm text-gray-600">
+            <input type="checkbox" name="allow_non_members" defaultChecked /> 非會員也能報名（需填姓名電話）
+          </label>
+          <div className="flex gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 border py-3 rounded-lg font-bold text-gray-500 hover:bg-gray-50"
+            >
+              取消
+            </button>
+            <button
+              type="submit"
+              disabled={saving}
+              className="flex-1 bg-red-600 text-white py-3 rounded-lg font-bold hover:bg-red-700 disabled:opacity-50"
+            >
+              {saving ? '建立中…' : '建立'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+/* ---------------- 代為報名 ---------------- */
+
+const ManualEntryModal: React.FC<{
+  sheet: Sheet;
+  members: Member[];
+  onClose: () => void;
+  onAdded: () => void;
+}> = ({ sheet, members, onClose, onAdded }) => {
+  const [saving, setSaving] = useState(false);
+  const [search, setSearch] = useState('');
+  const [picked, setPicked] = useState<Member | null>(null);
+
+  const results = useMemo(() => {
+    const t = search.trim().toLowerCase();
+    if (!t) return [];
+    return members
+      .filter(m => (m.status ?? 'active') === 'active')
+      .filter(m => m.name.toLowerCase().includes(t) || (m.company ?? '').toLowerCase().includes(t))
+      .slice(0, 8);
+  }, [search, members]);
+
+  const submit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const f = new FormData(e.currentTarget);
+    const realName = String(f.get('real_name') || '').trim();
+    if (!realName) return;
+    setSaving(true);
+    try {
+      const { error } = await supabase.from('signup_entries').insert([
+        {
+          sheet_id: sheet.id,
+          line_user_id: null, // 後台代報，沒有 LINE 身分
+          member_id: picked ? Number(picked.id) : null,
+          display_name: null,
+          real_name: realName,
+          phone: String(f.get('phone') || '').trim() || null,
+          company: String(f.get('company') || '').trim() || null,
+          referrer: String(f.get('referrer') || '').trim() || null,
+          extra_count: Number(f.get('extra_count') || 0),
+          extra_names: String(f.get('extra_names') || '').trim() || null,
+          note: String(f.get('note') || '').trim() || null,
+        },
+      ]);
+      if (error) {
+        alert('新增失敗：' + error.message);
+        return;
+      }
+      onAdded();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-start justify-center p-4 overflow-y-auto">
+      <div className="bg-white w-full max-w-md rounded-2xl p-6 my-8">
+        <div className="flex items-center justify-between mb-1">
+          <h3 className="text-lg font-bold">代為報名</h3>
+          <button onClick={onClose} className="text-gray-300 hover:text-gray-500">
+            <X size={20} />
+          </button>
+        </div>
+        <p className="text-xs text-gray-500 mb-5">幫當下沒看手機的人登記。搜尋會員可自動帶入資料。</p>
+
+        <form onSubmit={submit} className="space-y-4">
+          <div className="relative">
+            <label className="block text-sm font-bold text-gray-700 mb-1">
+              搜尋會員 <span className="text-gray-300 font-medium">選填</span>
+            </label>
+            <input
+              value={picked ? picked.name : search}
+              onChange={e => {
+                setPicked(null);
+                setSearch(e.target.value);
+              }}
+              className="w-full border rounded-lg px-3 py-3 outline-none focus:ring-2 focus:ring-red-500"
+              placeholder="打名字搜尋，或留空直接填底下欄位"
+            />
+            {!picked && results.length > 0 && (
+              <div className="absolute z-10 left-0 right-0 mt-1 bg-white border rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                {results.map(m => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => {
+                      setPicked(m);
+                      setSearch('');
+                    }}
+                    className="w-full text-left px-3 py-2 hover:bg-red-50 text-sm"
+                  >
+                    <span className="font-bold text-gray-800">{m.name}</span>
+                    <span className="text-xs text-gray-400 ml-2">{m.company}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-bold text-gray-700 mb-1">姓名 *</label>
+            <input
+              name="real_name"
+              required
+              key={picked?.id ?? 'none'}
+              defaultValue={picked?.name ?? ''}
+              className="w-full border rounded-lg px-3 py-3 outline-none focus:ring-2 focus:ring-red-500"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-1">電話</label>
+              <input
+                name="phone"
+                key={`p-${picked?.id ?? 'none'}`}
+                defaultValue={picked?.mobile_phone ?? ''}
+                className="w-full border rounded-lg px-3 py-3 outline-none focus:ring-2 focus:ring-red-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-1">再帶幾位</label>
+              <input
+                name="extra_count"
+                type="number"
+                min={0}
+                defaultValue={0}
+                disabled={!sheet.allow_guests}
+                className="w-full border rounded-lg px-3 py-3 outline-none focus:ring-2 focus:ring-red-500 disabled:bg-gray-50"
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-1">公司</label>
+              <input
+                name="company"
+                key={`c-${picked?.id ?? 'none'}`}
+                defaultValue={picked?.company ?? ''}
+                className="w-full border rounded-lg px-3 py-3 outline-none focus:ring-2 focus:ring-red-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-1">引薦人</label>
+              <input name="referrer" className="w-full border rounded-lg px-3 py-3 outline-none focus:ring-2 focus:ring-red-500" />
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-bold text-gray-700 mb-1">同行者姓名</label>
+            <input name="extra_names" className="w-full border rounded-lg px-3 py-3 outline-none focus:ring-2 focus:ring-red-500" />
+          </div>
+          <div>
+            <label className="block text-sm font-bold text-gray-700 mb-1">備註</label>
+            <input name="note" className="w-full border rounded-lg px-3 py-3 outline-none focus:ring-2 focus:ring-red-500" />
+          </div>
+
+          <div className="flex gap-3 pt-2">
+            <button type="button" onClick={onClose} className="flex-1 border py-3 rounded-lg font-bold text-gray-500 hover:bg-gray-50">
+              取消
+            </button>
+            <button
+              type="submit"
+              disabled={saving}
+              className="flex-1 bg-red-600 text-white py-3 rounded-lg font-bold hover:bg-red-700 disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              <Check size={16} /> {saving ? '新增中…' : '新增'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+export default SignupManager;

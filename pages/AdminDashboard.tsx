@@ -14,6 +14,7 @@ import MilestoneManager from './admin/MilestoneManager';
 import BirthdayManager from './admin/BirthdayManager';
 import MembershipExpiryManager from './admin/MembershipExpiryManager';
 import GuestManager from './admin/GuestManager';
+import SignupManager from './admin/SignupManager';
 import PaymentManager from './admin/PaymentManager';
 import PaymentBatchDetail from './admin/PaymentBatchDetail';
 import DocumentManager from './admin/DocumentManager';
@@ -108,6 +109,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
           <Route path="/" element={<DashboardHome activities={props.activities} registrations={props.registrations} />} />
           <Route path="/check-in" element={<CheckInManager activities={props.activities} registrations={props.registrations} onUpdateRegistration={props.onUpdateRegistration} onDeleteRegistration={props.onDeleteRegistration} onAddRegistration={props.onAddRegistration} onRefreshRegistrations={props.onRefreshRegistrations} />} />
           <Route path="/attendance" element={<AttendanceManager activities={props.activities} members={props.members} attendance={props.attendance} onUpdateAttendance={props.onUpdateAttendance} onDeleteAttendance={props.onDeleteAttendance} onRefreshAttendance={props.onRefreshAttendance} />} />
+          <Route path="/signups" element={
+            <SignupManager
+              canEdit={props.canEdit}
+              activities={props.activities}
+              members={props.members}
+              currentUser={props.currentUser}
+            />
+          } />
           <Route path="/payments" element={
             <PaymentManager
               canEdit={props.canEdit}
