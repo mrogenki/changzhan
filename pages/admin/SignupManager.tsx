@@ -31,6 +31,7 @@ type Sheet = {
   deadline: string | null;
   max_people: number | null;
   fee: number;
+  member_fee: number | null;
   allow_guests: boolean;
   allow_non_members: boolean;
   status: 'open' | 'closed';
@@ -195,7 +196,8 @@ const SignupManager: React.FC<Props> = ({ canEdit, activities, members, currentU
                       </button>
                       <div className="text-xs text-gray-400 mt-0.5">
                         {activity ? `活動：${activity.title}` : '自由主題'}
-                        {s.fee > 0 && ` · 每人 NT$ ${s.fee.toLocaleString('zh-TW')}`}
+                        {s.fee > 0 && ` · 一般 NT$ ${s.fee.toLocaleString('zh-TW')}`}
+                        {s.member_fee != null && ` / 會員 NT$ ${s.member_fee.toLocaleString('zh-TW')}`}
                         {s.max_people !== null && ` · 上限 ${s.max_people} 人`}
                         {!s.allow_non_members && ' · 限會員'}
                       </div>
@@ -313,16 +315,57 @@ const SheetDetail: React.FC<{
   }
 
   // 轉成收款項目：本人一筆，帶的每一位也各一筆（人頭數與收款筆數對得起來）
+  // 分級時：會員本人算會員價，非會員與同行者一律算一般價
   async function convertToPayment() {
-    const amountStr = window.prompt(`要向這 ${head} 位收多少錢？（每人金額）`, String(sheet.fee || 0));
-    if (amountStr === null) return;
-    const amount = Number(amountStr);
-    if (!Number.isFinite(amount) || amount < 0) {
-      alert('金額不正確');
-      return;
+    const hasTier = sheet.member_fee != null;
+    let normal = sheet.fee;
+    let member = sheet.member_fee ?? sheet.fee;
+
+    // 接龍沒設金額時才問，避免每次都要重打
+    if (!hasTier && sheet.fee <= 0) {
+      const input = window.prompt(`要向這 ${head} 位收多少錢？（每人金額）`, '0');
+      if (input === null) return;
+      const n = Number(input);
+      if (!Number.isFinite(n) || n < 0) {
+        alert('金額不正確');
+        return;
+      }
+      normal = n;
+      member = n;
     }
-    if (!window.confirm(`建立收款項目「${sheet.title}」\n\n對象：${head} 位\n每人：NT$ ${amount.toLocaleString('zh-TW')}\n\n確定嗎？`))
-      return;
+
+    // 先算出每一筆，確認畫面才講得出總額
+    const rows: Array<{ payee_name: string; payee_phone: string | null; member_id: number | null; amount_due: number }> = [];
+    entries.forEach(e => {
+      rows.push({
+        payee_name: e.real_name,
+        payee_phone: e.phone,
+        member_id: e.member_id,
+        amount_due: e.member_id ? member : normal,
+      });
+      // 同行者：有填名字就用名字拆開，沒填就標成「○○○ 的同行者 N」；一律算一般價
+      const names = (e.extra_names ?? '')
+        .split(/[,，、\s]+/)
+        .map(x => x.trim())
+        .filter(Boolean);
+      for (let i = 0; i < e.extra_count; i++) {
+        rows.push({
+          payee_name: names[i] ?? `${e.real_name} 的同行者 ${i + 1}`,
+          payee_phone: null,
+          member_id: null,
+          amount_due: normal,
+        });
+      }
+    });
+
+    const total = rows.reduce((sum, r) => sum + r.amount_due, 0);
+    const memberCount = rows.filter(r => r.member_id).length;
+    const breakdown = hasTier
+      ? `會員 ${memberCount} 位 × NT$ ${member.toLocaleString('zh-TW')}\n` +
+        `一般 ${rows.length - memberCount} 位 × NT$ ${normal.toLocaleString('zh-TW')}\n`
+      : `${rows.length} 位 × NT$ ${normal.toLocaleString('zh-TW')}\n`;
+
+    if (!window.confirm(`建立收款項目「${sheet.title}」\n\n${breakdown}合計 NT$ ${total.toLocaleString('zh-TW')}\n\n確定嗎？`)) return;
 
     setConverting(true);
     try {
@@ -331,7 +374,7 @@ const SheetDetail: React.FC<{
         .insert([
           {
             title: sheet.title,
-            default_amount: amount,
+            default_amount: normal,
             activity_id: sheet.activity_id,
             finance_category: sheet.activity_id ? '活動費用' : '其他',
             status: 'open',
@@ -346,40 +389,16 @@ const SheetDetail: React.FC<{
         return;
       }
 
-      const rows: any[] = [];
-      entries.forEach(e => {
-        rows.push({
-          batch_id: batch.id,
-          payee_name: e.real_name,
-          payee_phone: e.phone,
-          member_id: e.member_id,
-          amount_due: amount,
-          amount_paid: 0,
-        });
-        // 同行者：有填名字就用名字拆開，沒填就標成「○○○ 的同行者 N」
-        const names = (e.extra_names ?? '')
-          .split(/[,，、\s]+/)
-          .map(s => s.trim())
-          .filter(Boolean);
-        for (let i = 0; i < e.extra_count; i++) {
-          rows.push({
-            batch_id: batch.id,
-            payee_name: names[i] ?? `${e.real_name} 的同行者 ${i + 1}`,
-            payee_phone: null,
-            amount_due: amount,
-            amount_paid: 0,
-          });
-        }
-      });
-
       if (rows.length > 0) {
-        const { error: itemErr } = await supabase.from('payment_items').insert(rows);
+        const { error: itemErr } = await supabase
+          .from('payment_items')
+          .insert(rows.map(r => ({ ...r, batch_id: batch.id, amount_paid: 0 })));
         if (itemErr) {
           alert(`收款項目已建立，但名單寫入失敗：${itemErr.message}`);
           return;
         }
       }
-      alert(`已建立收款項目「${sheet.title}」，共 ${rows.length} 筆。\n請到「收款管理」進行收款。`);
+      alert(`已建立收款項目「${sheet.title}」，共 ${rows.length} 筆、合計 NT$ ${total.toLocaleString('zh-TW')}。\n請到「收款管理」進行收款。`);
     } finally {
       setConverting(false);
     }
@@ -396,7 +415,8 @@ const SheetDetail: React.FC<{
             <h1 className="text-2xl font-bold">{sheet.title}</h1>
             <p className="text-gray-500 text-sm mt-1">
               {activity ? `${activity.date} ${activity.title}` : '自由主題'}
-              {sheet.fee > 0 && ` · 每人 NT$ ${sheet.fee.toLocaleString('zh-TW')}`}
+              {sheet.fee > 0 && ` · 一般 NT$ ${sheet.fee.toLocaleString('zh-TW')}`}
+              {sheet.member_fee != null && ` / 會員 NT$ ${sheet.member_fee.toLocaleString('zh-TW')}`}
               {sheet.deadline && ` · 截止 ${fmt(sheet.deadline)}`}
               {sheet.status === 'closed' && ' · 已結束'}
             </p>
@@ -580,11 +600,16 @@ const SheetFormModal: React.FC<{
   const [title, setTitle] = useState(sheet?.title ?? '');
   const [activityId, setActivityId] = useState(sheet?.activity_id ? String(sheet.activity_id) : '');
   const [fee, setFee] = useState(String(sheet?.fee ?? 0));
+  const [memberFee, setMemberFee] = useState(sheet?.member_fee != null ? String(sheet.member_fee) : '');
   const [deadline, setDeadline] = useState(toLocalInput(sheet?.deadline));
 
   const boundActivity = activities.find(a => String(a.id) === activityId);
   // 幹部可能刻意改成跟活動不同的金額（例如只收餐費），所以不鎖死，只在不一致時提醒
-  const feeDiffers = !!boundActivity && Number(fee || 0) !== Number(boundActivity.price ?? 0);
+  const memberFeeNum = memberFee === '' ? null : Number(memberFee);
+  const feeDiffers =
+    !!boundActivity &&
+    (Number(fee || 0) !== Number(boundActivity.price ?? 0) ||
+      (boundActivity.member_price ?? null) !== memberFeeNum);
 
   // 選了活動就把活動資訊帶過來，避免接龍與活動各說各話
   const pickActivity = (id: string) => {
@@ -592,6 +617,7 @@ const SheetFormModal: React.FC<{
     const act = activities.find(a => String(a.id) === id);
     if (!act) return;
     setFee(String(act.price ?? 0));
+    setMemberFee(act.member_price != null ? String(act.member_price) : '');
     if (act.date) setDeadline(`${act.date}T${act.time || '00:00'}`);
     if (!title.trim()) setTitle(act.title);
   };
@@ -610,6 +636,7 @@ const SheetFormModal: React.FC<{
       deadline: deadline ? new Date(deadline).toISOString() : null,
       max_people: maxRaw ? Number(maxRaw) : null,
       fee: Number(fee || 0),
+      member_fee: memberFeeNum,
       allow_guests: f.get('allow_guests') === 'on',
       allow_non_members: f.get('allow_non_members') === 'on',
     };
@@ -692,14 +719,25 @@ const SheetFormModal: React.FC<{
             />
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div>
-              <label className="block text-sm font-bold text-gray-700 mb-1">每人費用</label>
+              <label className="block text-sm font-bold text-gray-700 mb-1">一般價</label>
               <input
                 type="number"
                 min={0}
                 value={fee}
                 onChange={e => setFee(e.target.value)}
+                className="w-full border rounded-lg px-3 py-3 outline-none focus:ring-2 focus:ring-red-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-1">會員價</label>
+              <input
+                type="number"
+                min={0}
+                value={memberFee}
+                onChange={e => setMemberFee(e.target.value)}
+                placeholder="不分級"
                 className="w-full border rounded-lg px-3 py-3 outline-none focus:ring-2 focus:ring-red-500"
               />
             </div>
@@ -727,11 +765,14 @@ const SheetFormModal: React.FC<{
 
           {feeDiffers ? (
             <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
-              ⚠️ 活動「{boundActivity!.title}」的金額是 NT$ {Number(boundActivity!.price ?? 0).toLocaleString('zh-TW')}，
-              這裡設定的是 NT$ {Number(fee || 0).toLocaleString('zh-TW')}。報名頁會顯示這裡的金額。
+              ⚠️ 活動「{boundActivity!.title}」是 一般 NT$ {Number(boundActivity!.price ?? 0).toLocaleString('zh-TW')}
+              {boundActivity!.member_price != null && ` · 會員 NT$ ${Number(boundActivity!.member_price).toLocaleString('zh-TW')}`}，
+              與這裡設定的不同。報名頁會顯示這裡的金額。
             </p>
           ) : (
-            <p className="text-[11px] text-gray-400">每人費用填 0 就是免費，報名頁不會顯示金額。</p>
+            <p className="text-[11px] text-gray-400">
+              一般價填 0 就是免費。會員價留空代表大家同價；填了之後，會員本人算會員價、帶的人一律算一般價。
+            </p>
           )}
 
           <label className="flex items-center gap-2 text-sm text-gray-600">

@@ -53,6 +53,7 @@ const ActivityManager: React.FC<ActivityManagerProps> = ({ activities, onAddActi
     time: '06:30',
     location: '88號樂章（臺北市內湖區民善街88號5樓）',
     price: 800,
+    member_price: '' as number | '' ,
     picture: 'https://images.unsplash.com/photo-1517457373958-b7bdd4587205?q=80&w=2069&auto=format&fit=crop',
     description: '',
     guest_welcome_message: '',
@@ -69,6 +70,7 @@ const ActivityManager: React.FC<ActivityManagerProps> = ({ activities, onAddActi
         time: editingActivity.time,
         location: editingActivity.location,
         price: editingActivity.price,
+        member_price: editingActivity.member_price ?? '',
         picture: editingActivity.picture,
         description: editingActivity.description,
         guest_welcome_message: (editingActivity as any).guest_welcome_message || '',
@@ -101,6 +103,8 @@ const ActivityManager: React.FC<ActivityManagerProps> = ({ activities, onAddActi
       ...formData,
       // 空字串轉 null,讓 RPC 端走全域預設
       guest_welcome_message: formData.guest_welcome_message.trim() || null,
+      // 會員價留空 = 這場不分級
+      member_price: formData.member_price === '' ? null : Number(formData.member_price),
       status: 'active',
     } as any;
 
@@ -186,7 +190,12 @@ const ActivityManager: React.FC<ActivityManagerProps> = ({ activities, onAddActi
                   <MapPin size={12} /> <span className="line-clamp-1">{activity.location}</span>
                 </div>
                 <div className="flex justify-between items-center pt-3 border-t border-gray-50">
-                   <span className="font-bold text-red-600">NT$ {activity.price}</span>
+                   <span className="font-bold text-red-600">
+                     NT$ {activity.price}
+                     {activity.member_price != null && (
+                       <span className="text-xs text-gray-400 font-medium ml-1">／會員 {activity.member_price}</span>
+                     )}
+                   </span>
                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${activity.date < today ? 'bg-gray-100 text-gray-400' : 'bg-green-50 text-green-600'}`}>
                      {activity.date < today ? '已結束' : '進行中'}
                    </span>
@@ -232,15 +241,27 @@ const ActivityManager: React.FC<ActivityManagerProps> = ({ activities, onAddActi
                    </select>
                 </div>
                 <div>
-                   <label className="block text-sm font-bold text-gray-700 mb-1">報名費用</label>
+                   <label className="block text-sm font-bold text-gray-700 mb-1">報名費用（一般價）</label>
                    <input
                     required
                     type="number"
                     value={formData.price}
                     onChange={e => setFormData({...formData, price: parseInt(e.target.value)})}
                     className="w-full border rounded-lg px-3 py-3 outline-none focus:ring-2 focus:ring-red-500"
-                    placeholder="500"
+                    placeholder="800"
                   />
+                </div>
+                <div>
+                   <label className="block text-sm font-bold text-gray-700 mb-1">會員價</label>
+                   <input
+                    type="number"
+                    min={0}
+                    value={formData.member_price}
+                    onChange={e => setFormData({...formData, member_price: e.target.value === '' ? '' : parseInt(e.target.value)})}
+                    className="w-full border rounded-lg px-3 py-3 outline-none focus:ring-2 focus:ring-red-500"
+                    placeholder="留空 = 不分級"
+                  />
+                  <p className="text-[11px] text-gray-400 mt-1">留空代表大家同一個價</p>
                 </div>
                 <div>
                    <label className="block text-sm font-bold text-gray-700 mb-1">活動日期</label>

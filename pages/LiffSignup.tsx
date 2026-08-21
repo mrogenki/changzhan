@@ -31,6 +31,7 @@ type Sheet = {
   deadline: string | null;
   max_people: number | null;
   fee: number;
+  member_fee: number | null;
   allow_guests: boolean;
   allow_non_members: boolean;
   status: string;
@@ -274,6 +275,9 @@ const LiffSignup: React.FC = () => {
 
   const sheet = data!.sheet;
   const entries = data!.entries;
+  // 分級時本人依身分計價，同行者一律一般價
+  const myUnitFee = sheet.member_fee != null && isMember ? sheet.member_fee : sheet.fee;
+  const myTotalFee = myUnitFee + sheet.fee * extraCount;
   const full =
     sheet.max_people !== null && data!.head_count >= sheet.max_people && !myEntry;
   const canSignUp = !sheet.closed && !full && (isMember || sheet.allow_non_members);
@@ -303,9 +307,16 @@ const LiffSignup: React.FC = () => {
             <Users size={15} /> 目前 {data!.head_count} 人
             {sheet.max_people !== null && ` / ${sheet.max_people}`}
           </span>
-          {sheet.fee > 0 && (
+          {(sheet.fee > 0 || (sheet.member_fee ?? 0) > 0) && (
             <span className="inline-flex items-center gap-1.5 bg-amber-50 text-amber-700 px-3 py-1.5 rounded-full text-sm font-bold">
-              <Wallet size={15} /> 每人 NT$ {sheet.fee.toLocaleString('zh-TW')}
+              <Wallet size={15} />
+              {sheet.member_fee != null ? (
+                <>
+                  {isMember ? '會員價' : '一般價'} NT$ {myUnitFee.toLocaleString('zh-TW')}
+                </>
+              ) : (
+                <>每人 NT$ {sheet.fee.toLocaleString('zh-TW')}</>
+              )}
             </span>
           )}
           {sheet.deadline && (
@@ -314,6 +325,12 @@ const LiffSignup: React.FC = () => {
             </span>
           )}
         </div>
+        {sheet.member_fee != null && (
+          <p className="text-[11px] text-gray-400 mt-2">
+            會員 NT$ {sheet.member_fee.toLocaleString('zh-TW')} · 一般 NT$ {sheet.fee.toLocaleString('zh-TW')}
+            （帶的人算一般價）
+          </p>
+        )}
         {sheet.closed && (
           <div className="mt-3 bg-gray-100 text-gray-500 text-sm font-bold px-3 py-2 rounded-lg text-center">
             報名已結束
@@ -501,9 +518,14 @@ const LiffSignup: React.FC = () => {
                       </button>
                       <span className="text-xs text-gray-400">含眷屬、朋友</span>
                     </div>
-                    {sheet.fee > 0 && (
+                    {myTotalFee > 0 && (
                       <p className="text-xs text-amber-700 mt-2 font-bold">
-                        共 {1 + extraCount} 位 · 應付 NT$ {(sheet.fee * (1 + extraCount)).toLocaleString('zh-TW')}
+                        共 {1 + extraCount} 位 · 應付 NT$ {myTotalFee.toLocaleString('zh-TW')}
+                        {sheet.member_fee != null && extraCount > 0 && (
+                          <span className="font-medium text-gray-400">
+                            （本人 {myUnitFee} + 同行 {extraCount} × {sheet.fee}）
+                          </span>
+                        )}
                       </p>
                     )}
                   </div>

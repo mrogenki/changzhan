@@ -70,7 +70,8 @@ export interface Activity {
     date: string;
     time: string;
     location: string;
-    price: number;
+    price: number;              // 一般價（來賓）
+    member_price?: number | null; // 會員價，null = 不分級
     picture: string;
     description: string;
     status?: 'active' | 'closed';

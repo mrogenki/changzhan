@@ -39,7 +39,13 @@ const ActivityCard: React.FC<{ activity: Activity }> = ({ activity }) => (
         </div>
         <div className="flex items-center gap-2">
           <DollarSign size={16} className="text-red-600" />
-          <span>NT$ {activity.price.toLocaleString()}</span>
+          <span>
+            NT$ {(activity.member_price != null
+              ? Math.min(activity.price, activity.member_price)
+              : activity.price
+            ).toLocaleString()}
+            {activity.member_price != null && ' 起'}
+          </span>
         </div>
       </div>
       <div className="flex items-center justify-between pt-4 border-t border-gray-50">

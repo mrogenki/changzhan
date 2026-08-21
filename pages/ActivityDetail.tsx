@@ -254,7 +254,16 @@ const ActivityDetail: React.FC<ActivityDetailProps> = ({ activities, registratio
                 </div>
                 <div>
                   <p className="text-xs text-gray-400 uppercase font-bold tracking-wider">費用</p>
-                  <p className="font-medium">NT$ {activity.price.toLocaleString()}</p>
+                  {activity.member_price != null ? (
+                    <>
+                      <p className="font-medium">一般 NT$ {activity.price.toLocaleString()}</p>
+                      <p className="font-medium text-red-600">
+                        會員 NT$ {activity.member_price.toLocaleString()}
+                      </p>
+                    </>
+                  ) : (
+                    <p className="font-medium">NT$ {activity.price.toLocaleString()}</p>
+                  )}
                 </div>
               </div>
             </div>
