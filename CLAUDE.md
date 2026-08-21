@@ -321,7 +321,13 @@ npm run preview    # 本機預覽 build
 - **後台代報**的 `line_user_id` 是 null，不受「一個 LINE 帳號一筆」的 unique index 限制。
 - **轉成收款**：本人一筆，帶的每一位也各一筆（有填同行者姓名就用名字，沒填記成「○○○ 的同行者 N」），這樣收款筆數跟實際人頭對得起來。
 
-**LINE 指令 `!名單`**：回覆最近一張進行中且未過截止的接龍名單與報名連結，走 reply API 不計額度。截止時間在程式裡篩，不用 PostgREST 的 `or()` 帶 ISO 時間字串（解析容易出意外）。
+**同一張接龍可以貼到多個群組**，共用同一份名單：靠 `line_user_id` 認人，同一人從哪個群點進來都是同一筆，不會重複報名。但要知道各群的人**彼此看得到名單**、**人數上限是全域的**，而且名單上**看不出誰從哪個群報的**——需要分開統計就開不同張接龍。
+
+**LINE 指令 `!名單`**：走 reply API 不計額度。**接龍不綁群組**，所以同時有多張進行中時無法推斷該回哪一張——
+- 只有一張進行中 → 直接列出完整名單
+- 多張 → 列出清單（標題／人數／截止／各自的報名連結）讓使用者自己點
+
+截止時間在程式裡篩，不用 PostgREST 的 `or()` 帶 ISO 時間字串（解析容易出意外）。
 
 **環境變數 `VITE_LIFF_SIGNUP_ID`**（`.env.local` 與 Vercel 都要，Vercel 改完需重新 deploy）：目前值 `2009854899-KEtH0Qad`，Endpoint 應設為 `https://changzhan.vercel.app/liff/signup`。webhook 裡也寫了同一組 ID（`line-webhook` 的 `LIFF_SIGNUP_ID` 常數），**換 LIFF app 時兩邊都要改**。
 
