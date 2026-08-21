@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import liff from '@line/liff';
 import { createClient } from '@supabase/supabase-js';
-import { Check, Users, Clock, MapPin, X, Loader2, AlertCircle } from 'lucide-react';
+import { Check, Users, Clock, MapPin, X, Loader2, AlertCircle, Wallet } from 'lucide-react';
 
 const supabase = createClient(
   import.meta.env.VITE_SUPABASE_URL as string,
@@ -30,6 +30,7 @@ type Sheet = {
   description: string | null;
   deadline: string | null;
   max_people: number | null;
+  fee: number;
   allow_guests: boolean;
   allow_non_members: boolean;
   status: string;
@@ -302,6 +303,11 @@ const LiffSignup: React.FC = () => {
             <Users size={15} /> 目前 {data!.head_count} 人
             {sheet.max_people !== null && ` / ${sheet.max_people}`}
           </span>
+          {sheet.fee > 0 && (
+            <span className="inline-flex items-center gap-1.5 bg-amber-50 text-amber-700 px-3 py-1.5 rounded-full text-sm font-bold">
+              <Wallet size={15} /> 每人 NT$ {sheet.fee.toLocaleString('zh-TW')}
+            </span>
+          )}
           {sheet.deadline && (
             <span className="text-xs text-gray-400 font-medium">
               截止 {fmtDeadline(sheet.deadline)}
@@ -495,6 +501,11 @@ const LiffSignup: React.FC = () => {
                       </button>
                       <span className="text-xs text-gray-400">含眷屬、朋友</span>
                     </div>
+                    {sheet.fee > 0 && (
+                      <p className="text-xs text-amber-700 mt-2 font-bold">
+                        共 {1 + extraCount} 位 · 應付 NT$ {(sheet.fee * (1 + extraCount)).toLocaleString('zh-TW')}
+                      </p>
+                    )}
                   </div>
                   {extraCount > 0 && (
                     <div>

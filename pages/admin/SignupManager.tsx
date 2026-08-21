@@ -10,6 +10,7 @@ import {
   ArrowLeft,
   UserPlus,
   Check,
+  Pencil,
 } from 'lucide-react';
 import { supabase } from '../../supabaseClient';
 import { Activity, AdminUser, Member } from '../../types';
@@ -29,6 +30,7 @@ type Sheet = {
   activity_id: number | null;
   deadline: string | null;
   max_people: number | null;
+  fee: number;
   allow_guests: boolean;
   allow_non_members: boolean;
   status: 'open' | 'closed';
@@ -68,6 +70,7 @@ const SignupManager: React.FC<Props> = ({ canEdit, activities, members, currentU
   const [loading, setLoading] = useState(true);
   const [openSheet, setOpenSheet] = useState<Sheet | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [editingSheet, setEditingSheet] = useState<Sheet | null>(null);
 
   useEffect(() => {
     load();
@@ -132,6 +135,7 @@ const SignupManager: React.FC<Props> = ({ canEdit, activities, members, currentU
         currentUser={currentUser}
         onBack={() => setOpenSheet(null)}
         onChanged={load}
+        onEdit={() => setEditingSheet(current)}
         onCopyLink={() => copyLink(current)}
         onToggleStatus={() => toggleStatus(current)}
         onDelete={() => removeSheet(current)}
@@ -191,6 +195,7 @@ const SignupManager: React.FC<Props> = ({ canEdit, activities, members, currentU
                       </button>
                       <div className="text-xs text-gray-400 mt-0.5">
                         {activity ? `活動：${activity.title}` : '自由主題'}
+                        {s.fee > 0 && ` · 每人 NT$ ${s.fee.toLocaleString('zh-TW')}`}
                         {s.max_people !== null && ` · 上限 ${s.max_people} 人`}
                         {!s.allow_non_members && ' · 限會員'}
                       </div>
@@ -228,6 +233,15 @@ const SignupManager: React.FC<Props> = ({ canEdit, activities, members, currentU
                       </button>
                       {canEdit && (
                         <button
+                          onClick={() => setEditingSheet(s)}
+                          className="text-gray-400 hover:text-blue-600 p-2 hover:bg-blue-50 rounded-lg"
+                          title="編輯接龍"
+                        >
+                          <Pencil size={16} />
+                        </button>
+                      )}
+                      {canEdit && (
+                        <button
                           onClick={() => removeSheet(s)}
                           className="text-gray-400 hover:text-red-600 p-2 hover:bg-red-50 rounded-lg align-middle"
                           title="刪除"
@@ -249,13 +263,18 @@ const SignupManager: React.FC<Props> = ({ canEdit, activities, members, currentU
         </div>
       </div>
 
-      {createOpen && (
-        <CreateSheetModal
+      {(createOpen || editingSheet) && (
+        <SheetFormModal
+          sheet={editingSheet}
           activities={activities}
           currentUser={currentUser}
-          onClose={() => setCreateOpen(false)}
-          onCreated={async () => {
+          onClose={() => {
             setCreateOpen(false);
+            setEditingSheet(null);
+          }}
+          onSaved={async () => {
+            setCreateOpen(false);
+            setEditingSheet(null);
             await load();
           }}
         />
@@ -275,10 +294,11 @@ const SheetDetail: React.FC<{
   currentUser: AdminUser;
   onBack: () => void;
   onChanged: () => void;
+  onEdit: () => void;
   onCopyLink: () => void;
   onToggleStatus: () => void;
   onDelete: () => void;
-}> = ({ canEdit, sheet, entries, activities, members, currentUser, onBack, onChanged, onCopyLink, onToggleStatus, onDelete }) => {
+}> = ({ canEdit, sheet, entries, activities, members, currentUser, onBack, onChanged, onEdit, onCopyLink, onToggleStatus, onDelete }) => {
   const [addOpen, setAddOpen] = useState(false);
   const [converting, setConverting] = useState(false);
 
@@ -294,7 +314,7 @@ const SheetDetail: React.FC<{
 
   // 轉成收款項目：本人一筆，帶的每一位也各一筆（人頭數與收款筆數對得起來）
   async function convertToPayment() {
-    const amountStr = window.prompt(`要向這 ${head} 位收多少錢？（每人金額）`, '0');
+    const amountStr = window.prompt(`要向這 ${head} 位收多少錢？（每人金額）`, String(sheet.fee || 0));
     if (amountStr === null) return;
     const amount = Number(amountStr);
     if (!Number.isFinite(amount) || amount < 0) {
@@ -376,6 +396,7 @@ const SheetDetail: React.FC<{
             <h1 className="text-2xl font-bold">{sheet.title}</h1>
             <p className="text-gray-500 text-sm mt-1">
               {activity ? `${activity.date} ${activity.title}` : '自由主題'}
+              {sheet.fee > 0 && ` · 每人 NT$ ${sheet.fee.toLocaleString('zh-TW')}`}
               {sheet.deadline && ` · 截止 ${fmt(sheet.deadline)}`}
               {sheet.status === 'closed' && ' · 已結束'}
             </p>
@@ -389,6 +410,12 @@ const SheetDetail: React.FC<{
             </button>
             {canEdit && (
               <>
+                <button
+                  onClick={onEdit}
+                  className="flex items-center gap-2 border border-gray-200 px-4 py-2.5 rounded-xl hover:bg-gray-50 font-bold text-gray-700"
+                >
+                  <Pencil size={18} /> 編輯
+                </button>
                 <button
                   onClick={() => setAddOpen(true)}
                   className="flex items-center gap-2 border border-gray-200 px-4 py-2.5 rounded-xl hover:bg-gray-50 font-bold text-gray-700"
@@ -525,13 +552,29 @@ const SheetDetail: React.FC<{
 
 /* ---------------- 建立接龍 ---------------- */
 
-const CreateSheetModal: React.FC<{
+const SheetFormModal: React.FC<{
+  sheet: Sheet | null; // null = 建立，有值 = 編輯
   activities: Activity[];
   currentUser: AdminUser;
   onClose: () => void;
-  onCreated: () => void;
-}> = ({ activities, currentUser, onClose, onCreated }) => {
+  onSaved: () => void;
+}> = ({ sheet, activities, currentUser, onClose, onSaved }) => {
   const [saving, setSaving] = useState(false);
+  const isEdit = !!sheet;
+
+  // datetime-local 要的是「本地時間」字串，DB 存的是 UTC，回填時要換算回台北時間
+  const deadlineLocal = (() => {
+    if (!sheet?.deadline) return '';
+    const parts = new Intl.DateTimeFormat('sv-SE', {
+      timeZone: 'Asia/Taipei',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(new Date(sheet.deadline));
+    return parts.replace(' ', 'T'); // sv-SE 給的是 'YYYY-MM-DD HH:mm'
+  })();
 
   const submit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -541,27 +584,30 @@ const CreateSheetModal: React.FC<{
     const maxRaw = String(f.get('max_people') || '').trim();
     const deadlineRaw = String(f.get('deadline') || '').trim();
 
+    const payload = {
+      title,
+      description: String(f.get('description') || '').trim() || null,
+      activity_id: f.get('activity_id') ? Number(f.get('activity_id')) : null,
+      // datetime-local 沒有時區，會以瀏覽器所在時區解讀（幹部都在台灣，等同台北時間）
+      deadline: deadlineRaw ? new Date(deadlineRaw).toISOString() : null,
+      max_people: maxRaw ? Number(maxRaw) : null,
+      fee: Number(f.get('fee') || 0),
+      allow_guests: f.get('allow_guests') === 'on',
+      allow_non_members: f.get('allow_non_members') === 'on',
+    };
+
     setSaving(true);
     try {
-      const { error } = await supabase.from('signup_sheets').insert([
-        {
-          title,
-          description: String(f.get('description') || '').trim() || null,
-          activity_id: f.get('activity_id') ? Number(f.get('activity_id')) : null,
-          // datetime-local 沒有時區，使用者輸入的是台北時間
-          deadline: deadlineRaw ? new Date(deadlineRaw).toISOString() : null,
-          max_people: maxRaw ? Number(maxRaw) : null,
-          allow_guests: f.get('allow_guests') === 'on',
-          allow_non_members: f.get('allow_non_members') === 'on',
-          status: 'open',
-          created_by: currentUser.name,
-        },
-      ]);
+      const { error } = isEdit
+        ? await supabase.from('signup_sheets').update(payload).eq('id', sheet!.id)
+        : await supabase
+            .from('signup_sheets')
+            .insert([{ ...payload, status: 'open', created_by: currentUser.name }]);
       if (error) {
-        alert('建立失敗：' + error.message);
+        alert((isEdit ? '儲存失敗：' : '建立失敗：') + error.message);
         return;
       }
-      onCreated();
+      onSaved();
     } finally {
       setSaving(false);
     }
@@ -571,17 +617,25 @@ const CreateSheetModal: React.FC<{
     <div className="fixed inset-0 bg-black/50 z-50 flex items-start justify-center p-4 overflow-y-auto">
       <div className="bg-white w-full max-w-lg rounded-2xl p-6 my-8">
         <div className="flex items-center justify-between mb-5">
-          <h2 className="text-xl font-bold">建立接龍</h2>
+          <h2 className="text-xl font-bold">{isEdit ? '編輯接龍' : '建立接龍'}</h2>
           <button onClick={onClose} className="text-gray-300 hover:text-gray-500">
             <X size={22} />
           </button>
         </div>
+
+        {isEdit && (
+          <p className="text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2 mb-4">
+            報名連結不會變，已經貼到群組的連結照樣可用。已報名的人不受影響。
+          </p>
+        )}
+
         <form onSubmit={submit} className="space-y-4">
           <div>
             <label className="block text-sm font-bold text-gray-700 mb-1">主題 *</label>
             <input
               name="title"
               required
+              defaultValue={sheet?.title ?? ''}
               className="w-full border rounded-lg px-3 py-3 outline-none focus:ring-2 focus:ring-red-500"
               placeholder="例：9/5 例會後聚餐"
             />
@@ -591,14 +645,16 @@ const CreateSheetModal: React.FC<{
             <textarea
               name="description"
               rows={2}
+              defaultValue={sheet?.description ?? ''}
               className="w-full border rounded-lg px-3 py-3 outline-none focus:ring-2 focus:ring-red-500"
-              placeholder="時間地點、費用、注意事項…"
+              placeholder="時間地點、注意事項…"
             />
           </div>
           <div>
             <label className="block text-sm font-bold text-gray-700 mb-1">綁定活動（選填）</label>
             <select
               name="activity_id"
+              defaultValue={sheet?.activity_id ? String(sheet.activity_id) : ''}
               className="w-full border rounded-lg px-3 py-3 bg-white outline-none focus:ring-2 focus:ring-red-500"
             >
               <option value="">不綁定（自由主題）</option>
@@ -609,14 +665,17 @@ const CreateSheetModal: React.FC<{
               ))}
             </select>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             <div>
-              <label className="block text-sm font-bold text-gray-700 mb-1">截止時間</label>
+              <label className="block text-sm font-bold text-gray-700 mb-1">每人費用</label>
               <input
-                name="deadline"
-                type="datetime-local"
+                name="fee"
+                type="number"
+                min={0}
+                defaultValue={sheet?.fee ?? 0}
                 className="w-full border rounded-lg px-3 py-3 outline-none focus:ring-2 focus:ring-red-500"
               />
+              <p className="text-[11px] text-gray-400 mt-1">0 = 免費</p>
             </div>
             <div>
               <label className="block text-sm font-bold text-gray-700 mb-1">人數上限</label>
@@ -625,15 +684,25 @@ const CreateSheetModal: React.FC<{
                 type="number"
                 min={1}
                 placeholder="不限"
+                defaultValue={sheet?.max_people ?? ''}
+                className="w-full border rounded-lg px-3 py-3 outline-none focus:ring-2 focus:ring-red-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-1">截止時間</label>
+              <input
+                name="deadline"
+                type="datetime-local"
+                defaultValue={deadlineLocal}
                 className="w-full border rounded-lg px-3 py-3 outline-none focus:ring-2 focus:ring-red-500"
               />
             </div>
           </div>
           <label className="flex items-center gap-2 text-sm text-gray-600">
-            <input type="checkbox" name="allow_guests" defaultChecked /> 可以帶眷屬／朋友
+            <input type="checkbox" name="allow_guests" defaultChecked={sheet ? sheet.allow_guests : true} /> 可以帶眷屬／朋友
           </label>
           <label className="flex items-center gap-2 text-sm text-gray-600">
-            <input type="checkbox" name="allow_non_members" defaultChecked /> 非會員也能報名（需填姓名電話）
+            <input type="checkbox" name="allow_non_members" defaultChecked={sheet ? sheet.allow_non_members : true} /> 非會員也能報名（需填姓名電話）
           </label>
           <div className="flex gap-3 pt-2">
             <button
@@ -648,7 +717,7 @@ const CreateSheetModal: React.FC<{
               disabled={saving}
               className="flex-1 bg-red-600 text-white py-3 rounded-lg font-bold hover:bg-red-700 disabled:opacity-50"
             >
-              {saving ? '建立中…' : '建立'}
+              {saving ? '儲存中…' : isEdit ? '儲存變更' : '建立'}
             </button>
           </div>
         </form>
