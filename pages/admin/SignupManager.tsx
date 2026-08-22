@@ -305,9 +305,18 @@ const SheetDetail: React.FC<{
 }> = ({ canEdit, sheet, entries, activities, members, currentUser, onBack, onChanged, onEdit, onCopyLink, onToggleStatus, onDelete }) => {
   const [addOpen, setAddOpen] = useState(false);
   const [converting, setConverting] = useState(false);
+  const [sortBy, setSortBy] = useState<'time' | 'group'>('time');
 
   const head = entries.reduce((s, e) => s + 1 + e.extra_count, 0);
   const activity = activities.find(a => String(a.id) === String(sheet.activity_id));
+
+  // 組別取自會員資料；來賓與沒設組別的會員歸「未分組」
+  const GROUPLESS = '未分組';
+  const groupOf = (e: Entry) =>
+    members.find(m => String(m.id) === String(e.member_id))?.group_name || GROUPLESS;
+
+  // 報名序號固定用原本的接龍順序，換排序時不會跟著跳號
+  const orderNo = new Map(entries.map((e, i) => [e.id, i + 1]));
 
   // 應收：本人依身分計價，同行者一律一般價（與 LIFF 頁、轉收款同一套規則）
   const memberPrice = sheet.member_fee ?? sheet.fee;
@@ -315,6 +324,30 @@ const SheetDetail: React.FC<{
   const totalDue = entries.reduce((sum, e) => sum + dueOf(e), 0);
   const memberHeads = entries.filter(e => e.member_id).length;
   const normalHeads = head - memberHeads;
+
+  // 依組別排序：組名用 numeric 比較，這樣 '12' < '13' < '16' < '三尊'；未分組排最後
+  const sortedEntries =
+    sortBy === 'time'
+      ? entries
+      : [...entries].sort((a, b) => {
+          const ga = groupOf(a);
+          const gb = groupOf(b);
+          if (ga !== gb) {
+            if (ga === GROUPLESS) return 1;
+            if (gb === GROUPLESS) return -1;
+            return ga.localeCompare(gb, 'zh-TW', { numeric: true });
+          }
+          return (orderNo.get(a.id) ?? 0) - (orderNo.get(b.id) ?? 0);
+        });
+
+  // 分組小標要用的每組統計
+  const groupStat = (g: string) => {
+    const rows = entries.filter(e => groupOf(e) === g);
+    return {
+      heads: rows.reduce((sum, e) => sum + 1 + e.extra_count, 0),
+      due: rows.reduce((sum, e) => sum + dueOf(e), 0),
+    };
+  };
 
   async function removeEntry(e: Entry) {
     if (!window.confirm(`確定要移除「${e.real_name}」的報名嗎？`)) return;
@@ -500,6 +533,24 @@ const SheetDetail: React.FC<{
       </div>
 
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="px-6 py-3 border-b border-gray-100 bg-gray-50/50 flex items-center gap-2">
+          <span className="text-xs font-bold text-gray-400">排序</span>
+          {([
+            ['time', '報名順序'],
+            ['group', '依組別'],
+          ] as const).map(([key, label]) => (
+            <button
+              key={key}
+              onClick={() => setSortBy(key)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                sortBy === key ? 'bg-red-600 text-white' : 'bg-white border text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+          <span className="text-[11px] text-gray-400 ml-auto">＃ 是接龍順序，換排序不會變動</span>
+        </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead className="bg-gray-50 border-b border-gray-100">
@@ -515,11 +566,28 @@ const SheetDetail: React.FC<{
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {entries.map((e, i) => {
+              {sortedEntries.map((e, i) => {
                 const member = members.find(m => String(m.id) === String(e.member_id));
+                // 依組別排序時，每組第一列前面插一條小標
+                const g = groupOf(e);
+                const showGroupHeader =
+                  sortBy === 'group' && (i === 0 || groupOf(sortedEntries[i - 1]) !== g);
+                const gs = showGroupHeader ? groupStat(g) : null;
                 return (
-                  <tr key={e.id} className="hover:bg-gray-50/50">
-                    <td className="px-6 py-4 text-gray-300 font-bold">{i + 1}</td>
+                  <React.Fragment key={e.id}>
+                  {showGroupHeader && (
+                    <tr className="bg-gray-50/80">
+                      <td colSpan={8} className="px-6 py-2">
+                        <span className="text-xs font-bold text-gray-700">{g}</span>
+                        <span className="text-[11px] text-gray-400 ml-3">
+                          {gs!.heads} 位
+                          {gs!.due > 0 && ` · 應收 ${money(gs!.due)}`}
+                        </span>
+                      </td>
+                    </tr>
+                  )}
+                  <tr className="hover:bg-gray-50/50">
+                    <td className="px-6 py-4 text-gray-300 font-bold">{orderNo.get(e.id)}</td>
                     <td className="px-6 py-4">
                       <div className="font-bold text-gray-900 flex items-center gap-2">
                         {e.real_name}
@@ -569,6 +637,7 @@ const SheetDetail: React.FC<{
                       )}
                     </td>
                   </tr>
+                  </React.Fragment>
                 );
               })}
             </tbody>
