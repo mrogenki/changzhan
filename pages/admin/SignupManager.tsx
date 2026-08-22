@@ -62,6 +62,8 @@ const sheetUrl = (token: string) =>
     ? `https://liff.line.me/${SIGNUP_LIFF_ID}?sheet=${encodeURIComponent(token)}`
     : `${window.location.origin}/liff/signup?sheet=${encodeURIComponent(token)}`;
 
+const money = (n: number) => `NT$ ${n.toLocaleString('zh-TW')}`;
+
 const fmt = (iso?: string | null) =>
   iso ? new Date(iso).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', dateStyle: 'short', timeStyle: 'short' }) : '';
 
@@ -307,6 +309,13 @@ const SheetDetail: React.FC<{
   const head = entries.reduce((s, e) => s + 1 + e.extra_count, 0);
   const activity = activities.find(a => String(a.id) === String(sheet.activity_id));
 
+  // 應收：本人依身分計價，同行者一律一般價（與 LIFF 頁、轉收款同一套規則）
+  const memberPrice = sheet.member_fee ?? sheet.fee;
+  const dueOf = (e: Entry) => (e.member_id ? memberPrice : sheet.fee) + sheet.fee * e.extra_count;
+  const totalDue = entries.reduce((sum, e) => sum + dueOf(e), 0);
+  const memberHeads = entries.filter(e => e.member_id).length;
+  const normalHeads = head - memberHeads;
+
   async function removeEntry(e: Entry) {
     if (!window.confirm(`確定要移除「${e.real_name}」的報名嗎？`)) return;
     const { error } = await supabase.from('signup_entries').delete().eq('id', e.id);
@@ -461,7 +470,7 @@ const SheetDetail: React.FC<{
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div className="bg-white p-4 rounded-xl border">
           <div className="text-xs text-gray-400 font-bold uppercase">總人頭</div>
           <div className="text-2xl font-bold text-gray-800">
@@ -477,6 +486,17 @@ const SheetDetail: React.FC<{
           <div className="text-xs text-blue-600 font-bold uppercase">來賓</div>
           <div className="text-2xl font-bold text-blue-700">{entries.filter(e => !e.member_id).length}</div>
         </div>
+        <div className="bg-amber-50 p-4 rounded-xl border border-amber-100">
+          <div className="text-xs text-amber-600 font-bold uppercase">應收金額</div>
+          <div className="text-2xl font-bold text-amber-700">{money(totalDue)}</div>
+          {totalDue > 0 && (
+            <p className="text-[11px] text-amber-600/80 mt-1 leading-relaxed">
+              {sheet.member_fee != null
+                ? `會員 ${memberHeads} × ${sheet.member_fee} · 一般 ${normalHeads} × ${sheet.fee}`
+                : `${head} 位 × ${sheet.fee}`}
+            </p>
+          )}
+        </div>
       </div>
 
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
@@ -488,6 +508,7 @@ const SheetDetail: React.FC<{
                 <th className="px-6 py-4">姓名</th>
                 <th className="px-6 py-4">聯絡資訊</th>
                 <th className="px-6 py-4">同行</th>
+                <th className="px-6 py-4 text-right">應收</th>
                 <th className="px-6 py-4">備註</th>
                 <th className="px-6 py-4">報名時間</th>
                 <th className="px-6 py-4 text-right">操作</th>
@@ -523,6 +544,13 @@ const SheetDetail: React.FC<{
                           <span className="font-bold text-gray-700">+{e.extra_count}</span>
                           {e.extra_names && <div className="text-xs text-gray-400">{e.extra_names}</div>}
                         </>
+                      ) : (
+                        <span className="text-gray-300">—</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 text-right whitespace-nowrap">
+                      {dueOf(e) > 0 ? (
+                        <span className="font-bold text-gray-700">{money(dueOf(e))}</span>
                       ) : (
                         <span className="text-gray-300">—</span>
                       )}
