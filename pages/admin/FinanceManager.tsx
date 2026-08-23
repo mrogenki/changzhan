@@ -76,10 +76,19 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    // 沒選關聯活動時下拉會給空字串，但 activity_id 是 bigint，直接送會炸；
+    // 金額也一併轉成數字，避免存成字串。
+    const payload = {
+      ...formData,
+      amount: Number(formData.amount) || 0,
+      activity_id: formData.activity_id === '' || formData.activity_id == null
+        ? null
+        : Number(formData.activity_id),
+    };
     if (editingRecord) {
-      onUpdateFinanceRecord({ ...editingRecord, ...formData } as FinanceRecord);
+      onUpdateFinanceRecord({ ...editingRecord, ...payload } as FinanceRecord);
     } else {
-      onAddFinanceRecord({ ...formData, id: Date.now() } as FinanceRecord);
+      onAddFinanceRecord({ ...payload, id: Date.now() } as FinanceRecord);
     }
     setIsModalOpen(false);
   };
