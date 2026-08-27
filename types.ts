@@ -212,3 +212,22 @@ export interface PaymentItem {
     note?: string | null;
     recorded_by?: string | null;
 }
+
+// 應付帳款：即將發生但還沒付的支出。確認支付後才會寫進 finance_records
+export type PayableStatus = 'pending' | 'paid' | 'cancelled';
+
+export interface PayableRecord {
+    id: number;
+    title: string;
+    category: string;
+    amount: number;              // 允許負數（沖銷／退回）
+    due_date?: string | null;    // 預計支付日
+    status: PayableStatus;
+    note?: string | null;
+    activity_id?: number | null;
+    finance_record_id?: number | null;
+    paid_at?: string | null;
+    paid_by?: string | null;
+    created_by?: string | null;
+    created_at?: string;
+}

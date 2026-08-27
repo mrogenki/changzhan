@@ -137,6 +137,7 @@
 | `finance_records` | 財務記錄（多一個 `payment_batch_id`，供收款工具寫入時識別是哪個收款項目）|
 | `signup_sheets` | 接龍（含公開連結用的隨機 `token`）|
 | `signup_entries` | 接龍的每筆報名 |
+| `payable_records` | 應付帳款（即將發生的支出），見第九之六節 |
 | `payment_batches` | 收款項目（每月餐費、某場活動收費…），見第九之三節 |
 | `payment_items` | 收款明細，每人一筆，掛在 `payment_batches` 底下 |
 | `milestones` | 大事記 |
@@ -341,6 +342,21 @@ npm run preview    # 本機預覽 build
 **環境變數 `VITE_LIFF_SIGNUP_ID`**（`.env.local` 與 Vercel 都要，Vercel 改完需重新 deploy）：目前值 `2009854899-KEtH0Qad`，Endpoint 應設為 `https://changzhan.vercel.app/liff/signup`。webhook 裡也寫了同一組 ID（`line-webhook` 的 `LIFF_SIGNUP_ID` 常數），**換 LIFF app 時兩邊都要改**。
 
 **判斷路由**：`App.tsx` 最前面的 LIFF 短路判斷**先判接龍**（path `/liff/signup` 或有 `sheet` 參數，含 `liff.state` 包裹），再判名片、例會報到。
+
+### 應付帳款（`/admin/payables`）
+
+`pages/admin/PayableManager.tsx`。記錄**即將發生但還沒付**的支出——你們 Excel 右側那塊「應付帳款明細表」就是這個（匯入 4-8 月收支時刻意跳過沒收，因為那是預估負債不是實際收支）。
+
+⚠️ **名稱**：需求上寫的是「應收帳款」，但描述的是即將發生的支出，會計上叫**應付**帳款。用這個名字也才不會跟「收款管理」（跟會員收錢）混淆。
+
+**流程**：建立 → 確認支付 → 產生 `finance_records` 一筆 `expense`，並用 `finance_record_id` 連回來。**沒確認支付前不會進流水帳**，所以收支管理裡永遠只有真正發生的錢。
+
+- **確認支付時可改日期與金額**：預估 5,200 實付 5,000 很常見，金額不同時會提示，並把應付紀錄一併更新為實付金額（以免帳上留著錯的預估）。
+- **撤銷支付**會把流水帳那筆一併刪除再改回待支付，否則帳上會留下不該存在的支出。
+- **金額允許負數**：沖銷／退回（你們表上的「獎金兌換 -2000」）。
+- **逾期**＝`status='pending'` 且 `due_date` 早於今天（台北時間），列表整列標紅並在統計卡單獨計算。
+- 寫入順序是**先寫流水帳拿到 id、再回頭標記已付**，避免標成已付卻沒有帳。
+- `finance_record_id` 是 `on delete set null`：若有人直接從收支管理刪掉那筆支出，應付紀錄會**維持已支付但失去關聯**（不會自動改回待支付）。要改狀態請用「撤銷支付」。
 
 ### 收款管理（`/admin/payments`）
 

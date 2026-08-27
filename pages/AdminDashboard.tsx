@@ -15,6 +15,7 @@ import BirthdayManager from './admin/BirthdayManager';
 import MembershipExpiryManager from './admin/MembershipExpiryManager';
 import GuestManager from './admin/GuestManager';
 import SignupManager from './admin/SignupManager';
+import PayableManager from './admin/PayableManager';
 import PaymentManager from './admin/PaymentManager';
 import PaymentBatchDetail from './admin/PaymentBatchDetail';
 import DocumentManager from './admin/DocumentManager';
@@ -132,6 +133,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
               canEdit={props.canEdit}
               members={props.members}
               registrations={props.registrations}
+              currentUser={props.currentUser}
+            />
+          } />
+          <Route path="/payables" element={
+            <PayableManager
+              canEdit={props.canEdit}
+              activities={props.activities}
               currentUser={props.currentUser}
             />
           } />
