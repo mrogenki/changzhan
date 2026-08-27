@@ -2,6 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import { Plus, Search, Filter, Trash2, Edit2, TrendingUp, TrendingDown, Wallet, Calendar as CalendarIcon, Tag, FileText, ChevronDown, X } from 'lucide-react';
 import { FinanceRecord, FinanceType, FinanceCategory, Activity } from '../../types';
+import FinanceMonthlyReport from './FinanceMonthlyReport';
 
 interface FinanceManagerProps {
   activities: Activity[];
@@ -18,6 +19,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
   onUpdateFinanceRecord,
   onDeleteFinanceRecord
 }) => {
+  const [tab, setTab] = useState<'ledger' | 'report'>('ledger');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState<FinanceRecord | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -100,14 +102,35 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
           <h1 className="text-2xl font-bold text-gray-900">收支管理</h1>
           <p className="text-gray-500 text-sm">記錄與追蹤分會的所有財務收支狀況</p>
         </div>
-        <button
-          onClick={() => handleOpenModal()}
-          className="flex items-center justify-center gap-2 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors shadow-sm"
-        >
-          <Plus size={20} />
-          <span>新增收支紀錄</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <div className="flex gap-1 bg-gray-100 p-1 rounded-lg">
+            {([['ledger', '流水帳'], ['report', '月報表']] as const).map(([k, label]) => (
+              <button
+                key={k}
+                onClick={() => setTab(k)}
+                className={`px-3 py-1.5 rounded-md text-sm font-bold transition ${
+                  tab === k ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          {tab === 'ledger' && (
+            <button
+              onClick={() => handleOpenModal()}
+              className="flex items-center justify-center gap-2 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors shadow-sm"
+            >
+              <Plus size={20} />
+              <span>新增收支紀錄</span>
+            </button>
+          )}
+        </div>
       </div>
+
+      {tab === 'report' && <FinanceMonthlyReport financeRecords={financeRecords} />}
+      {tab === 'ledger' && (
+      <>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -260,6 +283,9 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
       </div>
 
       {/* Modal */}
+      </>
+      )}
+
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
