@@ -204,7 +204,8 @@ const PaymentBatchDetail: React.FC<Props> = ({ canEdit, members, registrations, 
           <div>
             <h1 className="text-2xl font-bold">{batch.title}</h1>
             <p className="text-gray-500 text-sm mt-1">
-              每人 {money(batch.default_amount)}
+              一般 {money(batch.default_amount)}
+              {batch.member_amount != null && ` / 會員 ${money(batch.member_amount)}`}
               {batch.due_date && ` · 期限 ${batch.due_date}`}
               {batch.period && ` · 期別 ${batch.period}`}
               {batch.status === 'closed' && ' · 已結清'}
@@ -565,13 +566,15 @@ const AddPayeesModal: React.FC<{
     if (picked.length === 0) return;
     setSaving(true);
     try {
+      // 分級時會員本人算會員價，其餘算一般價（與建立項目時同一套規則）
+      const memberAmt = batch.member_amount ?? batch.default_amount;
       const rows = picked.map(p => ({
         batch_id: batch.id,
         payee_name: p.payee_name,
         payee_phone: p.payee_phone ?? null,
         member_id: p.member_id ?? null,
         registration_id: p.registration_id ?? null,
-        amount_due: batch.default_amount,
+        amount_due: p.member_id ? memberAmt : batch.default_amount,
         amount_paid: 0,
       }));
       const { error } = await supabase.from('payment_items').insert(rows);
@@ -589,7 +592,11 @@ const AddPayeesModal: React.FC<{
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
       <div className="bg-white w-full max-w-md rounded-2xl p-6">
         <h3 className="text-lg font-bold mb-1">加入名單</h3>
-        <p className="text-xs text-gray-500 mb-4">加入後應繳金額預設為 {money(batch.default_amount)}，可再個別調整。</p>
+        <p className="text-xs text-gray-500 mb-4">
+          {batch.member_amount != null
+            ? `加入後：會員 ${money(batch.member_amount)}、來賓 ${money(batch.default_amount)}，可再個別調整。`
+            : `加入後應繳金額預設為 ${money(batch.default_amount)}，可再個別調整。`}
+        </p>
 
         <div className="relative mb-3">
           <div className="flex items-center gap-2 border rounded-lg px-3 py-2">

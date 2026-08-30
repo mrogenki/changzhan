@@ -186,7 +186,8 @@ export const PAYMENT_METHOD_LABEL: Record<PaymentMethod, string> = {
 export interface PaymentBatch {
     id: number;
     title: string;
-    default_amount: number;
+    default_amount: number;        // 一般價
+    member_amount?: number | null; // 會員價，null = 不分級
     period?: string | null;        // '2026-09'，只有每月餐費會填
     activity_id?: number | null;
     due_date?: string | null;

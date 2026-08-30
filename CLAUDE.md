@@ -386,6 +386,8 @@ npm run preview    # 本機預覽 build
 - `payment_items_method_valid` check → 方式只能是 `cash`/`linepay`/`transfer`
 - `payment_batches_period_uniq` → 同一個月份只會有一個餐費項目，「建立本月餐費」可安全重複按
 
+**費用可分兩級**：`default_amount` 是一般價，`member_amount` 是會員價（null = 不分級，每月餐費就是這種）。規則與接龍一致——**會員本人算會員價，來賓與名單外的人算一般價**。建立項目與「加入名單」時都會依身分逐筆給 `amount_due`，之後仍可個別調整。選了「關聯活動」會自動帶入該活動的 `price` / `member_price`。
+
 **繳費狀態不存欄位**，由 `amount_paid` 對 `amount_due` 推導（0＝未繳、不足＝部分、足額＝已繳），避免改了金額狀態沒跟著對。
 
 **名單來源**（建立項目時可混用，之後也能用「加入名單」追加）：全體在籍會員 / 依組別 / 搜尋手動勾選（會員＋來賓）/ 從某場活動的出席名單帶入（會員取自 `attendance`、來賓取自已報到的 `registrations`）/ 直接打名字（家屬這類不在任何名單的人）。

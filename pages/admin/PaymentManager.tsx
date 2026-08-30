@@ -98,6 +98,8 @@ const PaymentManager: React.FC<Props> = ({ canEdit, members, activities, attenda
         return false;
       }
       if (payees.length > 0) {
+        // 分級時：會員本人算會員價，來賓與名單外的人算一般價（規則與接龍一致）
+        const memberAmt = batch.member_amount ?? batch.default_amount;
         const rows = payees.map(p => ({
           batch_id: created.id,
           payee_name: p.payee_name,
@@ -105,7 +107,7 @@ const PaymentManager: React.FC<Props> = ({ canEdit, members, activities, attenda
           member_id: p.member_id ?? null,
           guest_id: p.guest_id ?? null,
           registration_id: p.registration_id ?? null,
-          amount_due: batch.default_amount,
+          amount_due: p.member_id ? memberAmt : batch.default_amount,
           amount_paid: 0,
         }));
         const { error: itemErr } = await supabase.from('payment_items').insert(rows);
@@ -139,6 +141,7 @@ const PaymentManager: React.FC<Props> = ({ canEdit, members, activities, attenda
       {
         title: `${period} 餐費`,
         default_amount: MEAL_FEE_AMOUNT,
+        member_amount: null, // 餐費不分級
         period,
         activity_id: null,
         due_date: null,
@@ -255,6 +258,10 @@ const PaymentManager: React.FC<Props> = ({ canEdit, members, activities, attenda
                         {b.title}
                       </Link>
                       <div className="text-xs text-gray-400 mt-0.5">
+                        <span className="mr-2">
+                          一般 {money(b.default_amount)}
+                          {b.member_amount != null && ` / 會員 ${money(b.member_amount)}`}
+                        </span>
                         {b.period && <span className="mr-2">期別 {b.period}</span>}
                         {activity && <span className="mr-2">活動：{activity.title}</span>}
                         {b.due_date && <span>期限 {b.due_date}</span>}
@@ -434,6 +441,7 @@ const CreateBatchModal: React.FC<{
 }> = ({ members, activities, attendance, registrations, currentUser, creating, onClose, onCreate }) => {
   const [title, setTitle] = useState('');
   const [amount, setAmount] = useState(2800);
+  const [memberAmount, setMemberAmount] = useState('');
   const [period, setPeriod] = useState('');
   const [dueDate, setDueDate] = useState('');
   const [activityId, setActivityId] = useState('');
@@ -540,6 +548,7 @@ const CreateBatchModal: React.FC<{
       {
         title: title.trim(),
         default_amount: Number(amount) || 0,
+        member_amount: memberAmount === '' ? null : Number(memberAmount),
         period: period.trim() || null,
         activity_id: activityId ? Number(activityId) : null,
         due_date: dueDate || null,
@@ -570,7 +579,7 @@ const CreateBatchModal: React.FC<{
               />
             </div>
             <div>
-              <label className="block text-sm font-bold text-gray-700 mb-1">每人金額</label>
+              <label className="block text-sm font-bold text-gray-700 mb-1">一般價</label>
               <input
                 type="number"
                 min={0}
@@ -578,6 +587,18 @@ const CreateBatchModal: React.FC<{
                 onChange={e => setAmount(Number(e.target.value))}
                 className="w-full border rounded-lg px-3 py-3 outline-none focus:ring-2 focus:ring-red-500"
               />
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-1">會員價</label>
+              <input
+                type="number"
+                min={0}
+                value={memberAmount}
+                onChange={e => setMemberAmount(e.target.value)}
+                placeholder="不分級"
+                className="w-full border rounded-lg px-3 py-3 outline-none focus:ring-2 focus:ring-red-500"
+              />
+              <p className="text-[11px] text-gray-400 mt-1">留空＝大家同價</p>
             </div>
             <div>
               <label className="block text-sm font-bold text-gray-700 mb-1">繳費期限</label>
@@ -592,7 +613,16 @@ const CreateBatchModal: React.FC<{
               <label className="block text-sm font-bold text-gray-700 mb-1">關聯活動</label>
               <select
                 value={activityId}
-                onChange={e => setActivityId(e.target.value)}
+                onChange={e => {
+                  const id = e.target.value;
+                  setActivityId(id);
+                  // 帶入活動的兩級價，避免收款與活動各說各話
+                  const act = activities.find(a => String(a.id) === id);
+                  if (act) {
+                    setAmount(Number(act.price) || 0);
+                    setMemberAmount(act.member_price != null ? String(act.member_price) : '');
+                  }
+                }}
                 className="w-full border rounded-lg px-3 py-3 bg-white outline-none focus:ring-2 focus:ring-red-500"
               >
                 <option value="">不關聯</option>
