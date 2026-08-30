@@ -203,7 +203,7 @@ npm run preview    # 本機預覽 build
 - 🟡 多張表是 `allow_all` 政策（activities、admins、documents、finance_records、members、milestones、registrations、**line_groups、app_settings(UPDATE/INSERT)**）— 需逐一 audit + 收緊。後台登入已改走 Supabase Auth（Email + 密碼），後續可依 `authenticated` 角色逐表收緊，不必再維持 `allow_all`。
 - 🟡 `guest_attendance_summary` view 是 SECURITY DEFINER（advisor ERROR）— 應改為 SECURITY INVOKER 或 revoke
 - 🟡 `message_send_log` 允許 anon insert/update — 需評估是否真的需要（`guests`、`registrations` 已改為 `is_changzhan_admin()`，`registrations` 僅保留 anon insert 給公開報名）
-- 🟡 Storage buckets `activity-images`、`chapter-documents` 允許公開列檔 — 改為僅按 URL 存取
+- 🟡 Storage bucket `activity-images` 的政策是 public 角色且無條件，等於任何人都能用 anon key 上傳／刪除活動圖片 — 待收緊（`chapter-documents` 已改為 `authenticated` + `is_changzhan_editor()`）
 - 🟡 Supabase Auth 「Leaked Password Protection」未啟用（5 秒 toggle）
 
 ### 文件 / 結構
@@ -287,6 +287,18 @@ npm run preview    # 本機預覽 build
 - `mailto:` 「寫信給我」按鈕實測可用（LINE 接受）；若日後某情境被拒，改成 email 文字列即可（builder 內單點可調）。
 
 **判斷路由：** `App.tsx` 最前面的 LIFF 短路判斷**先判名片**（path `/liff/card` 或 `member`/`ids` 參數，含 `liff.state` 包裹），再判例會報到，避免參數被吃掉。
+
+### 文件管理的 Storage 權限（踩過的雷）
+
+`chapter-documents` bucket 原本的 storage 政策**只開給 `anon`**。後台登入改用 Supabase Auth 之後，上傳請求變成以 `authenticated` 身分送出，沒有對應政策 → 上傳一律被擋，錯誤訊息是 `new row violates row-level security policy`。
+
+⚠️ **改動後台登入方式時，storage 政策也要一起看**，不是只有資料表的 RLS。`activity-images` 沒事是因為它的政策用的是 public 角色（涵蓋所有身分）。
+
+現在 `chapter-documents` 的政策：
+- SELECT → `authenticated` + `is_changzhan_admin()`（`createSignedUrl` 需要）
+- INSERT / UPDATE / DELETE → `authenticated` + `is_changzhan_editor()`
+- **anon 的寫入與刪除已移除**：anon key 寫在前端 bundle 裡是公開的，原本等於任何人都能上傳或刪除分會文件
+- bucket 仍是 public，所以既有文件的公開網址照常下載，不受這些政策影響
 
 ### 後台的「可編輯 / 僅檢視」
 
