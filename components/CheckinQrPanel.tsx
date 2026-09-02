@@ -3,6 +3,9 @@ import { QRCodeCanvas } from 'qrcode.react';
 import { createClient } from '@supabase/supabase-js';
 import { RefreshCw } from 'lucide-react';
 
+// QR code 預設到期時間（例會結束後一小段時間，讓晚到的夥伴還能補報到）
+const DEFAULT_EXPIRY_TIME = '08:45';
+
 const supabase = createClient(
   import.meta.env.VITE_SUPABASE_URL as string,
   import.meta.env.VITE_SUPABASE_ANON_KEY as string
@@ -56,7 +59,7 @@ export default function CheckinQrPanel({ activityId, activityTitle, onAttendance
 
   // 表單 state
   const [expiryDate, setExpiryDate] = useState<string>('');
-  const [expiryTime, setExpiryTime] = useState<string>('08:00');
+  const [expiryTime, setExpiryTime] = useState<string>(DEFAULT_EXPIRY_TIME);
 
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
@@ -76,11 +79,11 @@ export default function CheckinQrPanel({ activityId, activityTitle, onAttendance
       if (cancelled) return;
 
       if (!error && data) {
-        // 預設值:活動日期 + 08:00
+        // 預設值:活動日期 + 預設到期時間
         const actDate = data.date || '';
         setActivityDate(actDate);
         setExpiryDate(actDate);
-        setExpiryTime('08:00');
+        setExpiryTime(DEFAULT_EXPIRY_TIME);
 
         // 已有 token (不論是否過期都顯示,讓 admin 可以延期)
         if (data.checkin_token && data.checkin_token_expires_at) {
@@ -179,7 +182,7 @@ export default function CheckinQrPanel({ activityId, activityTitle, onAttendance
     setExpiresAt(null);
     // reset 表單回預設
     setExpiryDate(activityDate);
-    setExpiryTime('08:00');
+    setExpiryTime(DEFAULT_EXPIRY_TIME);
   }
 
   async function handleRefresh() {
@@ -250,7 +253,7 @@ export default function CheckinQrPanel({ activityId, activityTitle, onAttendance
           </div>
         </div>
         <p className="text-xs text-gray-400">
-          預設活動當天 08:00 到期,可延後讓夥伴在例會結束後補報到
+          預設活動當天 08:45 到期,可延後讓夥伴在例會結束後補報到
         </p>
       </div>
 
