@@ -1,18 +1,11 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Calendar, MapPin, DollarSign, ArrowLeft, CheckCircle2, Share2, CopyCheck, Clock, Loader2, Search, User } from 'lucide-react';
-import emailjs from '@emailjs/browser';
 import { Activity, Registration, Member } from '../types';
 
-// TODO: 請替換為您 EmailJS 後台的實際資訊
-// 1. 前往 https://www.emailjs.com/ 註冊
-// 2. Add Service (例如 Gmail) -> 獲得 Service ID
-// 3. Email Templates -> Create New Template -> 獲得 Template ID
-//    Template 變數建議設定為: {{user_name}}, {{activity_title}}, {{activity_date}}, {{activity_time}}, {{activity_location}}
-// 4. Account -> Public Key
-const EMAILJS_SERVICE_ID: string = 'service_3cvfu3x';
-const EMAILJS_TEMPLATE_ID: string = 'template_tsptg0x';
-const EMAILJS_PUBLIC_KEY: string = 'ajJknYqtnk3p1_WmI';
+// 報名確認信改由 Supabase edge function `send-registration-email`（Resend）寄送，
+// 由 App.tsx::handleRegister 在報名寫入成功後 fire-and-forget 呼叫。
+// 前端不再碰任何寄信金鑰。
 
 interface ActivityDetailProps {
   activities: Activity[];
@@ -27,7 +20,6 @@ const ActivityDetail: React.FC<ActivityDetailProps> = ({ activities, registratio
   const activity = activities.find(a => String(a.id) === id);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isSendingEmail, setIsSendingEmail] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [showCopyTooltip, setShowCopyTooltip] = useState(false);
   const [formData, setFormData] = useState({
@@ -97,41 +89,6 @@ const ActivityDetail: React.FC<ActivityDetailProps> = ({ activities, registratio
     }
   };
 
-  const sendConfirmationEmail = async (reg: Registration) => {
-    // 檢查是否已設定 EmailJS 金鑰，若為預設值則跳過發送 (避免報錯)
-    if (EMAILJS_SERVICE_ID === 'YOUR_SERVICE_ID') {
-      console.warn('EmailJS 尚未設定，跳過郵件發送');
-      return;
-    }
-
-    setIsSendingEmail(true);
-    try {
-      await emailjs.send(
-        EMAILJS_SERVICE_ID,
-        EMAILJS_TEMPLATE_ID,
-        {
-          to_name: reg.name,
-          to_email: reg.email,
-          activity_title: activity.title,
-          activity_date: activity.date,
-          activity_time: activity.time,
-          activity_location: activity.location,
-          activity_price: activity.price,
-          company: reg.company,
-          title: reg.title,
-          message: `感謝您報名 ${activity.title}，我們期待您的蒞臨！`
-        },
-        EMAILJS_PUBLIC_KEY
-      );
-      console.log('報名確認信發送成功');
-    } catch (error) {
-      console.error('報名確認信發送失敗:', error);
-      // 這裡不跳出 alert，因為報名已經成功，Email 失敗不應該阻擋成功頁面
-    } finally {
-      setIsSendingEmail(false);
-    }
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -154,9 +111,7 @@ const ActivityDetail: React.FC<ActivityDetailProps> = ({ activities, registratio
     try {
       const success = await onRegister(newRegistration);
       if (success) {
-        // 報名成功後，嘗試發送 Email
-        await sendConfirmationEmail(newRegistration);
-        
+        // 確認信由 App.tsx::handleRegister 觸發 edge function 寄送，不阻擋成功畫面
         setIsSuccess(true);
         // 不再重置 isSubmitting，讓畫面停留在成功狀態
       } else {
@@ -415,7 +370,7 @@ const ActivityDetail: React.FC<ActivityDetailProps> = ({ activities, registratio
                 {isSubmitting ? (
                    <>
                      <Loader2 className="animate-spin" size={20} />
-                     {isSendingEmail ? '正在發送通知...' : '處理中...'}
+                     處理中...
                    </>
                 ) : '提交報名'}
               </button>

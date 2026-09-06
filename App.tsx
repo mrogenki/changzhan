@@ -353,11 +353,14 @@ const App: React.FC = () => {
             return false;
         }
         // 觸發 LINE 群組通知（若 app_settings 沒設目標群組會靜默跳過）
-        // 失敗不影響報名動作，所以 fire-and-forget + 吞掉錯誤
+        // 與報名確認信（Resend）：失敗都不影響報名動作，所以 fire-and-forget + 吞掉錯誤
         if (newId) {
             supabase.functions
                 .invoke('line-notify-registration', { body: { registrationId: newId } })
                 .catch((err) => console.warn('line-notify-registration failed:', err));
+            supabase.functions
+                .invoke('send-registration-email', { body: { registrationId: newId } })
+                .catch((err) => console.warn('send-registration-email failed:', err));
         }
         await fetchData();
         return true;

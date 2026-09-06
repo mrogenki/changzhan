@@ -36,7 +36,7 @@
 | 前端 | Vite + React 18/19 + TailwindCSS 4 + react-router-dom | Vercel |
 | 後端 | Supabase（PostgreSQL + Auth + Storage） | ap-northeast-1（東京）|
 | LINE 整合 | @line/liff（LIFF SDK） | LINE Platform |
-| Email | @emailjs/browser | EmailJS |
+| Email | Resend API（`send-registration-email` edge function）| Supabase Edge Functions |
 | 動態 OG tags | Vercel Serverless Function（`api/activity-og.ts`）| Vercel |
 | 動畫 / UI | framer-motion + motion + lucide-react + qrcode.react | — |
 | Excel | xlsx package（client-side parsing） | 瀏覽器 |
@@ -143,6 +143,7 @@
 | `milestones` | 大事記 |
 | `app_settings` | 系統設定（key/value，例：`line_notify_registration_group_id`） |
 | `message_send_log` | LINE 訊息發送記錄（`recipient_kind`: member / guest / **group**） |
+| `email_send_log` | 報名確認信發送記錄（`status`: sent / failed / skipped），只有後台登入者讀得到 |
 | `documents` | 文件管理 |
 | `line_groups` | LINE 長展小幫手所在群組（`line_group_id`, `name`, `is_active`，由 `line-webhook` 自動寫入） |
 
@@ -266,6 +267,29 @@ npm run preview    # 本機預覽 build
 - 自動回覆公告（`!公告`）走 LINE 的 reply API，**不計入推播額度**。
 
 **報名通知流程：** `App.tsx::handleRegister` insert 完 `registrations` 後 fire-and-forget invoke `line-notify-registration`，失敗不影響使用者報名動作。
+
+### 報名確認信（Resend）
+
+原本用 EmailJS，2026/09 改為 **Resend**。
+
+**為什麼一定要搬到伺服器端：** EmailJS 的 public key 設計上就是給瀏覽器用的（原本三組 ID 直接寫死在 `pages/ActivityDetail.tsx`，而這個 repo 是 public）。Resend 的 API key 是「可以用你的帳號寄任何信」的完整權限金鑰，**放進前端 bundle 等於公開**，所以改走 edge function。
+
+**Edge function `send-registration-email`**（`verify_jwt: true`，原始碼在 `supabase/functions/send-registration-email/index.ts`——**這支有進 repo**，不像其他幾支只部署在 Supabase）：
+
+- **只收 `{ registrationId }`**：收件地址與信件內容一律由伺服器用 service role 從 DB 撈。呼叫端無法指定收件人或內容，所以這支端點不會被拿去當免費的發信管道。
+- **每次都寫 `email_send_log`**（sent / failed / skipped），避免「沒寄出也沒人知道」。
+- **寄信失敗回 HTTP 200 + `ok:false`**：報名已經寫進 DB 了，寄信失敗不該讓使用者看到報名失敗。
+- **沒有 email、或 `RESEND_API_KEY` 未設定 → 記一筆 `skipped` 就結束**（代為報名允許 email 留空）。
+- 信裡的日期自己拆字串再用本地時間建構來算星期，`activities.date` 是純日期字串，`new Date('2026-09-15')` 會差一天。
+- 顯示的費用取 `activities.price`（一般價）；會員價要登入才判斷得出來，公開報名這裡不猜。
+
+**觸發點：** `App.tsx::handleRegister` 拿到 `newId` 後 fire-and-forget，與 `line-notify-registration` 並排。**後台「代為報名」不寄信**（`handleAddRegistration` 沒接），因為那多半是幹部補登、來賓也常沒有 email。
+
+**所需 Supabase Edge Function Secrets：**
+- `RESEND_API_KEY` — Resend 後台建立
+- `RESEND_FROM` — 例如 `BNI 長展分會 <noreply@你的網域>`
+
+⚠️ **Resend 要驗證寄件網域**。本站目前只有 `changzhan.vercel.app`（Vercel 子網域，無法加 DNS 記錄），所以**沒有可驗證的自有網域**。未設 `RESEND_FROM` 時退回 `onboarding@resend.dev`，那組**只能寄給 Resend 帳號本人**，一般報名者收不到。要真的對外寄信，得先有一個自有網域並在 Resend 完成 DNS 驗證。
 
 ### 會員電子名片（LINE Flex Message 分享）
 
