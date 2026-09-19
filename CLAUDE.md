@@ -49,10 +49,36 @@
 這個系統 **與 [`bni-report`](https://github.com/mrogenki/bni-report) 共用同一個 Supabase project**：
 
 - **Supabase Project ID**：`qxoglhkfxxqsjefynzqn`（名稱：changzhan）
-- **共用 tables**：`user_roles`（共用 RBAC）
-- **共用 functions**：`current_user_role()` SECURITY DEFINER（兩個系統的 RLS 都依賴此函式）
+- **真正共用的只有 Supabase Auth（`auth.users`）** —— 兩系統登入 session 相通
+- **權限是兩套平行的表，並不共用**：
+
+| 系統 | 權限來源 | 判定函式 | 涵蓋 |
+|------|---------|---------|------|
+| changzhan | `admins` | `is_changzhan_admin()` / `is_changzhan_editor()` | 本系統 16 張表 |
+| bni-report | `user_roles` | `current_user_role()` | `palms_imports`、`traffic_light_imports`、`member_groups` |
+
+> ⚠️ 本文件舊版寫「共用 tables：`user_roles`（共用 RBAC）」與「`current_user_role()`
+> 兩個系統的 RLS 都依賴此函式」—— **兩句都不正確**，已更正。
+> `user_roles` 與 `current_user_role()` 只有 bni-report 那三張表（加 `user_roles`
+> 自己）在用，changzhan 的表一張都沒用到。
 
 ⚠️ **動 RLS 政策或 SECURITY DEFINER functions 前要先檢查 bni-report 是否依賴**，反之亦然。
+
+### 為什麼兩套權限不合併（刻意的）
+
+它們授權的是**不同資源**，彼此正交。實際資料裡有 9 個人在 bni-report 是 `viewer`、
+在 changzhan 是 `管理員` —— 一個「只能看報告」的人，在這邊能改活動與財務。
+不管怎麼映射成單一角色，都會有人被升權或降權。
+
+🔴 **絕對不要把 `is_changzhan_admin()` 改成「或存在於 `user_roles`」。**
+目前有 4 位只在 `user_roles`、不在 `admins`，其中 3 位是 `viewer`。那樣改會讓
+只能看報告的人讀到 `members` 的完整個資（電話／地址／統編／生日）、
+`finance_records` 與 `payment_items`。那是越權，不是權限統一。
+
+反方向（分會幹部唯讀 bni-report 的報告）已經做了，而且**不需要動 RLS**：
+bni-report 的 `getCurrentUserRole()` 在 `user_roles` 查不到時會改查 `admins`，
+是分會幹部就給 `viewer`（只能看，不能上傳或編輯）。實作在 bni-report 的
+`src/supabase.js`，本系統這側不受影響。
 
 ### 統一入口（不合併程式碼）
 
@@ -200,6 +226,10 @@ npm run preview    # 本機預覽 build
 ## 八、已知狀況 / 待辦
 
 ### 安全
+- 🔴 **`admins.password` 是明文殘留**：14 列全部有值，且無一是 bcrypt hash。
+  該表讀取政策是 `is_changzhan_admin()`，等於**任何一位幹部都讀得到其他 13 位的密碼**。
+  後台登入早已改走 Supabase Auth，這欄位不再需要，應清空並 drop。
+  ⚠️ 動手前先確認 `manage-admin` Edge Function 有沒有在寫它（原始碼不在 repo 內）
 - 🔴 **`attendance` 表 RLS 未啟用**（advisor ERROR）— 任何人可直接修改出席記錄
 - 🟡 多張表是 `allow_all` 政策（activities、admins、documents、finance_records、members、milestones、registrations、**line_groups、app_settings(UPDATE/INSERT)**）— 需逐一 audit + 收緊。後台登入已改走 Supabase Auth（Email + 密碼），後續可依 `authenticated` 角色逐表收緊，不必再維持 `allow_all`。
 - 🟡 `guest_attendance_summary` view 是 SECURITY DEFINER（advisor ERROR）— 應改為 SECURITY INVOKER 或 revoke
