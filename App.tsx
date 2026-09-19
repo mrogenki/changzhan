@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
 import { Menu, X, Loader2 } from 'lucide-react';
 import { supabase } from './supabaseClient';
+import { compressImage } from './lib/compressImage';
 import Home from './pages/Home';
 import ActivityDetail from './pages/ActivityDetail';
 import AdminDashboard from './pages/AdminDashboard';
@@ -316,8 +317,10 @@ const App: React.FC = () => {
         setSession(null);
     };
 
-    const handleUploadImage = async (file: File): Promise<string> => {
+    const handleUploadImage = async (rawFile: File): Promise<string> => {
         try {
+            // 先在瀏覽器縮到長邊 1600px 並壓成 JPEG，手機原圖常是 3–5 MB（見 lib/compressImage.ts）
+            const file = await compressImage(rawFile);
             const fileExt = file.name.split('.').pop()?.toLowerCase() || 'jpg';
             const fileName = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
             const filePath = `activity-covers/${fileName}`;

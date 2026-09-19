@@ -312,6 +312,19 @@ npm run preview    # 本機預覽 build
 
 **判斷路由：** `App.tsx` 最前面的 LIFF 短路判斷**先判名片**（path `/liff/card` 或 `member`/`ids` 參數，含 `liff.state` 包裹），再判例會報到，避免參數被吃掉。
 
+### 圖片上傳自動壓縮（`lib/compressImage.ts`）
+
+所有圖片上傳（活動封面、大事記、會員照片、LINE 公告圖）都經過 `App.tsx::handleUploadImage`，上傳前先在瀏覽器端處理：
+
+- **長邊縮到 1600px**，輸出 **JPEG 品質 0.82**。實測 4032×3024 的手機照片從數 MB 降到數百 KB 以內。
+- **有透明背景的 PNG 才保留 PNG**（例如 logo），其餘 PNG 一律轉 JPEG（透明區塊先鋪白底，否則會變黑）。
+- **不用 WebP**：會員照片會進 LINE Flex Message、活動封面會當 og:image，這兩處對 WebP 支援不可靠。
+- **不處理**：GIF（動圖會變靜態）、SVG、以及尺寸不用縮且小於 200 KB 的圖（避免 JPEG 二次壓縮變糊）。
+- **壓完反而變大就用原檔**；**任何一步失敗都退回原檔上傳**（例如非 Safari 瀏覽器解不開 HEIC）——壓縮只是省空間，不能讓上傳失敗。
+- 用 `createImageBitmap(..., { imageOrientation: 'from-image' })` 解碼，手機直拍照片依 EXIF 轉正。
+
+文件管理（`chapter-documents`）的上傳走另一條路，**不會被壓縮**。已經上傳的舊圖不會回頭處理。
+
 ### 文件管理的 Storage 權限（踩過的雷）
 
 `chapter-documents` bucket 原本的 storage 政策**只開給 `anon`**。後台登入改用 Supabase Auth 之後，上傳請求變成以 `authenticated` 身分送出，沒有對應政策 → 上傳一律被擋，錯誤訊息是 `new row violates row-level security policy`。
