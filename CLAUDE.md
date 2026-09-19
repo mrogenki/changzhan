@@ -50,12 +50,12 @@
 
 - **Supabase Project ID**：`qxoglhkfxxqsjefynzqn`（名稱：changzhan）
 - **真正共用的只有 Supabase Auth（`auth.users`）** —— 兩系統登入 session 相通
-- **權限是兩套平行的表，並不共用**：
+- **RLS 的判定函式是兩套，各管各的表**：
 
-| 系統 | 權限來源 | 判定函式 | 涵蓋 |
-|------|---------|---------|------|
-| changzhan | `admins` | `is_changzhan_admin()` / `is_changzhan_editor()` | 本系統 16 張表 |
-| bni-report | `user_roles` | `current_user_role()` | `palms_imports`、`traffic_light_imports`、`member_groups` |
+| 系統 | RLS 判定 | 涵蓋 |
+|------|---------|------|
+| changzhan | `is_changzhan_admin()` / `is_changzhan_editor()`（查 `admins`） | 本系統 16 張表 |
+| bni-report | `current_user_role()`（查 `user_roles`） | `palms_imports`、`traffic_light_imports`、`member_groups` |
 
 > ⚠️ 本文件舊版寫「共用 tables：`user_roles`（共用 RBAC）」與「`current_user_role()`
 > 兩個系統的 RLS 都依賴此函式」—— **兩句都不正確**，已更正。
@@ -64,21 +64,37 @@
 
 ⚠️ **動 RLS 政策或 SECURITY DEFINER functions 前要先檢查 bni-report 是否依賴**，反之亦然。
 
-### 為什麼兩套權限不合併（刻意的）
+### `admins` 是兩個系統的權限來源（單向）
 
-它們授權的是**不同資源**，彼此正交。實際資料裡有 9 個人在 bni-report 是 `viewer`、
-在 changzhan 是 `管理員` —— 一個「只能看報告」的人，在這邊能改活動與財務。
-不管怎麼映射成單一角色，都會有人被升權或降權。
+雖然 RLS 判定是兩套，但**使用者權限已統一由本系統的 `admins` 表決定**。
+新幹部上任只要加進 `/admin/users`，他就能進 bni-report，不必再去那邊設一次。
+對應規則實作在 bni-report 的 `src/supabase.js::chapterRoleToReportRole`：
 
-🔴 **絕對不要把 `is_changzhan_admin()` 改成「或存在於 `user_roles`」。**
-目前有 4 位只在 `user_roles`、不在 `admins`，其中 3 位是 `viewer`。那樣改會讓
-只能看報告的人讀到 `members` 的完整個資（電話／地址／統編／生日）、
-`finance_records` 與 `payment_items`。那是越權，不是權限統一。
+| 本系統 | bni-report | 說明 |
+|--------|-----------|------|
+| 總管理員 | `admin` | 可管理 bni-report 的使用者 |
+| 管理員（`can_edit = true`） | `editor` | 可上傳／刪除 PALMS、紅綠燈，編輯組別 |
+| 管理員（`can_edit = false`） | `viewer` | 只能看報告 |
+| 工作人員 | `viewer` | 在本系統連活動頁都進不去，那邊也一律唯讀 |
 
-反方向（分會幹部唯讀 bni-report 的報告）已經做了，而且**不需要動 RLS**：
-bni-report 的 `getCurrentUserRole()` 在 `user_roles` 查不到時會改查 `admins`，
-是分會幹部就給 `viewer`（只能看，不能上傳或編輯）。實作在 bni-report 的
-`src/supabase.js`，本系統這側不受影響。
+⚠️ **改某人的 `role` 或 `can_edit`，會同時改變他在 bni-report 的權限。**
+
+⚠️ `admins` 目前有 5 筆 email 還是舊制 `<手機>@changzhan.local`。bni-report
+只能用 email 比對，那些人若用真實信箱登入會對不到 `admins`，目前靠
+`user_roles` 接住。把這些 email 換成真實信箱後兩邊就會自動一致，
+bni-report 那側不需要改任何東西。
+
+### 🔴 反方向絕對不可以做
+
+**絕對不要把 `is_changzhan_admin()` 改成「或存在於 `user_roles`」。**
+那會讓只能看報告的人讀到 `members` 的完整個資（電話／地址／統編／生日）、
+`finance_records` 與 `payment_items`。
+
+**單向才安全**：bni-report 的三張表只有分會績效資料，沒有個資也沒有金流，
+所以 changzhan → bni-report 可以自動放行；反過來不行。
+
+（bni-report 那側完全沒有動 RLS —— 它三張表的讀取政策本來就是
+`authenticated` + `USING(true)`，擋住幹部的一直是它的前端。）
 
 ### 統一入口（不合併程式碼）
 
