@@ -5,7 +5,7 @@
 
 ```
 supabase/
-├── migrations/     資料庫結構（01→08 依序執行）
+├── migrations/     資料庫結構（01→09 依序執行）
 └── functions/      8 支 Edge Function 原始碼
 ```
 
@@ -26,6 +26,7 @@ supabase/
 | `…000600_views_triggers.sql` | 2 個 view、4 個 trigger |
 | `…000700_rls_policies.sql` | RLS（62 條政策） |
 | `…000800_storage.sql` | 2 個 bucket 與其政策 |
+| `…000900_grants.sql` | 撤掉內部函式對外的 EXECUTE |
 
 用 Supabase Dashboard 的 SQL Editor 貼上執行即可，不需要 CLI。
 
