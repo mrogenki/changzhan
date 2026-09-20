@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Calendar, MapPin, DollarSign, ArrowLeft, CheckCircle2, Share2, CopyCheck, Clock, Loader2, Search, User } from 'lucide-react';
 import { Activity, Registration, Member } from '../types';
+import { CHAPTER_NAME, NO_REFERRER_OPTION } from '../chapterConfig';
 
 // 報名確認信改由 Supabase edge function `send-registration-email`（Resend）寄送，
 // 由 App.tsx::handleRegister 在報名寫入成功後 fire-and-forget 呼叫。
@@ -39,11 +40,11 @@ const ActivityDetail: React.FC<ActivityDetailProps> = ({ activities, registratio
     (m.company && m.company.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
-  // 下拉選項＝「BNI長展分會」官方選項 + 會員；兩者欄位不同，用共同型別描述
+  // 下拉選項＝分會官方選項（沒有特定引薦人時選它）+ 會員；兩者欄位不同，用共同型別描述
   type ReferrerOption = { id: string | number; name: string; company?: string; isSpecial?: boolean };
   const displayOptions: ReferrerOption[] = [
-    ...(searchTerm === '' || 'BNI長展分會'.toLowerCase().includes(searchTerm.toLowerCase()) 
-      ? [{ id: 'special-bni', name: 'BNI長展分會', company: '網路資訊 / 無特定引薦人', isSpecial: true }] 
+    ...(searchTerm === '' || NO_REFERRER_OPTION.toLowerCase().includes(searchTerm.toLowerCase())
+      ? [{ id: 'special-bni', name: NO_REFERRER_OPTION, company: '網路資訊 / 無特定引薦人', isSpecial: true }]
       : []),
     ...filteredMembers
   ];
@@ -63,7 +64,7 @@ const ActivityDetail: React.FC<ActivityDetailProps> = ({ activities, registratio
 
     const description = activity.description?.trim();
     const descriptionBlock = description ? `\n\n📋 活動介紹：\n${description}` : '';
-    const shareText = `【長展分會活動推薦】\n活動：${activity.title}\n日期：${activity.date}\n時間：${activity.time}\n地點：${activity.location}${descriptionBlock}\n\n立即點擊連結報名：`;
+    const shareText = `【${CHAPTER_NAME}活動推薦】\n活動：${activity.title}\n日期：${activity.date}\n時間：${activity.time}\n地點：${activity.location}${descriptionBlock}\n\n立即點擊連結報名：`;
 
     if (navigator.share) {
       try {
@@ -303,7 +304,7 @@ const ActivityDetail: React.FC<ActivityDetailProps> = ({ activities, registratio
                     }}
                     onFocus={() => setIsDropdownOpen(true)}
                     className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all outline-none"
-                    placeholder="搜尋或選擇引薦人 (若無請選 BNI長展分會)"
+                    placeholder={`搜尋或選擇引薦人 (若無請選 ${NO_REFERRER_OPTION})`}
                   />
                   <div className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400">
                     <Search size={18} />
@@ -330,7 +331,7 @@ const ActivityDetail: React.FC<ActivityDetailProps> = ({ activities, registratio
                             </div>
                             <div>
                               <p className="font-bold text-gray-800">{member.name}</p>
-                              <p className="text-xs text-gray-400">{member.company || '長展分會成員'}</p>
+                              <p className="text-xs text-gray-400">{member.company || `${CHAPTER_NAME}成員`}</p>
                             </div>
                           </div>
                           <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${member.isSpecial ? 'bg-red-600 text-white' : 'bg-gray-100 text-gray-500'}`}>

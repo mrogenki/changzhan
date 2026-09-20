@@ -202,6 +202,30 @@ schema、不在預設 search_path 裡，所以 migration 必須明確寫
 
 ---
 
+## 六之二、分會專屬設定（`chapterConfig.ts`）
+
+分會名稱、站台網址、LINE OA／LIFF ID 集中在 `chapterConfig.ts`，每個值都能用
+`VITE_` 環境變數覆蓋，沒設就用長展目前的值當 fallback。要開新分會時改 `.env`
+就好，不必翻每個頁面。**已驗證**：只設一個 `VITE_CHAPTER_SHORT_NAME=測試`，
+build 後整站的頁首、頁尾、大事記、報到頁都跟著改名。
+
+⚠️ **這裡有個會咬人的坑（實測踩到）**：Vite 只保證替換**字面上的**
+`import.meta.env.VITE_XXX`。寫成 `import.meta.env[key]` 這種動態索引時，
+值會不會被 inline 取決於壓縮器——實測 build 出來的頁面**整個讀不到環境變數**，
+安靜地用 fallback。
+
+`supabaseClient.ts` 原本就是這個寫法，意思是 `VITE_SUPABASE_URL` /
+`VITE_SUPABASE_ANON_KEY` 在正式站其實沒有生效，一直用的是寫死的長展專案。
+長展自己沒事（fallback 就是它自己），但**開第二家分會時會安靜地接到長展的資料庫**。
+已改成靜態存取。日後新增環境變數請一律寫 `import.meta.env.VITE_XXX`。
+
+`chapterConfig.ts` 管不到的地方，開新分會時要手動改：`index.html` 的 title 與
+og 預設值、`metadata.json`、`constants.tsx` 的範例資料、`api/activity-og.ts`
+（Vercel function 吃 `process.env`，已改成讀 `CHAPTER_NAME` / `SITE_HOST`）、
+以及 `supabase/functions/*` 裡的 `SITE_URL` 與 `LIFF_SIGNUP_ID` 常數。
+
+---
+
 ## 七、開發指令
 
 ```bash

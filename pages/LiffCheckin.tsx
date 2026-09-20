@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import liff from '@line/liff';
 import { createClient } from '@supabase/supabase-js';
+import { CHAPTER_FULL_NAME } from '../chapterConfig';
 
 const supabase = createClient(
   import.meta.env.VITE_SUPABASE_URL as string,
@@ -339,7 +340,7 @@ export default function LiffCheckin() {
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
       <div className="w-full max-w-md bg-white rounded-2xl shadow-lg p-6">
-        <h1 className="text-2xl font-bold text-center mb-2">BNI 長展分會</h1>
+        <h1 className="text-2xl font-bold text-center mb-2">{CHAPTER_FULL_NAME}</h1>
         <p className="text-center text-gray-500 mb-6">例會報到</p>
 
         {phase.kind === 'loading' && (

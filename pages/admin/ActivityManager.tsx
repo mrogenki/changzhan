@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Edit, Trash2, Calendar, Clock, MapPin, Image as ImageIcon, UploadCloud, Loader2, MessageCircle } from 'lucide-react';
 import { Activity, ActivityType } from '../../types';
+import { CHAPTER_FULL_NAME } from '../../chapterConfig';
 
 interface ActivityManagerProps {
   activities: Activity[];
@@ -10,7 +11,7 @@ interface ActivityManagerProps {
   onUploadImage: (file: File) => Promise<string>;
 }
 
-const DEFAULT_GUEST_WELCOME_PLACEHOLDER = `🎉 {name},感謝您參加 BNI 長展分會!
+const DEFAULT_GUEST_WELCOME_PLACEHOLDER = `🎉 {name},感謝您參加 ${CHAPTER_FULL_NAME}!
 
 您已完成報到:
 📅 {activity_title}

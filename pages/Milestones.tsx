@@ -3,6 +3,7 @@ import React, { useState, useMemo } from 'react';
 import { Calendar, Tag, Image as ImageIcon, Award, Camera, ChevronRight, X, ChevronLeft, Maximize2 } from 'lucide-react';
 import { Milestone, MilestoneType } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
+import { CHAPTER_SHORT_NAME } from '../chapterConfig';
 
 interface MilestonesProps {
   milestones: Milestone[];
@@ -78,7 +79,7 @@ const Milestones: React.FC<MilestonesProps> = ({ milestones }) => {
         <div className="max-w-7xl mx-auto text-center">
           <div className="inline-flex items-center gap-2 bg-red-50 text-red-600 px-4 py-1.5 rounded-full text-sm font-bold mb-6">
             <Award size={16} />
-            長展大事記
+            {CHAPTER_SHORT_NAME}大事記
           </div>
           <h1 className="text-3xl md:text-4xl font-extrabold mb-4 text-gray-900 tracking-tight">紀錄榮耀與精彩瞬間</h1>
           <p className="text-gray-500 max-w-2xl mx-auto leading-relaxed">

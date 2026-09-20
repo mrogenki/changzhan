@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Link, useLocation, Navigate } f
 import { Menu, X, Loader2 } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import { compressImage } from './lib/compressImage';
+import { CHAPTER_NAME, CHAPTER_SHORT_NAME, CHAPTER_FULL_NAME, LINE_OA_ID } from './chapterConfig';
 import Home from './pages/Home';
 import ActivityDetail from './pages/ActivityDetail';
 import AdminDashboard from './pages/AdminDashboard';
@@ -20,13 +21,6 @@ import LineFloatingButton, { LineLogo, buildLineChatUrl } from './components/Lin
 import { Activity, ActivityType, Registration, AdminUser, Member, AttendanceRecord, AttendanceStatus, FinanceRecord, Milestone, ChapterDocument } from './types';
 import { INITIAL_ACTIVITIES } from './constants';
 
-const getEnv = (key: string): string | undefined => {
-  try {
-    return (import.meta as any)?.env?.[key];
-  } catch (e) {
-    return undefined;
-  }
-};
 
 // PostgREST 預設每次查詢上限 1000 筆。attendance 等會持續成長的表必須分頁
 // 全量抓回,否則最新的記錄會被截斷(例如當日報到記錄是最新寫入,會剛好被丟掉)。
@@ -60,7 +54,7 @@ const Header: React.FC = () => {
                     <div className="flex items-center">
                         <Link to="/" className="flex-shrink-0 flex items-center gap-2">
                             <div className="w-8 h-8 bg-red-600 rounded-md flex items-center justify-center text-white font-bold">長</div>
-                            <span className="text-xl font-bold tracking-tight">長展分會</span>
+                            <span className="text-xl font-bold tracking-tight">{CHAPTER_NAME}</span>
                         </Link>
                     </div>
                     <div className="hidden lg:flex items-center space-x-6">
@@ -70,7 +64,7 @@ const Header: React.FC = () => {
                         <Link to="/group-meeting" className="text-gray-700 hover:text-red-600 transition-colors font-medium">組聚</Link>
                         <Link to="/members" className="text-gray-700 hover:text-red-600 transition-colors font-medium">產業資源</Link>
                         <Link to="/calendar" className="text-gray-700 hover:text-red-600 transition-colors font-medium">行事曆</Link>
-                        <Link to="/milestones" className="text-gray-700 hover:text-red-600 transition-colors font-medium">長展大事記</Link>
+                        <Link to="/milestones" className="text-gray-700 hover:text-red-600 transition-colors font-medium">{CHAPTER_SHORT_NAME}大事記</Link>
                         <Link to="/admin" className="text-gray-500 hover:text-gray-900 flex items-center gap-1 border border-gray-200 px-3 py-1 rounded-full text-sm font-bold">後台管理</Link>
                     </div>
                     <div className="lg:hidden flex items-center">
@@ -88,7 +82,7 @@ const Header: React.FC = () => {
                     <Link to="/group-meeting" onClick={() => setIsOpen(false)} className="block text-gray-700 font-bold">組聚</Link>
                     <Link to="/members" onClick={() => setIsOpen(false)} className="block text-gray-700 font-bold">產業資源</Link>
                     <Link to="/calendar" onClick={() => setIsOpen(false)} className="block text-gray-700 font-bold">行事曆</Link>
-                    <Link to="/milestones" onClick={() => setIsOpen(false)} className="block text-gray-700 font-bold">長展大事記</Link>
+                    <Link to="/milestones" onClick={() => setIsOpen(false)} className="block text-gray-700 font-bold">{CHAPTER_SHORT_NAME}大事記</Link>
                     <Link to="/admin" onClick={() => setIsOpen(false)} className="block text-gray-500 text-sm font-bold">後台管理</Link>
                 </div>
             )}
@@ -100,7 +94,7 @@ const Footer: React.FC = () => {
     const location = useLocation();
     if (location.pathname.startsWith('/admin')) return null;
 
-    const lineOaId = getEnv('VITE_LINE_OA_ID') || '@568cognw';
+    const lineOaId = LINE_OA_ID;
     const lineUrl = buildLineChatUrl(lineOaId);
 
     return (
@@ -108,7 +102,7 @@ const Footer: React.FC = () => {
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
                 <div className="flex justify-center items-center gap-2 mb-4">
                     <div className="w-6 h-6 bg-red-600 rounded-md flex items-center justify-center text-white text-xs font-bold">長</div>
-                    <span className="font-bold text-gray-800 tracking-wider">BNI 長展分會</span>
+                    <span className="font-bold text-gray-800 tracking-wider">{CHAPTER_FULL_NAME}</span>
                 </div>
                 {lineUrl && (
                     <div className="mb-4">
@@ -123,7 +117,7 @@ const Footer: React.FC = () => {
                         </a>
                     </div>
                 )}
-                <p className="text-gray-400 text-xs">&copy; 2026 長展分會. All rights reserved.</p>
+                <p className="text-gray-400 text-xs">&copy; 2026 {CHAPTER_NAME}. All rights reserved.</p>
             </div>
         </footer>
     );

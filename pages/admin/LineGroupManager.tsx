@@ -20,6 +20,7 @@ import {
   PowerOff,
 } from 'lucide-react';
 import { AdminUser } from '../../types';
+import { CHAPTER_SHORT_NAME } from '../../chapterConfig';
 
 const supabase = createClient(
   import.meta.env.VITE_SUPABASE_URL as string,
@@ -268,7 +269,7 @@ const LineGroupManager: React.FC<Props> = ({ canEdit, currentUser, onUploadImage
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold flex items-center gap-2">
           <MessageSquare size={28} className="text-green-600" />
-          LINE 長展小幫手
+          LINE {CHAPTER_SHORT_NAME}小幫手
         </h1>
         <button
           onClick={() => { fetchAll(); fetchQuota(); }}
@@ -407,7 +408,7 @@ const LineGroupManager: React.FC<Props> = ({ canEdit, currentUser, onUploadImage
         ) : groups.length === 0 ? (
           <div className="py-8 text-center text-gray-500 bg-gray-50 rounded-lg">
             <AlertCircle size={24} className="inline mr-2" />
-            尚無群組。請先把長展小幫手加入 LINE 群組，bot 收到 join 事件後會自動出現在此清單。
+            尚無群組。請先把{CHAPTER_SHORT_NAME}小幫手加入 LINE 群組，bot 收到 join 事件後會自動出現在此清單。
           </div>
         ) : (
           <div className="overflow-x-auto">

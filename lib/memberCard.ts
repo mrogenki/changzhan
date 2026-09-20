@@ -3,6 +3,8 @@
 // 產生可透過 liff.shareTargetPicker() 分享，或經 send-line-message / line-broadcast
 // edge function 推播的 flex 訊息。單張用 bubble，整組用 carousel。
 
+import { CHAPTER_FULL_NAME } from '../chapterConfig';
+
 /** 名片所需欄位（對應 public_member_cards RPC 回傳） */
 export interface MemberCardData {
   id: number;
@@ -195,7 +197,7 @@ export function buildMemberCarouselMessage(members: MemberCardData[]): {
       altText:
         used.length === 1
           ? `${used[0].name}的電子名片`
-          : `BNI 長展分會會員名片（${used.length} 位）`,
+          : `${CHAPTER_FULL_NAME}會員名片（${used.length} 位）`,
       contents: {
         type: 'carousel',
         contents: used.map(buildMemberCardBubble),
@@ -228,7 +230,7 @@ export function buildMemberShareMessages(members: MemberCardData[]): {
         ? buildMemberCardMessage(chunk[0])
         : {
             type: 'flex',
-            altText: `BNI 長展分會會員名片（${used.length} 位）`,
+            altText: `${CHAPTER_FULL_NAME}會員名片（${used.length} 位）`,
             contents: {
               type: 'carousel',
               contents: chunk.map(buildMemberCardBubble),

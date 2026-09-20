@@ -1,5 +1,6 @@
 import React from 'react';
 import { useLocation } from 'react-router-dom';
+import { LINE_OA_ID as CHAPTER_LINE_OA_ID } from '../chapterConfig';
 
 const getEnv = (key: string): string | undefined => {
   try {
@@ -9,7 +10,7 @@ const getEnv = (key: string): string | undefined => {
   }
 };
 
-const LINE_OA_ID = getEnv('VITE_LINE_OA_ID') || '@568cognw';
+const LINE_OA_ID = CHAPTER_LINE_OA_ID;
 
 // 把 LINE OA ID 轉成可以開啟聊天的 URL
 // 接受 @xxxxx 或 xxxxx 兩種格式，自動補 @ 前綴

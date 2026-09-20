@@ -2,6 +2,7 @@ import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { LayoutDashboard, Calendar, Users, LogOut, ClipboardList, Building2, Shield, Banknote, Award, Cake, CalendarClock, X, UserCheck, FolderOpen, MessageSquare, BarChart3, ExternalLink, Wallet, ListOrdered, ReceiptText } from 'lucide-react';
 import { AdminUser, UserRole } from '../../types';
+import { CHAPTER_SHORT_NAME } from '../../chapterConfig';
 
 // 引薦單報告系統(bni-report)網址；未設定則不顯示入口
 const BNI_REPORT_URL = import.meta.env.VITE_BNI_REPORT_URL as string | undefined;
@@ -137,7 +138,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout, isOpen, onClose }) =>
               </Link>
               <Link to="/admin/line-groups" onClick={handleNavClick} className={linkClass(location.pathname.startsWith('/admin/line-groups'))}>
                 <MessageSquare size={20} />
-                <span>LINE 長展小幫手</span>
+                <span>LINE {CHAPTER_SHORT_NAME}小幫手</span>
               </Link>
             </>
           )}

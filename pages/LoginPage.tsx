@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ShieldCheck, Lock, Mail } from 'lucide-react';
 import { supabase, phoneToEmail } from '../supabaseClient';
+import { CHAPTER_NAME } from '../chapterConfig';
 
 const LoginPage: React.FC = () => {
   const [account, setAccount] = useState('');
@@ -37,7 +38,7 @@ const LoginPage: React.FC = () => {
             <ShieldCheck size={32} />
           </div>
           <h1 className="text-3xl font-bold text-gray-900 tracking-tight">管理員登入</h1>
-          <p className="text-gray-400 mt-2 font-medium">長展分會活動管理系統</p>
+          <p className="text-gray-400 mt-2 font-medium">{CHAPTER_NAME}活動管理系統</p>
         </div>
 
         <div className="bg-white p-10 rounded-[40px] shadow-2xl shadow-gray-200/50 border border-gray-100 animate-in fade-in zoom-in duration-500">

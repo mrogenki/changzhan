@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, MapPin, Clock, CalendarDays } from 'lucide-react';
 import { Activity, ActivityType } from '../types';
+import { CHAPTER_NAME } from '../chapterConfig';
 
 interface Props {
   activities: Activity[];
@@ -102,7 +103,7 @@ const Calendar: React.FC<Props> = ({ activities }) => {
         <h1 className="text-3xl font-bold text-gray-900 tracking-tight flex items-center justify-center gap-2">
           <CalendarDays className="text-red-600" size={30} /> 活動行事曆
         </h1>
-        <p className="text-gray-400 mt-2 font-medium">長展分會的例會、培訓與精選活動，一次看清楚</p>
+        <p className="text-gray-400 mt-2 font-medium">{CHAPTER_NAME}的例會、培訓與精選活動，一次看清楚</p>
       </div>
 
       {/* 月份切換 */}

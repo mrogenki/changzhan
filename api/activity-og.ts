@@ -21,6 +21,13 @@ const SUPABASE_ANON_KEY =
   process.env.VITE_SUPABASE_ANON_KEY ||
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF4b2dsaGtmeHhxc2plZnluenFuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAwMzQwNTAsImV4cCI6MjA4NTYxMDA1MH0.gLvcHgY0rqLd26Nw61_M7nmjaz4TUsP9VL-XxN5wNSU';
 
+// 分會專屬設定。這支是 Vercel serverless function，吃的是 process.env，
+// 不是前端的 import.meta.env，所以不能共用 chapterConfig.ts。
+// 開新分會時在 Vercel 設 CHAPTER_NAME / CHAPTER_FULL_NAME / SITE_HOST 即可。
+const CHAPTER_NAME = process.env.CHAPTER_NAME || '長展分會';
+const CHAPTER_FULL_NAME = process.env.CHAPTER_FULL_NAME || `BNI ${CHAPTER_NAME}`;
+const FALLBACK_HOST = process.env.SITE_HOST || 'changzhan.vercel.app';
+
 const DEFAULT_IMAGE =
   'https://qxoglhkfxxqsjefynzqn.supabase.co/storage/v1/object/public/activity-images/changzhan-logo.jpg';
 
@@ -116,7 +123,7 @@ function injectOg(
 }
 
 export default async function handler(req: any, res: any) {
-  const host = req.headers['x-forwarded-host'] || req.headers.host || 'changzhan.vercel.app';
+  const host = req.headers['x-forwarded-host'] || req.headers.host || FALLBACK_HOST;
   const rawId = req.query?.id;
   const id = Array.isArray(rawId) ? rawId[0] : rawId;
 
@@ -136,9 +143,9 @@ export default async function handler(req: any, res: any) {
     const parts = [activity.date, activity.time].filter(Boolean).join(' ');
     const description = [parts, activity.location ? `地點：${activity.location}` : '']
       .filter(Boolean)
-      .join(' | ') || '立即報名參加 BNI 長展分會的商務例會與精選活動。';
+      .join(' | ') || `立即報名參加 ${CHAPTER_FULL_NAME}的商務例會與精選活動。`;
     html = injectOg(html, {
-      title: `${activity.title} - 長展分會活動報名`,
+      title: `${activity.title} - ${CHAPTER_NAME}活動報名`,
       description,
       image: picture,
       url: `https://${host}/activity/${id}`,

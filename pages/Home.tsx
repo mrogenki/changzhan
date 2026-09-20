@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { Activity, ActivityType } from '../types';
+import { CHAPTER_NAME } from '../chapterConfig';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -96,7 +97,7 @@ const HeroCarousel: React.FC<{ activities: Activity[] }> = ({ activities }) => {
       <section className="bg-red-600 text-white py-20 px-4">
         <div className="max-w-7xl mx-auto">
           <h1 className="text-4xl md:text-5xl font-extrabold mb-6">連結、成長、共好</h1>
-          <p className="text-xl text-red-100 max-w-2xl">長展分會提供最專業的商務媒合與人脈交流活動，讓您的事業在這裡展翅高飛。</p>
+          <p className="text-xl text-red-100 max-w-2xl">{CHAPTER_NAME}提供最專業的商務媒合與人脈交流活動，讓您的事業在這裡展翅高飛。</p>
         </div>
       </section>
     );
