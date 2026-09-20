@@ -1,0 +1,2 @@
+# 確保 Supabase CLI 以本專案為 workdir，不要往上層找到別的 linked 副本
+project_id = "qxoglhkfxxqsjefynzqn"

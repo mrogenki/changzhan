@@ -181,6 +181,27 @@
 
 ---
 
+## 六之一、可複製性（`supabase/`）
+
+整套系統現在可以從零重建：`supabase/migrations/` 是資料庫結構（19 張表、
+47 約束、45 索引、2 view、4 trigger、62 條 RLS 政策），`supabase/functions/`
+是 8 支 edge function 的原始碼。步驟寫在 `supabase/README.md`。
+
+**在此之前，DB 結構與 7 支 edge function 只存在於正式環境的 Supabase 上**
+——等於沒有備份，也沒辦法開第二套給別的分會。
+
+**已驗證**：2026-09-20 在一個拋棄式 schema 上從零跑完 01→07，數量與正式
+環境一致，測完即刪。過程中抓到一個真實問題：`signup_sheets.token` 的預設值
+用到 pgcrypto 的 `gen_random_bytes()`，Supabase 把擴充套件裝在 `extensions`
+schema、不在預設 search_path 裡，所以 migration 必須明確寫
+`extensions.gen_random_bytes()` 並先 `create extension if not exists pgcrypto`，
+否則在乾淨的新專案上會失敗。
+
+⚠️ **以後改 DB 結構，請同時更新 `supabase/migrations/`**，否則又會回到
+「只有正式環境知道真相」的狀態。
+
+---
+
 ## 七、開發指令
 
 ```bash
@@ -234,7 +255,7 @@ npm run preview    # 本機預覽 build
 ### LINE 長展小幫手（OA bot 推播）
 共用同一個 LINE Channel（與 `send-line-message` 用的 Channel Access Token 相同）。
 
-**Edge Functions（皆部署於 Supabase，repo 內無原始檔）：**
+**Edge Functions（原始碼已全部收進 `supabase/functions/`，見 `supabase/README.md`）：**
 
 | Function | verify_jwt | 用途 |
 |----------|-----------|------|
