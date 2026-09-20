@@ -33,7 +33,10 @@ as $function$
 $function$;
 
 -- ⚠️ 以下三支與 bni-report 共用（依賴 user_roles 表）。
---    新分會若不跑 bni-report，可以只保留 current_user_role() 的前半段。
+--    **實測踩到**：乾淨的新專案沒有 user_roles，函式建得起來（plpgsql 不會在建立時
+--    解析表名），但一被呼叫就噴 relation "public.user_roles" does not exist。
+--    而 member_aliases 的 RLS 政策就會呼叫 current_user_role()，等於新分會一用就炸。
+--    所以這裡用 to_regclass 檢查表存在與否，不存在就跳過那段。
 create or replace function public.current_user_role()
  returns text
  language plpgsql
@@ -62,9 +65,13 @@ begin
   end if;
 
   -- 不在 admins：可能是 email 還沒從舊制 <手機>@changzhan.local 遷移，
-  -- 用 user_roles 接住（等 email 遷移完就能拿掉這段）
-  select role into fallback_role
-  from public.user_roles where user_id = auth.uid() limit 1;
+  -- 用 user_roles 接住（等 email 遷移完就能拿掉這段）。
+  -- 新分會沒有這張表，to_regclass 會回 null，直接回 null 當作「沒有權限」。
+  if to_regclass('public.user_roles') is null then
+    return null;
+  end if;
+  execute 'select role from public.user_roles where user_id = auth.uid() limit 1'
+    into fallback_role;
   return fallback_role;
 end;
 $function$;
@@ -76,9 +83,12 @@ create or replace function public.handle_new_user()
  set search_path to 'public'
 as $function$
 begin
-  insert into public.user_roles (user_id, role, email)
-  values (new.id, 'viewer', new.email)
-  on conflict (user_id) do nothing;
+  -- 同上：新分會沒有 user_roles 就什麼都不做
+  if to_regclass('public.user_roles') is null then
+    return new;
+  end if;
+  execute 'insert into public.user_roles (user_id, role, email) values ($1, ''viewer'', $2) on conflict (user_id) do nothing'
+    using new.id, new.email;
   return new;
 end;
 $function$;

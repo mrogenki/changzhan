@@ -197,6 +197,13 @@ schema、不在預設 search_path 裡，所以 migration 必須明確寫
 `extensions.gen_random_bytes()` 並先 `create extension if not exists pgcrypto`，
 否則在乾淨的新專案上會失敗。
 
+**2026-09-20 實地演練**：開了一個全新 Supabase 專案從頭跑完 migration + 部署 8 支
+edge function + 建後台帳號 + 登入 + 權限測試，全部通過（詳見 `supabase/README.md`），
+測完已刪除。演練抓到兩個真問題：(1) `current_user_role()` 參照 bni-report 的
+`user_roles`，新分會一呼叫就炸，已用 `to_regclass` 擋掉；(2) 新專案的內建寄信有
+額度限制、且 `.local` 網域會被拒——**長展舊制的 `<手機>@changzhan.local` 帳號格式
+在新專案建不起來**，第一個後台帳號要用 Dashboard 的 Add user + Auto Confirm。
+
 ⚠️ **以後改 DB 結構，請同時更新 `supabase/migrations/`**，否則又會回到
 「只有正式環境知道真相」的狀態。
 

@@ -29,19 +29,30 @@ supabase/
 
 用 Supabase Dashboard 的 SQL Editor 貼上執行即可，不需要 CLI。
 
-**已驗證**：2026-09-20 在一個乾淨 schema 上從零跑完 01→07，得到
-19 張表、47 個約束、45 個索引、2 個 view、4 個 trigger、62 條政策，
-全部 19 張表都開啟了 RLS。
+**已驗證（真的開了一個全新的 Supabase 專案走完一遍，2026-09-20）**：
+01→09 全部跑完後得到 19 張表、45 個索引、2 個 view、4 個 trigger、
+19 支函式、62 條資料表政策、8 條 storage 政策、2 個 bucket，19 張表全開 RLS
+——與長展正式環境一致。Supabase advisor 沒有任何 ERROR。
 
-3. 建立第一個後台人員（`admins` 表要有一筆，否則登入後會顯示「此帳號沒有後台權限」）：
+3. 建立第一個後台人員。**順序：先在 Dashboard 建 Auth 帳號，再寫 admins 表。**
+
+   到 **Authentication → Users → Add user**，填 email 與密碼，**務必勾 Auto Confirm**。
+   然後：
 
 ```sql
 insert into public.admins (name, email, role, can_edit)
-values ('你的名字', 'you@example.com', '總管理員', true);
+values ('你的名字', '跟上面一模一樣的@email', '總管理員', true);
 ```
 
-接著到 Authentication → Users 用同一個 email 建帳號（勾 Auto Confirm）。
 **`admins.email` 與 Auth 帳號的 email 必須一致**，權限判斷是比對 JWT 裡的 email。
+
+⚠️ **不要用前台的註冊流程建第一個帳號**（實測踩到）：
+- 新專案的內建寄信服務額度極小，連續註冊兩次就回 `email rate limit exceeded`
+- `.local` 與 `example.com` 這類網域會被擋成 `Email address is invalid`
+  （長展的舊帳號是 `<手機>@changzhan.local`，這種格式在新專案建不起來）
+- 手動 `insert into auth.users` 也不建議：GoTrue 假設 `confirmation_token`
+  等欄位是空字串而不是 NULL，漏掉就會登入失敗並回
+  `Database error querying schema`
 
 ---
 
@@ -52,6 +63,7 @@ supabase functions deploy <name> --project-ref <新專案 ref>
 ```
 
 `line-webhook` 要加 `--no-verify-jwt`（LINE 平台不會帶 JWT）。其餘 7 支維持預設。
+**已驗證**：8 支全部部署成功，`line-webhook` 的 `verify_jwt` 確實是 false。
 
 | Function | verify_jwt | 用途 |
 |---|---|---|
@@ -103,3 +115,31 @@ LINE 那層無法共用，每家都要自己申請：官方帳號、Messaging AP
 `message_send_log` 的 anon 讀寫、`line_groups` 的 anon FOR ALL、
 `guest_attendance_summary` view 仍是 SECURITY DEFINER。
 細節寫在 `…000700_rls_policies.sql` 的註解裡。
+
+---
+
+## 五、實地演練的結果（2026-09-20）
+
+開了一個全新 Supabase 專案 `chapter-template-test` 從頭走完，驗證過的項目：
+
+| 項目 | 結果 |
+|---|---|
+| 9 份 migration 依序執行 | 全部成功，數量與正式環境一致 |
+| 8 支 edge function 部署 | 全部成功 |
+| Email + 密碼登入 | 成功取得 JWT |
+| `is_changzhan_admin()` / `current_user_role()` | `true` / `admin` |
+| 後台建立活動（editor 權限） | 成功 |
+| 未登入者讀活動 | 看得到（公開頁面需要） |
+| 未登入者讀會員／報名 | 回空陣列（RLS 擋下） |
+| 公開報名 RPC | 成功寫入，寫入後仍讀不到別人的報名 |
+| 報名確認信 function（未設 key） | 回 `{"ok":true,"skipped":"no_api_key"}`，不會讓報名看起來壞掉 |
+| anon 上傳圖片 | 被 RLS 擋下 |
+| Supabase advisor | 0 個 ERROR |
+
+**演練中抓到並已修正的問題**：`current_user_role()` 與 `handle_new_user()`
+直接參照 bni-report 的 `user_roles` 表。函式建得起來（plpgsql 不在建立時解析表名），
+但一被呼叫就噴 `relation "public.user_roles" does not exist`——而 `member_aliases`
+的 RLS 政策就會呼叫 `current_user_role()`，等於新分會一碰就炸。現在用 `to_regclass`
+判斷表存在與否。
+
+測試專案驗證完已刪除。
