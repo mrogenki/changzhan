@@ -101,6 +101,7 @@ $function$;
 create or replace function public.touch_updated_at()
  returns trigger
  language plpgsql
+ set search_path to 'public'
 as $function$
 begin
   new.updated_at = now();

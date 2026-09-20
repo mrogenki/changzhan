@@ -221,12 +221,23 @@ npm run preview    # 本機預覽 build
 ## 八、已知狀況 / 待辦
 
 ### 安全
-- 🔴 **`attendance` 表 RLS 未啟用**（advisor ERROR）— 任何人可直接修改出席記錄
-- 🟡 多張表是 `allow_all` 政策（activities、admins、documents、finance_records、members、milestones、registrations、**line_groups、app_settings(UPDATE/INSERT)**）— 需逐一 audit + 收緊。後台登入已改走 Supabase Auth（Email + 密碼），後續可依 `authenticated` 角色逐表收緊，不必再維持 `allow_all`。
-- 🟡 `guest_attendance_summary` view 是 SECURITY DEFINER（advisor ERROR）— 應改為 SECURITY INVOKER 或 revoke
-- 🟡 `message_send_log` 允許 anon insert/update — 需評估是否真的需要（`guests`、`registrations` 已改為 `is_changzhan_admin()`，`registrations` 僅保留 anon insert 給公開報名）
-- 🟡 Storage bucket `activity-images` 的政策是 public 角色且無條件，等於任何人都能用 anon key 上傳／刪除活動圖片 — 待收緊（`chapter-documents` 已改為 `authenticated` + `is_changzhan_editor()`）
-- 🟡 Supabase Auth 「Leaked Password Protection」未啟用（5 秒 toggle）
+
+2026-09-20 做過一輪收緊，Supabase advisor 的 **ERROR 已清空**，剩下的都是 WARN：
+
+**已處理：**
+- ✅ `attendance` 已啟用 RLS（先前是 advisor ERROR）
+- ✅ **`activity-images` storage 政策**：原本是 public 角色無條件可寫可刪，等於任何人拿前端的 anon key 就能上傳或刪除活動圖片與會員照片。改為「公開讀、`authenticated` + `is_changzhan_editor()` 才能寫」。實測 anon 上傳被擋（RLS 403）、anon 刪除刪不到東西，公開讀取正常。
+- ✅ **`guest_attendance_summary` 改為 `security_invoker`**：原本是 SECURITY DEFINER 而 anon 有 SELECT 權限，等於繞過 RLS 把來賓姓名電話公開出去。改完 anon 讀它回傳空陣列。
+- ✅ `check_message_recently_sent` / `handle_new_user` / `sync_role_to_jwt` 撤掉對外的 EXECUTE。**注意**：Postgres 預設把 EXECUTE 給 `PUBLIC`，只撤 anon/authenticated 沒有用，要連 PUBLIC 一起撤。
+
+**仍待處理：**
+- 🟡 `message_send_log` 允許 anon insert/update — LIFF 訪客報到的歡迎訊息以 anon 身分呼叫 `send-line-message`，該函式要寫紀錄。要收緊得先改成由 edge function 以 service role 寫入。
+- 🟡 `line_groups` 有一條 anon 的 `FOR ALL` 政策 — 唯讀帳號仍可繞過前端直接改群組資料。要收緊得先確認 `line-webhook` 用哪個 key 寫入。
+- 🟡 `list_unbound_members()` 對 anon 開放（LIFF 會員綁定的下拉選單需要），等於未綁定會員的姓名可被列舉。
+- 🟡 `public_member_cards()` 對 anon 開放電話 + email，可被逐 id 爬取。
+- 🟡 Supabase Auth 「Leaked Password Protection」未啟用（5 秒 toggle，只有你能開）
+
+其餘 15 支 SECURITY DEFINER 函式的 advisor WARN 是**預期中的**：RLS 政策本身要呼叫 `is_changzhan_admin()` 這類函式，撤掉 EXECUTE 會讓後台整個讀不到資料；LIFF 與公開報名的函式則必須對 anon 開放。安全靠的是函式內部的檢查（token、有效期、手機末 4 碼）。
 
 ### 文件 / 結構
 - `App.tsx` 28KB / `constants.tsx` 36KB — 規模不小，未來可考慮模組化

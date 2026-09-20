@@ -10,10 +10,11 @@ select id, title, date, "time", location,
   case when picture ~ '^https?://'::text then picture else null::text end as picture
 from public.activities;
 
--- 來賓管理用：guests 表加上出席次數與引薦人彙總
--- ⚠️ 這支目前是 SECURITY DEFINER（Supabase advisor 會報 ERROR）。
---    新分會建議改成 security_invoker = true，除非確認有 anon 直接讀它的需求。
-create or replace view public.guest_attendance_summary as
+-- 來賓管理用：guests 表加上出席次數與引薦人彙總。
+-- security_invoker = true：沿用查詢者的權限。原本是 SECURITY DEFINER，
+-- 而 anon 對這個 view 有 SELECT 權限，等於繞過 RLS 把來賓姓名電話公開出去。
+create or replace view public.guest_attendance_summary
+with (security_invoker = true) as
 select g.id, g.line_user_id, g.name, g.phone, g.email, g.company,
   g.created_at as bound_at,
   coalesce(count(r.id) filter (where r.check_in_status = true), 0::bigint) as attendance_count,
