@@ -53,6 +53,7 @@ const MemberManager: React.FC<MemberManagerProps> = ({ members, onAddMember, onU
       landline: formData.get('landline') as string,
       address: formData.get('address') as string,
       group_name: formData.get('group_name') as string,
+      is_group_leader: formData.get('is_group_leader') === 'on',
     };
 
     if (editingMember) onUpdateMember(memberData);
@@ -368,6 +369,9 @@ const MemberManager: React.FC<MemberManagerProps> = ({ members, onAddMember, onU
                     ) : (
                       <span className="text-gray-300">-</span>
                     )}
+                    {member.is_group_leader && (
+                      <span className="ml-1.5 inline-block px-1.5 py-0.5 rounded bg-red-50 text-red-600 text-xs font-bold">組長</span>
+                    )}
                   </td>
                   <td className="px-6 py-4">
                     <span className={`px-2 py-1 rounded text-xs font-bold ${
@@ -504,6 +508,10 @@ const MemberManager: React.FC<MemberManagerProps> = ({ members, onAddMember, onU
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-1">組別</label>
                   <input name="group_name" defaultValue={editingMember?.group_name} className="w-full border rounded-lg px-3 py-3 outline-none focus:ring-2 focus:ring-red-500" placeholder="例如：第1組" />
+                  <label className="flex items-center gap-2 mt-2 text-sm text-gray-600 cursor-pointer">
+                    <input type="checkbox" name="is_group_leader" defaultChecked={!!editingMember?.is_group_leader} className="w-4 h-4 accent-red-600" />
+                    小組長（可在 LINE 裡自助發起組聚）
+                  </label>
                 </div>
                 <div className="col-span-2">
                   <label className="block text-sm font-bold text-gray-700 mb-1">產業鏈</label>

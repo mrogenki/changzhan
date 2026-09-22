@@ -17,6 +17,7 @@ import GroupMeeting from './pages/GroupMeeting';
 import LiffCheckin from './pages/LiffCheckin';
 import LiffCard from './pages/LiffCard';
 import LiffSignup from './pages/LiffSignup';
+import LiffHost from './pages/LiffHost';
 import LineFloatingButton, { LineLogo, buildLineChatUrl } from './components/LineFloatingButton';
 import { Activity, ActivityType, Registration, AdminUser, Member, AttendanceRecord, AttendanceStatus, FinanceRecord, Milestone, ChapterDocument } from './types';
 import { INITIAL_ACTIVITIES } from './constants';
@@ -129,6 +130,15 @@ const App: React.FC = () => {
     if (typeof window !== 'undefined') {
         const path = window.location.pathname;
         const search = window.location.search;
+
+        // 小組長發起組聚：共用接龍的 LIFF app（?host=1），所以要排在接龍之前判斷，
+        // 否則會被 /liff/signup 的路徑條件接走
+        const hasHostParam =
+            /[?&]host=1/.test(search) ||
+            (search.includes('liff.state') && /host(=|%3D)1/.test(search));
+        if (hasHostParam) {
+            return <LiffHost />;
+        }
 
         // 接龍報名 LIFF：先判斷，避免 sheet 參數被後面的 liff.state 條件吃掉
         const isSignupPath = path.startsWith('/liff/signup');

@@ -187,6 +187,11 @@ const ActivityManager: React.FC<ActivityManagerProps> = ({ activities, onAddActi
                   <Clock size={12} /> {activity.time}
                 </div>
                 <h3 className="font-bold text-gray-900 mb-2 line-clamp-1">{activity.title}</h3>
+                {activity.created_by_member_id && (
+                  <p className="-mt-1 mb-2 text-xs font-bold text-red-600">
+                    第 {activity.host_group} 組小組長從 LINE 發起
+                  </p>
+                )}
                 <div className="flex items-center gap-1 text-xs text-gray-500 mb-4">
                   <MapPin size={12} /> <span className="line-clamp-1">{activity.location}</span>
                 </div>

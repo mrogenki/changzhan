@@ -455,6 +455,24 @@ npm run preview    # 本機預覽 build
 
 **判斷路由**：`App.tsx` 最前面的 LIFF 短路判斷**先判接龍**（path `/liff/signup` 或有 `sheet` 參數，含 `liff.state` 包裹），再判名片、例會報到。
 
+### 小組長自助發起組聚（`/liff/signup?host=1`）
+
+`pages/LiffHost.tsx` + edge function `leader-activity`。小組長在 LINE 裡點開就能發起組聚並開接龍，**不用登入後台**。
+
+- **誰能用**：`members.is_group_leader = true` 的在籍會員，由幹部在「會員管理」編輯會員時勾選（列表組別旁會顯示「組長」）。每組可以不只一位。
+- **能做什麼**：活動類型**固定為「組聚」**，組別**自動帶入**他的 `group_name` 不能改。填主題（留白就用「第 N 組組聚」）、日期時間、地點、一般價／會員價、人數上限、說明。送出後**同時建立活動 + 綁定的接龍**（截止時間預設為活動開始時間），直接進分享畫面用 `shareTargetPicker` 貼到群組。
+- **直接公開**，不需審核。幹部在後台活動管理看得到，卡片上標「第 N 組小組長從 LINE 發起」，照樣可以修改或下架。
+- **只能改、取消自己發起的**（比對 `activities.created_by_member_id`）。取消是把活動與接龍都改成 `closed`，**不刪除**——已報名的名單留著給幹部查。
+- **入口網址**：`https://liff.line.me/<VITE_LIFF_SIGNUP_ID>?host=1`，建議放進 OA 圖文選單。共用接龍的 LIFF app，所以 `App.tsx` 的 LIFF 短路判斷**要把 `host=1` 排在接龍之前**，否則會被 `/liff/signup` 的路徑條件接走。
+
+**⚠️ 為什麼要走 edge function 驗 ID token，不能像接龍頁一樣直接呼叫 RPC**：接龍頁是直接相信前端傳上來的 LINE user ID，這對「報名 +1」沒什麼風險；但「建立公開活動」不一樣——只要知道某位小組長的 LINE ID 就能冒名發活動。所以前端帶 `liff.getIDToken()`，`leader-activity` 向 LINE 的 `/oauth2/v2.1/verify` 驗證後才以 service role 寫入。實測偽造的 token 會回 401。
+
+**需要的設定（只有你能做）**：
+- **接龍的 LIFF app 要勾 `openid` scope**（LINE Developers → LIFF → 該 app → Scopes）。沒勾的話 `getIDToken()` 會是 null，頁面會直接顯示這個錯誤訊息。
+- `leader-activity` 的 secret `LINE_LOGIN_CHANNEL_ID`（選填）：LIFF app 所屬 LINE Login channel 的 ID。沒設就用長展的 `2009854899`（LIFF ID 的格式是 `<channel id>-<亂碼>`，前半段就是它）。**開新分會時一定要設**。
+
+**驗證狀況**：欄位檢查的純函式 9 個案例全過；偽造／缺少 token 會被擋（401）；用 SQL 模擬函式寫入的資料，確認官網看得到、接龍頁帶得出活動資訊與雙價、取消後接龍擋下新報名且保留既有名單。**沒辦法實測的**：真的從 LINE 登入拿 ID token 走完 create/update/cancel——需要一位小組長在手機上實際操作一次。
+
 ### 收支月報表（`/admin/finance` → 月報表分頁）
 
 `pages/admin/FinanceMonthlyReport.tsx`。收支管理分成「流水帳／月報表」兩個分頁。

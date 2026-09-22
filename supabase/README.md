@@ -27,6 +27,7 @@ supabase/
 | `…000700_rls_policies.sql` | RLS（62 條政策） |
 | `…000800_storage.sql` | 2 個 bucket 與其政策 |
 | `…000900_grants.sql` | 撤掉內部函式對外的 EXECUTE |
+| `20260922000100_group_leader_self_service.sql` | 小組長欄位、活動發起人欄位 |
 
 用 Supabase Dashboard 的 SQL Editor 貼上執行即可，不需要 CLI。
 
@@ -76,6 +77,7 @@ supabase functions deploy <name> --project-ref <新專案 ref>
 | `manage-admin` | ✅ | 後台人員管理（service role） |
 | `send-registration-email` | ✅ | 報名確認信（Resend） |
 | `invite-user` | ✅ | 邀請使用者 |
+| `leader-activity` | ✅ | 小組長在 LINE 發起組聚（伺服器端驗 LINE ID token） |
 
 **Secrets**（Dashboard → Edge Functions → Secrets）：
 
@@ -87,7 +89,7 @@ supabase functions deploy <name> --project-ref <新專案 ref>
 
 ## 三、每家分會必須換掉的東西
 
-程式裡仍有寫死的分會專屬資訊（約 35 處），開新客戶前要逐一處理：
+程式裡仍有寫死的分會專屬資訊（`leader-activity` 的 `LINE_LOGIN_CHANNEL_ID` 預設值也是長展的，新分會要設這個 secret）（約 35 處），開新客戶前要逐一處理：
 
 - **環境變數**：`VITE_SUPABASE_URL`、`VITE_SUPABASE_ANON_KEY`、
   `VITE_LIFF_CARD_ID`、`VITE_LIFF_SIGNUP_ID`、`VITE_LINE_OA_ID`、`VITE_BNI_REPORT_URL`

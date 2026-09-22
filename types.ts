@@ -76,6 +76,9 @@ export interface Activity {
     description: string;
     status?: 'active' | 'closed';
     guest_welcome_message?: string | null;
+    /** 小組長在 LINE 自助發起的組聚才有；後台建立的是 null */
+    created_by_member_id?: number | null;
+    host_group?: string | null;
 }
 
 export interface Registration {
@@ -128,6 +131,8 @@ export interface Member {
     address?: string;
     group_name?: string;
     line_user_id?: string | null;
+    /** 小組長：可以在 LINE 裡自助發起組聚（/liff/signup?host=1） */
+    is_group_leader?: boolean;
 }
 
 export interface AttendanceRecord {
