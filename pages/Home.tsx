@@ -6,6 +6,7 @@ import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { Activity, ActivityType } from '../types';
 import { CHAPTER_NAME } from '../chapterConfig';
+import ActivityCover from '../components/ActivityCover';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -18,7 +19,7 @@ interface HomeProps {
 const ActivityCard: React.FC<{ activity: Activity }> = ({ activity }) => (
   <Link to={`/activity/${activity.id}`} className="group bg-white rounded-xl border border-gray-100 overflow-hidden hover:shadow-xl transition-all duration-300">
     <div className="relative aspect-video overflow-hidden">
-      <img src={activity.picture} alt={activity.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" referrerPolicy="no-referrer" />
+      <ActivityCover activity={activity} className="group-hover:scale-105 transition-transform duration-500" />
       <div className="absolute top-4 left-4">
         <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${activity.type === ActivityType.REGULAR ? 'bg-red-600 text-white' : 'bg-gray-800 text-white'}`}>
           {activity.type}
@@ -124,11 +125,7 @@ const HeroCarousel: React.FC<{ activities: Activity[] }> = ({ activities }) => {
               className="absolute inset-0"
             >
               <div className="relative w-full h-full">
-                <img 
-                  src={currentActivity.picture} 
-                  alt={currentActivity.title}
-                  className="w-full h-full object-cover opacity-60"
-                />
+                <ActivityCover activity={currentActivity} className="opacity-60" showCaption={false} />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex flex-col justify-end p-8 md:p-16">
                   <div className="max-w-3xl space-y-4">
                     <motion.span 

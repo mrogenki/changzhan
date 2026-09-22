@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Edit, Trash2, Calendar, Clock, MapPin, Image as ImageIcon, UploadCloud, Loader2, MessageCircle } from 'lucide-react';
 import { Activity, ActivityType } from '../../types';
 import { CHAPTER_FULL_NAME } from '../../chapterConfig';
+import ActivityCover from '../../components/ActivityCover';
 
 interface ActivityManagerProps {
   activities: Activity[];
@@ -158,7 +159,7 @@ const ActivityManager: React.FC<ActivityManagerProps> = ({ activities, onAddActi
           displayActivities.map(activity => (
             <div key={activity.id} className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden group hover:shadow-lg transition-all">
               <div className="relative aspect-video">
-                <img src={activity.picture} alt={activity.title} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                <ActivityCover activity={activity} />
                 <div className="absolute top-2 right-2 flex gap-1">
                   <button
                     onClick={() => { setEditingActivity(activity); setIsModalOpen(true); }}

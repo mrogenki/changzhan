@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Calendar, Clock, MapPin, Inbox } from 'lucide-react';
 import { Activity } from '../types';
+import ActivityCover from './ActivityCover';
 
 interface Props {
     title: string;
@@ -37,13 +38,7 @@ const ActivityListView: React.FC<Props> = ({ title, subtitle, activities, emptyM
                             className="group bg-white rounded-2xl border border-gray-200 overflow-hidden hover:shadow-xl hover:border-red-200 transition-all duration-300"
                         >
                             <div className="aspect-video bg-gray-100 overflow-hidden">
-                                {activity.picture && (
-                                    <img
-                                        src={activity.picture}
-                                        alt={activity.title}
-                                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                                    />
-                                )}
+                                <ActivityCover activity={activity} className="group-hover:scale-105 transition-transform duration-500" />
                             </div>
                             <div className="p-6">
                                 <span className="inline-block bg-red-50 text-red-600 text-xs font-bold px-3 py-1 rounded-full mb-3">

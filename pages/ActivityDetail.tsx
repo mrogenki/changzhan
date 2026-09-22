@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Calendar, MapPin, DollarSign, ArrowLeft, CheckCircle2, Share2, CopyCheck, Clock, Loader2, Search, User } from 'lucide-react';
 import { Activity, Registration, Member } from '../types';
 import { CHAPTER_NAME, NO_REFERRER_OPTION } from '../chapterConfig';
+import ActivityCover from '../components/ActivityCover';
 
 // 報名確認信改由 Supabase edge function `send-registration-email`（Resend）寄送，
 // 由 App.tsx::handleRegister 在報名寫入成功後 fire-and-forget 呼叫。
@@ -169,12 +170,9 @@ const ActivityDetail: React.FC<ActivityDetailProps> = ({ activities, registratio
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
         <div className="lg:col-span-2 space-y-8">
           <div className="relative w-full aspect-video rounded-2xl overflow-hidden shadow-sm">
-            <img 
-              src={activity.picture} 
-              alt={activity.title} 
-              className="absolute inset-0 w-full h-full object-cover" 
-              referrerPolicy="no-referrer"
-            />
+            <div className="absolute inset-0">
+              <ActivityCover activity={activity} />
+            </div>
           </div>
           
           <div>
