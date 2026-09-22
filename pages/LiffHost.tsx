@@ -67,6 +67,9 @@ function fmtDate(date: string, time?: string | null) {
   return `${+mo}/${+d}（${wd}）${time ? ` ${time}` : ''}`;
 }
 
+/** 組名是數字才加「第 N 組」，像「三尊」這種就原樣用（與 leader-activity 一致） */
+const fmtGroup = (g: string | null) => (!g ? '（未設定組別）' : /^\d+$/.test(g) ? `第 ${g} 組` : g);
+
 const todayTpe = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Taipei' }).format(new Date());
 
 const signupUrl = (token: string) =>
@@ -282,7 +285,7 @@ const LiffHost: React.FC = () => {
     );
   }
 
-  const groupLabel = profile.group_name ? `第 ${profile.group_name} 組` : '（未設定組別）';
+  const groupLabel = fmtGroup(profile.group_name);
 
   // --- 建立成功 → 分享 ---
   if (view.kind === 'done') {
@@ -345,8 +348,8 @@ const LiffHost: React.FC = () => {
           <div>
             <label className={label}>主題</label>
             <input className={input} value={form.title} onChange={set('title')}
-              placeholder={`第 ${profile.group_name ?? ''} 組組聚`} maxLength={60} />
-            <p className="text-xs text-gray-400 mt-1">留白就用「第 {profile.group_name} 組組聚」</p>
+              placeholder={`${groupLabel}組聚`} maxLength={60} />
+            <p className="text-xs text-gray-400 mt-1">留白就用「{groupLabel}組聚」</p>
           </div>
 
           <div className="grid grid-cols-2 gap-3">

@@ -54,6 +54,9 @@ function taipeiIso(date: string, time: string): string {
   return new Date(`${date}T${time || "00:00"}:00+08:00`).toISOString();
 }
 
+/** 組名是數字才加「第 N 組」，像「三尊」這種就原樣用，免得變成「第 三尊 組」 */
+const groupLabel = (g: string) => (/^\d+$/.test(g) ? `第 ${g} 組` : g);
+
 const toInt = (v: unknown): number | null => {
   if (v === null || v === undefined || v === "") return null;
   const n = Math.round(Number(v));
@@ -87,7 +90,7 @@ function clean(input: Input, groupName: string) {
     return "金額與人數要填 0 以上的整數";
   }
 
-  const title = String(input.title ?? "").trim() || `第 ${groupName} 組組聚`;
+  const title = String(input.title ?? "").trim() || `${groupLabel(groupName)}組聚`;
   if (title.length > 60) return "主題太長了（60 字以內）";
 
   return {
