@@ -1,6 +1,29 @@
 
 import { Activity, ActivityType, AdminUser, UserRole, Member } from './types';
 
+// 分會職務（可複選）。與 members.company_title（公司職稱）是兩回事。
+//
+// 順序＝顯示順序，會員身兼多職時依這個順序排badge。
+// 要增減職務直接改這個陣列即可，資料庫端不限制名稱；
+// 但**改名字**時要記得既有會員資料裡存的是舊字串，需一併更新。
+export const CHAPTER_POSITIONS = [
+  '主席', '副主席', '秘財', '導師', '執事',
+  '小組長',
+  '活動組長', '培訓組長', '廣宣組長', '資訊組長', '接待組長',
+] as const;
+
+/** 職務含「小組長」的人可以在 LINE 自助發起組聚（見 supabase/functions/leader-activity） */
+export const GROUP_LEADER_POSITION = '小組長';
+
+/** 依 CHAPTER_POSITIONS 的順序排列；清單外的（改過名的舊資料）排最後 */
+export const sortPositions = (positions?: string[] | null): string[] => {
+  const order = (p: string) => {
+    const i = (CHAPTER_POSITIONS as readonly string[]).indexOf(p);
+    return i === -1 ? CHAPTER_POSITIONS.length : i;
+  };
+  return [...(positions ?? [])].filter(Boolean).sort((a, b) => order(a) - order(b) || a.localeCompare(b, 'zh-Hant'));
+};
+
 export const INITIAL_ACTIVITIES: Activity[] = [
   {
     id: '1',

@@ -28,6 +28,7 @@ supabase/
 | `…000800_storage.sql` | 2 個 bucket 與其政策 |
 | `…000900_grants.sql` | 撤掉內部函式對外的 EXECUTE |
 | `20260922000100_group_leader_self_service.sql` | 小組長欄位、活動發起人欄位 |
+| `20260923000100_member_positions.sql` | 會員分會職務（取代小組長布林欄） |
 
 用 Supabase Dashboard 的 SQL Editor 貼上執行即可，不需要 CLI。
 

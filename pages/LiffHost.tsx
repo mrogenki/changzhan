@@ -12,7 +12,9 @@ import { CHAPTER_NAME, LIFF_SIGNUP_ID } from '../chapterConfig';
 //
 // ⚠️ LIFF app 必須勾選 openid scope，liff.getIDToken() 才拿得到東西。
 
-type Profile = { id: number; name: string; group_name: string | null; is_group_leader: boolean };
+// is_group_leader 由 leader-activity 依 members.positions 是否含「小組長」算好，
+// 前端不自己比對職務字串（權限判斷留在伺服器端）
+type Profile = { id: number; name: string; group_name: string | null; positions: string[]; is_group_leader: boolean };
 
 type MyActivity = {
   id: number;

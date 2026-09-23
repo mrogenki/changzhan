@@ -131,8 +131,9 @@ export interface Member {
     address?: string;
     group_name?: string;
     line_user_id?: string | null;
-    /** 小組長：可以在 LINE 裡自助發起組聚（/liff/signup?host=1） */
-    is_group_leader?: boolean;
+    /** 分會職務（可複選），有效值見 constants.tsx 的 CHAPTER_POSITIONS。
+     *  含「小組長」的人可以在 LINE 自助發起組聚（/liff/signup?host=1）。 */
+    positions?: string[];
 }
 
 export interface AttendanceRecord {

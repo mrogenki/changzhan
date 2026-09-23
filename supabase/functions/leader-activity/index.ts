@@ -23,6 +23,8 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 const LINE_VERIFY_URL = "https://api.line.me/oauth2/v2.1/verify";
 const DEFAULT_CHANNEL_ID = "2009854899";
 const GROUP_MEETING = "組聚";
+// 分會職務含這個字串的人就是小組長（前端的 CHAPTER_POSITIONS 是同一份清單）
+const GROUP_LEADER_POSITION = "小組長";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -132,13 +134,16 @@ Deno.serve(async (req) => {
 
     const { data: member } = await db
       .from("members")
-      .select("id, name, group_name, is_group_leader, status")
+      .select("id, name, group_name, positions, status")
       .eq("line_user_id", lineUserId)
       .maybeSingle();
 
     if (!member || (member.status && member.status !== "active")) {
       return json({ ok: true, member: null });
     }
+
+    // 權限只看職務，沒有另一個勾選欄位可以跟它不一致
+    const isGroupLeader = (member.positions ?? []).includes(GROUP_LEADER_POSITION);
 
     // 我發起過的組聚（近 30 天到未來），附上綁定接龍的 token 與目前人數
     const myActivities = async () => {
@@ -173,19 +178,21 @@ Deno.serve(async (req) => {
       id: member.id,
       name: member.name,
       group_name: member.group_name,
-      is_group_leader: !!member.is_group_leader,
+      positions: member.positions ?? [],
+      // 前端只關心能不能發起，不必自己再比對職務字串
+      is_group_leader: isGroupLeader,
     };
 
     if (action === "me") {
       return json({
         ok: true,
         member: profile,
-        activities: member.is_group_leader ? await myActivities() : [],
+        activities: isGroupLeader ? await myActivities() : [],
       });
     }
 
     // 以下都要是小組長
-    if (!member.is_group_leader) {
+    if (!isGroupLeader) {
       return json({ error: "not_leader", message: "只有小組長可以發起組聚，請聯絡幹部開通" }, 403);
     }
     if (!member.group_name) {

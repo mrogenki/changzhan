@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { X, UploadCloud, FileSpreadsheet, Download, AlertTriangle, CheckCircle2, Loader2, Info } from 'lucide-react';
 import { Member } from '../../types';
+import { CHAPTER_POSITIONS, sortPositions } from '../../constants';
 
 interface MemberImportModalProps {
   existingMembers: Member[];
@@ -12,6 +13,7 @@ interface MemberImportModalProps {
 const TEMPLATE_HEADERS = [
   '會員編號',     // member_no (必填)
   '組別',         // group_name
+  '職務',         // positions，可複選，用「、」或逗號分隔
   '產業鏈',       // industry_chain (必填，必須是 5 選 1)
   '行業別',       // industry_category (必填)
   '姓名',         // name (必填)
@@ -211,6 +213,16 @@ const MemberImportModal: React.FC<MemberImportModalProps> = ({ existingMembers, 
         const joinDate = normalizeDate(get(row, '入會日期'));
         const endDate = normalizeDate(get(row, '會籍到期日'));
         const birthday = normalizeDate(get(row, '生日'));
+        // 職務：允許用「、」、逗號或空白分隔，比對 CHAPTER_POSITIONS
+        const rawPositions = get(row, '職務');
+        const positions = rawPositions
+          ? rawPositions.split(/[、,，\/\s]+/).map(v => v.trim()).filter(Boolean)
+          : [];
+        const badPositions = positions.filter(v => !(CHAPTER_POSITIONS as readonly string[]).includes(v));
+        if (badPositions.length > 0) {
+          errors.push(`職務「${badPositions.join('、')}」不在清單中（可用：${CHAPTER_POSITIONS.join('/')}）`);
+        }
+
         if (joinDate && !isValidDate(joinDate)) errors.push(`入會日期格式錯誤：${joinDate}`);
         if (endDate && !isValidDate(endDate)) errors.push(`會籍到期日格式錯誤：${endDate}`);
         if (birthday && !isValidDate(birthday)) errors.push(`生日格式錯誤：${birthday}`);
@@ -246,6 +258,7 @@ const MemberImportModal: React.FC<MemberImportModalProps> = ({ existingMembers, 
               company: mergeValue(company, existing.company),
               // 其他選填欄位採智慧合併
               group_name: mergeValue(get(row, '組別'), existing.group_name),
+              positions: rawPositions ? sortPositions(positions) : existing.positions,
               company_title: mergeValue(get(row, '公司抬頭'), existing.company_title),
               tax_id: mergeValue(taxId, existing.tax_id),
               mobile_phone: mergeValue(get(row, '手機號碼'), existing.mobile_phone),
@@ -268,6 +281,7 @@ const MemberImportModal: React.FC<MemberImportModalProps> = ({ existingMembers, 
               industry_category: category || '',
               company: company || '',
               group_name: get(row, '組別') || undefined,
+              positions: sortPositions(positions),
               company_title: get(row, '公司抬頭') || undefined,
               tax_id: taxId || undefined,
               mobile_phone: get(row, '手機號碼') || undefined,

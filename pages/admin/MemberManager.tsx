@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Download, UserPlus, Edit, Trash2, Shield, Eye, EyeOff, Globe, CalendarDays, FileDown, Bell, AlertTriangle, X, UploadCloud, Loader2, Image as ImageIcon, FileSpreadsheet, Search, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
 import { Member } from '../../types';
+import { CHAPTER_POSITIONS, sortPositions } from '../../constants';
 import MemberImportModal from './MemberImportModal';
 
 interface MemberManagerProps {
@@ -53,7 +54,8 @@ const MemberManager: React.FC<MemberManagerProps> = ({ members, onAddMember, onU
       landline: formData.get('landline') as string,
       address: formData.get('address') as string,
       group_name: formData.get('group_name') as string,
-      is_group_leader: formData.get('is_group_leader') === 'on',
+      // checkbox 全部同名 position，getAll 拿到所有勾起來的
+      positions: sortPositions(formData.getAll('position') as string[]),
     };
 
     if (editingMember) onUpdateMember(memberData);
@@ -90,7 +92,7 @@ const MemberManager: React.FC<MemberManagerProps> = ({ members, onAddMember, onU
     }
     
     // 定義標題
-    const headers = ['會員編號', '組別', '產業鏈', '行業別', '姓名', '公司名稱', '公司抬頭', '統一編號', '手機號碼', '室內電話', '電子郵件', '地址', '會員簡介', '網站連結', '狀態', '入會日期', '會籍到期日', '生日'];
+    const headers = ['會員編號', '組別', '職務', '產業鏈', '行業別', '姓名', '公司名稱', '公司抬頭', '統一編號', '手機號碼', '室內電話', '電子郵件', '地址', '會員簡介', '網站連結', '狀態', '入會日期', '會籍到期日', '生日'];
     
     // 加入 BOM 以讓 Excel 正確識別 UTF-8
     let csvContent = '\uFEFF'; 
@@ -105,6 +107,7 @@ const MemberManager: React.FC<MemberManagerProps> = ({ members, onAddMember, onU
       const row = [
         escape(m.member_no),
         escape(m.group_name),
+        escape(sortPositions(m.positions).join('、')),
         escape(m.industry_chain),
         escape(m.industry_category),
         escape(m.name),
@@ -183,6 +186,7 @@ const MemberManager: React.FC<MemberManagerProps> = ({ members, onAddMember, onU
             m.industry_chain,
             m.industry_category,
             m.company_title,
+            (m.positions ?? []).join(' '),
             m.mobile_phone,
             m.landline,
             m.tax_id,
@@ -369,9 +373,11 @@ const MemberManager: React.FC<MemberManagerProps> = ({ members, onAddMember, onU
                     ) : (
                       <span className="text-gray-300">-</span>
                     )}
-                    {member.is_group_leader && (
-                      <span className="ml-1.5 inline-block px-1.5 py-0.5 rounded bg-red-50 text-red-600 text-xs font-bold">組長</span>
-                    )}
+                    {sortPositions(member.positions).map(p => (
+                      <span key={p} className="ml-1.5 inline-block px-1.5 py-0.5 rounded bg-red-50 text-red-600 text-xs font-bold whitespace-nowrap">
+                        {p}
+                      </span>
+                    ))}
                   </td>
                   <td className="px-6 py-4">
                     <span className={`px-2 py-1 rounded text-xs font-bold ${
@@ -508,10 +514,24 @@ const MemberManager: React.FC<MemberManagerProps> = ({ members, onAddMember, onU
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-1">組別</label>
                   <input name="group_name" defaultValue={editingMember?.group_name} className="w-full border rounded-lg px-3 py-3 outline-none focus:ring-2 focus:ring-red-500" placeholder="例如：第1組" />
-                  <label className="flex items-center gap-2 mt-2 text-sm text-gray-600 cursor-pointer">
-                    <input type="checkbox" name="is_group_leader" defaultChecked={!!editingMember?.is_group_leader} className="w-4 h-4 accent-red-600" />
-                    小組長（可在 LINE 裡自助發起組聚）
-                  </label>
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-sm font-bold text-gray-700 mb-1">分會職務</label>
+                  <div className="border rounded-lg p-3 flex flex-wrap gap-x-4 gap-y-2">
+                    {CHAPTER_POSITIONS.map(p => (
+                      <label key={p} className="flex items-center gap-1.5 text-sm text-gray-700 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          name="position"
+                          value={p}
+                          defaultChecked={(editingMember?.positions ?? []).includes(p)}
+                          className="w-4 h-4 accent-red-600"
+                        />
+                        {p}
+                      </label>
+                    ))}
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">可複選；沒有職務就不用勾。勾「小組長」的人可以在 LINE 裡自助發起組聚。</p>
                 </div>
                 <div className="col-span-2">
                   <label className="block text-sm font-bold text-gray-700 mb-1">產業鏈</label>
