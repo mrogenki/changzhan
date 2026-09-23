@@ -6,6 +6,7 @@ import Sidebar from './admin/Sidebar';
 import DashboardHome from './admin/DashboardHome';
 import CheckInManager from './admin/CheckInManager';
 import AttendanceManager from './admin/AttendanceManager';
+import MeetingManager from './admin/MeetingManager';
 import ActivityManager from './admin/ActivityManager';
 import MemberManager from './admin/MemberManager';
 import UserManager from './admin/UserManager';
@@ -109,6 +110,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
         <Routes>
           <Route path="/" element={<DashboardHome activities={props.activities} registrations={props.registrations} />} />
           <Route path="/check-in" element={<CheckInManager activities={props.activities} registrations={props.registrations} onUpdateRegistration={props.onUpdateRegistration} onDeleteRegistration={props.onDeleteRegistration} onAddRegistration={props.onAddRegistration} onRefreshRegistrations={props.onRefreshRegistrations} />} />
+          <Route path="/meetings" element={
+            <MeetingManager
+              canEdit={props.canEdit}
+              activities={props.activities}
+              members={props.members}
+              attendance={props.attendance}
+              currentUser={props.currentUser}
+              onUpdateAttendance={props.onUpdateAttendance}
+              onAddActivity={props.onAddActivity}
+              onRefreshAttendance={props.onRefreshAttendance}
+            />
+          } />
           <Route path="/attendance" element={<AttendanceManager activities={props.activities} members={props.members} attendance={props.attendance} onUpdateAttendance={props.onUpdateAttendance} onDeleteAttendance={props.onDeleteAttendance} onRefreshAttendance={props.onRefreshAttendance} />} />
           <Route path="/signups" element={
             <SignupManager

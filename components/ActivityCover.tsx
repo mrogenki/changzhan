@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Users, CalendarDays, GraduationCap, Sparkles, Star, type LucideIcon } from 'lucide-react';
+import { Users, CalendarDays, GraduationCap, Sparkles, Star, Gavel, type LucideIcon } from 'lucide-react';
 import { Activity, ActivityType } from '../types';
 import { CHAPTER_NAME } from '../chapterConfig';
 
@@ -16,6 +16,7 @@ const COVER_STYLE: Record<string, { bg: string; fg: string; Icon: LucideIcon }> 
   [ActivityType.GROUP_MEETING]: { bg: 'from-amber-400 to-amber-600', fg: 'text-amber-50', Icon: Users },
   [ActivityType.REGULAR]: { bg: 'from-purple-500 to-purple-700', fg: 'text-purple-50', Icon: Star },
   [ActivityType.SPECIAL]: { bg: 'from-emerald-500 to-emerald-700', fg: 'text-emerald-50', Icon: Sparkles },
+  [ActivityType.LEADERSHIP_MEETING]: { bg: 'from-slate-500 to-slate-700', fg: 'text-slate-50', Icon: Gavel },
 };
 const FALLBACK: { bg: string; fg: string; Icon: LucideIcon } = { bg: 'from-gray-500 to-gray-700', fg: 'text-gray-50', Icon: CalendarDays };
 

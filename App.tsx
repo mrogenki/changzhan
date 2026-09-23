@@ -707,22 +707,26 @@ const App: React.FC = () => {
         );
     }
 
+    // 內部活動（執事會）只在後台看得到。未登入者已被 RLS 擋掉，
+    // 但後台人員登入後拿到的是完整清單，公開頁要自己濾掉。
+    const publicActivities = activities.filter(a => !a.is_internal);
+
     return (
         <Router>
             <div className="min-h-screen flex flex-col">
                 <Header />
                 <main className="flex-grow bg-gray-50/30">
                     <Routes>
-                        <Route path="/" element={<Home activities={activities} />} />
-                        <Route path="/regular-meeting" element={<RegularMeeting activities={activities} />} />
-                        <Route path="/training" element={<BusinessTraining activities={activities} />} />
-                        <Route path="/group-meeting" element={<GroupMeeting activities={activities} />} />
+                        <Route path="/" element={<Home activities={publicActivities} />} />
+                        <Route path="/regular-meeting" element={<RegularMeeting activities={publicActivities} />} />
+                        <Route path="/training" element={<BusinessTraining activities={publicActivities} />} />
+                        <Route path="/group-meeting" element={<GroupMeeting activities={publicActivities} />} />
                         {/* 舊路徑轉址，避免先前分享出去的連結失效 */}
                         <Route path="/coffee" element={<Navigate to="/group-meeting" replace />} />
                         <Route path="/members" element={<MemberList members={members} />} />
-                        <Route path="/calendar" element={<Calendar activities={activities} />} />
+                        <Route path="/calendar" element={<Calendar activities={publicActivities} />} />
                         <Route path="/milestones" element={<Milestones milestones={milestones} />} />
-                        <Route path="/activity/:id" element={<ActivityDetail activities={activities} onRegister={handleRegister} registrations={registrations} members={members} />} />
+                        <Route path="/activity/:id" element={<ActivityDetail activities={publicActivities} onRegister={handleRegister} registrations={registrations} members={members} />} />
                         <Route path="/admin/login" element={session ? <Navigate to="/admin" /> : <LoginPage />} />
                         <Route path="/admin/*" element={
                             !session ? (

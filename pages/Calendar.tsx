@@ -17,6 +17,7 @@ const TYPE_STYLE: Record<string, { chip: string; dot: string; label: string }> =
   [ActivityType.GROUP_MEETING]: { chip: 'bg-amber-100 text-amber-700', dot: 'bg-amber-500', label: '組聚' },
   [ActivityType.REGULAR]: { chip: 'bg-purple-100 text-purple-700', dot: 'bg-purple-500', label: '會員專屬' },
   [ActivityType.SPECIAL]: { chip: 'bg-emerald-100 text-emerald-700', dot: 'bg-emerald-500', label: '一般活動' },
+  [ActivityType.LEADERSHIP_MEETING]: { chip: 'bg-slate-200 text-slate-700', dot: 'bg-slate-500', label: '執事會' },
 };
 const FALLBACK_STYLE = { chip: 'bg-gray-100 text-gray-600', dot: 'bg-gray-400', label: '其他' };
 const styleOf = (type: string) => TYPE_STYLE[type] ?? FALLBACK_STYLE;

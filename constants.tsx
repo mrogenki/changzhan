@@ -12,6 +12,9 @@ export const CHAPTER_POSITIONS = [
   '活動組長', '培訓組長', '廣宣組長', '資訊組長', '接待組長',
 ] as const;
 
+/** 執事會的應到名單＝有這些職務的在籍會員。各組長與小組長不在此列。 */
+export const LEADERSHIP_MEETING_POSITIONS = ['主席', '副主席', '秘財', '導師', '執事'];
+
 /** 職務含「小組長」的人可以在 LINE 自助發起組聚（見 supabase/functions/leader-activity） */
 export const GROUP_LEADER_POSITION = '小組長';
 

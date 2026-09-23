@@ -490,6 +490,39 @@ npm run preview    # 本機預覽 build
 
 **驗證狀況**：欄位檢查的純函式 9 個案例全過；偽造／缺少 token 會被擋（401）；用 SQL 模擬函式寫入的資料，確認官網看得到、接龍頁帶得出活動資訊與雙價、取消後接龍擋下新報名且保留既有名單。**沒辦法實測的**：真的從 LINE 登入拿 ID token 走完 create/update/cancel——需要一位小組長在手機上實際操作一次。
 
+### 執事會（`/admin/meetings`）
+
+`pages/admin/MeetingManager.tsx`。例會後的執事會：**簽到 + 會議記錄 + 待辦追蹤**。
+
+- **會議本身是一筆 `activities`**（`type = '執事會'`），所以 QR 報到（`CheckinQrPanel` →
+  `line_checkin()`）與 `attendance` 出席統計都是現成的，不用重寫一套。
+- **應到名單**＝職務在 `constants.tsx` 的 `LEADERSHIP_MEETING_POSITIONS`
+  （主席／副主席／秘財／導師／執事）裡的在籍會員。**各組長與小組長不在此列。**
+- 簽到只記 **出席／請假／缺席**，不套用例會那套 07:01 遲到規則（`line_checkin` 本來就
+  只對「例會活動」判遲到）。
+- **會議記錄**：討論事項 + 決議兩個欄位，存 `meeting_minutes`（一場一份）。
+  可「複製全文」貼到 LINE 群組，內容含出席名單、討論、決議、待辦。
+- **待辦追蹤**（`meeting_action_items`）：內容、負責人（會員選單，也可留空）、期限、完成勾選。
+  逾期會標紅。**其他場次未完成的待辦會自動列在下方**，開會時直接對上次的進度。
+- 刪掉會議時，記錄與待辦會一起刪（`on delete cascade`，實測確認）。
+
+**⚠️ 內部活動（`activities.is_internal`）**：執事會不該出現在官網與行事曆。
+這靠兩層：
+
+1. **DB trigger `activities_force_internal`**：只要 `type = '執事會'` 就強制
+   `is_internal = true`，不管是從哪條路徑寫入的。只靠前端記得帶旗標，哪天漏掉
+   就是把開會時間地點公開出去。
+2. **RLS**：`activities_public_read` 改成 `using (coalesce(is_internal, false) = false)`，
+   **未登入者根本讀不到**內部活動。實測 anon 直接查該筆、列出活動、甚至 `activity_og`
+   view 都是空的。
+
+後台人員登入後拿到的是完整清單，所以 `App.tsx` 另外算一份 `publicActivities`
+（濾掉 `is_internal`）傳給首頁／例會／培訓／組聚／行事曆／活動詳情這幾個公開頁。
+
+**驗證狀況**：trigger 與 RLS 實測過（未登入者四種讀法都拿不到）；用 SQL 模擬頁面的
+寫入與 cascade 刪除，行為正確；公開頁在瀏覽器確認活動照常顯示、沒有執事會。
+**後台畫面需登入，我沒有實際點過**——簽到、記錄、待辦的介面要你自己走一次。
+
 ### 收支月報表（`/admin/finance` → 月報表分頁）
 
 `pages/admin/FinanceMonthlyReport.tsx`。收支管理分成「流水帳／月報表」兩個分頁。

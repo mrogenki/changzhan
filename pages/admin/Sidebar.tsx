@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Calendar, Users, LogOut, ClipboardList, Building2, Shield, Banknote, Award, Cake, CalendarClock, X, UserCheck, FolderOpen, MessageSquare, BarChart3, ExternalLink, Wallet, ListOrdered, ReceiptText } from 'lucide-react';
+import { LayoutDashboard, Calendar, Users, LogOut, ClipboardList, Building2, Shield, Banknote, Award, Cake, CalendarClock, X, UserCheck, FolderOpen, MessageSquare, BarChart3, ExternalLink, Wallet, ListOrdered, ReceiptText, Gavel } from 'lucide-react';
 import { AdminUser, UserRole } from '../../types';
 import { CHAPTER_SHORT_NAME } from '../../chapterConfig';
 
@@ -83,6 +83,11 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout, isOpen, onClose }) =>
           <Link to="/admin/attendance" onClick={handleNavClick} className={linkClass(location.pathname.startsWith('/admin/attendance'))}>
             <ClipboardList size={20} />
             <span>會員報到 (會員專屬)</span>
+          </Link>
+
+          <Link to="/admin/meetings" onClick={handleNavClick} className={linkClass(location.pathname.startsWith('/admin/meetings'))}>
+            <Gavel size={20} />
+            <span>執事會</span>
           </Link>
 
           <Link to="/admin/signups" onClick={handleNavClick} className={linkClass(location.pathname.startsWith('/admin/signups'))}>

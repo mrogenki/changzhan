@@ -3,7 +3,9 @@ export enum ActivityType {
     SPECIAL = '一般活動',
     REGULAR_MEETING = '例會活動',
     BUSINESS_TRAINING = '商務培訓',
-    GROUP_MEETING = '組聚'
+    GROUP_MEETING = '組聚',
+    /** 例會後的執事會。一律是內部活動（DB trigger 會釘住 is_internal） */
+    LEADERSHIP_MEETING = '執事會'
 }
 
 export enum UserRole {
@@ -79,6 +81,32 @@ export interface Activity {
     /** 小組長在 LINE 自助發起的組聚才有；後台建立的是 null */
     created_by_member_id?: number | null;
     host_group?: string | null;
+    /** 內部活動：不上官網、不上行事曆，未登入者讀不到（執事會一律為 true） */
+    is_internal?: boolean;
+}
+
+/** 執事會的會議記錄，一場會議一份 */
+export interface MeetingMinutes {
+    id: number;
+    activity_id: number;
+    content?: string | null;    // 討論事項
+    decisions?: string | null;  // 決議
+    created_by?: string | null;
+    created_at?: string;
+    updated_at?: string;
+}
+
+/** 會議待辦事項 */
+export interface MeetingActionItem {
+    id: number;
+    minutes_id: number;
+    content: string;
+    /** 負責人是會員就連 id；外部人士只留名字 */
+    owner_member_id?: number | null;
+    owner_name?: string | null;
+    due_date?: string | null;
+    status: 'pending' | 'done';
+    done_at?: string | null;
 }
 
 export interface Registration {
