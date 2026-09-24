@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Calendar, MapPin, DollarSign, ArrowLeft, CheckCircle2, Share2, CopyCheck, Clock, Loader2, Search, User } from 'lucide-react';
 import { Activity, Registration, Member } from '../types';
 import { CHAPTER_NAME, NO_REFERRER_OPTION } from '../chapterConfig';
 import ActivityCover from '../components/ActivityCover';
+import { supabase } from '../supabaseClient';
 
 // 報名確認信改由 Supabase edge function `send-registration-email`（Resend）寄送，
 // 由 App.tsx::handleRegister 在報名寫入成功後 fire-and-forget 呼叫。
@@ -54,7 +55,19 @@ const ActivityDetail: React.FC<ActivityDetailProps> = ({ activities, registratio
     return <div className="p-20 text-center">活動不存在</div>;
   }
 
-  const alreadyRegisteredCount = registrations.filter(r => String(r.activityId) === String(id)).length;
+  // 報名人數改用 RPC：anon 對 registrations 只有 INSERT 權限，
+  // 原本用 props 算的話，對未登入的訪客永遠是 0。RPC 只回一個數字（不含個資），
+  // 而且把接龍報名的人頭也算進去。
+  const propCount = registrations.filter(r => String(r.activityId) === String(id)).length;
+  const [headCount, setHeadCount] = useState<number | null>(null);
+  useEffect(() => {
+    let alive = true;
+    if (!id) return;
+    supabase.rpc('public_activity_headcount', { p_activity_id: Number(id) })
+      .then(({ data, error }) => { if (alive && !error && typeof data === 'number') setHeadCount(data); });
+    return () => { alive = false; };
+  }, [id]);
+  const alreadyRegisteredCount = headCount ?? propCount;
 
   const handleShare = async () => {
     // 在 share URL 加上 ?t={timestamp} cache buster，

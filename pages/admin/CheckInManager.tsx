@@ -2,6 +2,28 @@ import React, { useState, useEffect } from 'react';
 import { Search, FileDown, CheckCircle, XCircle, Trash2, RefreshCw, UserPlus } from 'lucide-react';
 import { Activity, Registration } from '../../types';
 import PaidAmountInput from './PaidAmountInput';
+import { supabase } from '../../supabaseClient';
+
+// 同一場活動的人可能從兩條路進來：公開頁的報名表，或 LINE 接龍。
+// 這頁把兩邊併成一份名單，每筆標來源；寫入仍各自回原本的表。
+type AttendeeRow = {
+  key: string;
+  source: 'web' | 'signup';
+  id: number | string;
+  name: string;
+  phone?: string;
+  email?: string;
+  company?: string;
+  title?: string;
+  referrer?: string;
+  extra_count: number;
+  extra_names?: string | null;
+  checked_in: boolean;
+  paid_amount?: number | null;
+  created_at?: string;
+  activityId: string | number;
+  reg?: Registration;   // web 才有，給既有的 handler 用
+};
 
 interface CheckInManagerProps {
   activities: Activity[];
@@ -21,24 +43,84 @@ const CheckInManager: React.FC<CheckInManagerProps> = ({ activities, registratio
   const [addOpen, setAddOpen] = useState(false);
   const [adding, setAdding] = useState(false);
 
+  // 接龍報名的人（走 activity_attendees view，RLS 沿用底層表）
+  const [signupRows, setSignupRows] = useState<AttendeeRow[]>([]);
+
+  const loadSignupRows = async () => {
+    let q = supabase.from('activity_attendees').select('*').eq('source', 'signup');
+    if (selectedActivityId && selectedActivityId !== 'all') q = q.eq('activity_id', selectedActivityId);
+    const { data } = await q;
+    setSignupRows((data ?? []).map((r: any) => ({
+      key: `signup-${r.source_id}`,
+      source: 'signup' as const,
+      id: r.source_id,
+      name: r.name,
+      phone: r.phone ?? undefined,
+      company: r.company ?? undefined,
+      referrer: r.referrer ?? undefined,
+      extra_count: r.extra_count ?? 0,
+      extra_names: r.extra_names,
+      checked_in: !!r.checked_in,
+      created_at: r.created_at,
+      activityId: r.activity_id,
+    })));
+  };
+
+  useEffect(() => { loadSignupRows(); /* eslint-disable-next-line */ }, [selectedActivityId]);
+
+  const toggleSignupCheckIn = async (row: AttendeeRow) => {
+    const next = !row.checked_in;
+    setSignupRows(prev => prev.map(r => (r.key === row.key ? { ...r, checked_in: next } : r)));
+    const { error } = await supabase.from('signup_entries')
+      .update({ checked_in: next, checked_in_at: next ? new Date().toISOString() : null })
+      .eq('id', row.id);
+    if (error) {
+      alert('更新報到狀態失敗：' + error.message);
+      setSignupRows(prev => prev.map(r => (r.key === row.key ? { ...r, checked_in: !next } : r)));
+    }
+  };
+
   useEffect(() => {
     if (!selectedActivityId && activities.length > 0) {
       setSelectedActivityId(String(activities[0].id));
     }
   }, [activities]);
 
-  const filteredRegistrations = registrations.filter(r => {
-    const matchesActivity = selectedActivityId === 'all' || String(r.activityId) === selectedActivityId;
-    const matchesSearch = r.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          r.phone.includes(searchTerm) ||
-                          r.company?.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesActivity && matchesSearch;
+  const webRows: AttendeeRow[] = registrations
+    .filter(r => selectedActivityId === 'all' || String(r.activityId) === selectedActivityId)
+    .map(r => ({
+      key: `web-${r.id}`, source: 'web' as const, id: r.id, name: r.name, phone: r.phone,
+      email: r.email, company: r.company, title: r.title, referrer: r.referrer,
+      extra_count: 0, checked_in: !!r.check_in_status, paid_amount: r.paid_amount,
+      created_at: r.created_at, activityId: r.activityId, reg: r,
+    }));
+
+  const q = searchTerm.toLowerCase();
+  const filteredRegistrations = [...webRows, ...signupRows]
+    .filter(r =>
+      (r.name ?? '').toLowerCase().includes(q) ||
+      (r.phone ?? '').includes(searchTerm) ||
+      (r.company ?? '').toLowerCase().includes(q))
+    .sort((a, b) => String(a.created_at ?? '').localeCompare(String(b.created_at ?? '')));
+
+  // 同一支電話兩邊都報了 → 標出來，不自動刪，由人決定
+  const phoneCount = new Map<string, number>();
+  filteredRegistrations.forEach(r => {
+    const k = (r.phone ?? '').replace(/[^0-9]/g, '');
+    if (k) phoneCount.set(k, (phoneCount.get(k) ?? 0) + 1);
   });
+  const isDuplicate = (r: AttendeeRow) => {
+    const k = (r.phone ?? '').replace(/[^0-9]/g, '');
+    return !!k && (phoneCount.get(k) ?? 0) > 1;
+  };
+
+  // 接龍可以帶同行者，人頭要另外算
+  const headCount = filteredRegistrations.reduce((n, r) => n + 1 + (r.extra_count ?? 0), 0);
 
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
-      await onRefreshRegistrations();
+      await Promise.all([onRefreshRegistrations(), loadSignupRows()]);
     } finally {
       setRefreshing(false);
     }
@@ -83,16 +165,16 @@ const CheckInManager: React.FC<CheckInManagerProps> = ({ activities, registratio
       return;
     }
     let csvContent = '\uFEFF';
-    const headers = ['活動名稱', '日期', '姓名', '電話', 'Email', '公司', '職稱', '引薦人', '繳費金額', '報到狀態', '報名時間'];
+    const headers = ['活動名稱', '日期', '來源', '姓名', '電話', 'Email', '公司', '職稱', '引薦人', '同行人數', '繳費金額', '報到狀態', '報名時間'];
     csvContent += headers.join(',') + '\n';
 
     filteredRegistrations.forEach(reg => {
       const activity = activities.find(a => String(a.id) === String(reg.activityId));
       const actTitle = activity ? activity.title : '未知活動';
       const actDate = activity ? activity.date : '';
-      const checkIn = reg.check_in_status ? '已報到' : '未報到';
+      const checkIn = reg.checked_in ? '已報到' : '未報到';
       const paid = reg.paid_amount || 0;
-      const regTime = new Date(reg.created_at).toLocaleString('zh-TW');
+      const regTime = reg.created_at ? new Date(reg.created_at).toLocaleString('zh-TW') : '';
 
       const escape = (text: string | undefined) => {
         if (!text) return '""';
@@ -102,12 +184,14 @@ const CheckInManager: React.FC<CheckInManagerProps> = ({ activities, registratio
       const row = [
         escape(actTitle),
         escape(actDate),
+        escape(reg.source === 'signup' ? '接龍' : '網頁報名'),
         escape(reg.name),
         escape(reg.phone),
         escape(reg.email),
         escape(reg.company),
         escape(reg.title),
         escape(reg.referrer),
+        reg.extra_count || 0,
         paid,
         escape(checkIn),
         escape(regTime)
@@ -195,7 +279,12 @@ const CheckInManager: React.FC<CheckInManagerProps> = ({ activities, registratio
           </div>
           <div className="flex gap-4 text-sm font-bold text-gray-500">
              <span>報名：{filteredRegistrations.length}</span>
-             <span className="text-green-600">已報到：{filteredRegistrations.filter(r => r.check_in_status).length}</span>
+             {headCount !== filteredRegistrations.length && <span>總人頭：{headCount}</span>}
+             <span className="text-gray-400">
+               網頁 {filteredRegistrations.filter(r => r.source === 'web').length}
+               ／接龍 {filteredRegistrations.filter(r => r.source === 'signup').length}
+             </span>
+             <span className="text-green-600">已報到：{filteredRegistrations.filter(r => r.checked_in).length}</span>
           </div>
         </div>
 
@@ -213,10 +302,28 @@ const CheckInManager: React.FC<CheckInManagerProps> = ({ activities, registratio
             </thead>
             <tbody className="divide-y divide-gray-50">
               {filteredRegistrations.map(reg => (
-                <tr key={reg.id} className={`hover:bg-gray-50/50 transition-colors ${reg.check_in_status ? 'bg-green-50/10' : ''}`}>
+                <tr key={reg.key} className={`hover:bg-gray-50/50 transition-colors ${reg.checked_in ? 'bg-green-50/10' : ''}`}>
                   <td className="px-6 py-4">
-                    <div className="font-bold text-gray-900">{reg.name}</div>
-                    <div className="text-xs text-gray-500 mt-0.5">{reg.company} {reg.title && ` - ${reg.title}`}</div>
+                    <div className="font-bold text-gray-900 flex items-center gap-2 flex-wrap">
+                      {reg.name}
+                      {reg.source === 'signup' && (
+                        <span className="px-1.5 py-0.5 rounded bg-sky-50 text-sky-600 text-[10px] font-bold">接龍</span>
+                      )}
+                      {isDuplicate(reg) && (
+                        <span className="px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 text-[10px] font-bold"
+                          title="同一支電話在兩份名單都出現，請確認是不是重複報名">
+                          可能重複
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-xs text-gray-500 mt-0.5">
+                      {reg.company} {reg.title && ` - ${reg.title}`}
+                      {reg.extra_count > 0 && (
+                        <span className="text-sky-600 font-bold">
+                          　+{reg.extra_count} 位{reg.extra_names ? `（${reg.extra_names}）` : ''}
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="px-6 py-4">
                     <div className="text-sm font-mono text-gray-600">{reg.phone}</div>
@@ -229,33 +336,47 @@ const CheckInManager: React.FC<CheckInManagerProps> = ({ activities, registratio
                   </td>
                   <td className="px-6 py-4">
                     <button
-                      onClick={() => onUpdateRegistration({...reg, check_in_status: !reg.check_in_status})}
+                      onClick={() => reg.source === 'web'
+                        ? onUpdateRegistration({ ...reg.reg!, check_in_status: !reg.checked_in })
+                        : toggleSignupCheckIn(reg)}
                       className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${
-                        reg.check_in_status
+                        reg.checked_in
                           ? 'bg-green-100 text-green-700 hover:bg-green-200'
                           : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
                       }`}
                     >
-                      {reg.check_in_status ? <CheckCircle size={14} /> : <XCircle size={14} />}
-                      {reg.check_in_status ? '已報到' : '未報到'}
+                      {reg.checked_in ? <CheckCircle size={14} /> : <XCircle size={14} />}
+                      {reg.checked_in ? '已報到' : '未報到'}
                     </button>
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
-                      <span className="text-gray-400 text-xs">$</span>
-                      <PaidAmountInput
-                        value={reg.paid_amount}
-                        onSave={(val) => onUpdateRegistration({...reg, paid_amount: val})}
-                      />
+                      {reg.source === 'web' ? (
+                        <>
+                          <span className="text-gray-400 text-xs">$</span>
+                          <PaidAmountInput
+                            value={reg.paid_amount ?? 0}
+                            onSave={(val) => onUpdateRegistration({ ...reg.reg!, paid_amount: val })}
+                          />
+                        </>
+                      ) : (
+                        // 接龍的收費走「收款管理」（可從接龍名單頁一鍵轉過去），這裡不重複記
+                        <span className="text-xs text-gray-400" title="接龍的收費請用收款管理">收款管理</span>
+                      )}
                     </div>
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <button
-                      onClick={() => { if(window.confirm('確定要刪除此報名紀錄嗎？')) onDeleteRegistration(reg.id); }}
-                      className="text-gray-400 hover:text-red-600 p-2 hover:bg-red-50 rounded-lg transition-colors"
-                    >
-                      <Trash2 size={18} />
-                    </button>
+                    {reg.source === 'web' ? (
+                      <button
+                        onClick={() => { if (window.confirm('確定要刪除此報名紀錄嗎？')) onDeleteRegistration(reg.id); }}
+                        className="text-gray-400 hover:text-red-600 p-2 hover:bg-red-50 rounded-lg transition-colors"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    ) : (
+                      // 接龍的報名在接龍名單頁刪，避免兩個地方都能動同一筆
+                      <span className="text-xs text-gray-300 pr-2" title="請到「接龍報名」頁面處理">—</span>
+                    )}
                   </td>
                 </tr>
               ))}

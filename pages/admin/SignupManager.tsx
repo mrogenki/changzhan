@@ -308,6 +308,20 @@ const SheetDetail: React.FC<{
   const [sortBy, setSortBy] = useState<'time' | 'group'>('time');
 
   const head = entries.reduce((s, e) => s + 1 + e.extra_count, 0);
+
+  // 同一場活動也可能有人從公開頁的報名表進來。這裡把他們列出來，
+  // 免得人數少算；但**不併進下面的名單**——轉收款是照接龍的人建立收款明細，
+  // 併進去會變成重複收款。網頁報名的收費走報到管理／收款管理。
+  const [webRegs, setWebRegs] = useState<{ source_id: number; name: string; phone: string | null; company: string | null; referrer: string | null; checked_in: boolean }[]>([]);
+  useEffect(() => {
+    if (!sheet.activity_id) { setWebRegs([]); return; }
+    let alive = true;
+    supabase.from('activity_attendees')
+      .select('source_id, name, phone, company, referrer, checked_in')
+      .eq('source', 'web').eq('activity_id', sheet.activity_id)
+      .then(({ data }) => { if (alive) setWebRegs(data ?? []); });
+    return () => { alive = false; };
+  }, [sheet.activity_id]);
   const activity = activities.find(a => String(a.id) === String(sheet.activity_id));
 
   // 組別取自會員資料；來賓與沒設組別的會員歸「未分組」
@@ -510,6 +524,11 @@ const SheetDetail: React.FC<{
             {head}
             {sheet.max_people !== null && <span className="text-base text-gray-300"> / {sheet.max_people}</span>}
           </div>
+          {webRegs.length > 0 && (
+            <p className="text-[11px] text-sky-600 font-bold mt-1">
+              ＋網頁報名 {webRegs.length} 人＝共 {head + webRegs.length}
+            </p>
+          )}
         </div>
         <div className="bg-white p-4 rounded-xl border">
           <div className="text-xs text-gray-400 font-bold uppercase">報名筆數</div>
@@ -645,6 +664,31 @@ const SheetDetail: React.FC<{
           {entries.length === 0 && <div className="p-10 text-center text-gray-400">還沒有人報名</div>}
         </div>
       </div>
+
+      {webRegs.length > 0 && (
+        <div className="bg-sky-50 rounded-xl border border-sky-200 p-5">
+          <h3 className="font-bold text-sky-900 flex items-center gap-2">
+            這場活動另外有 {webRegs.length} 人從網頁報名
+          </h3>
+          <p className="text-xs text-sky-700/80 mt-1 leading-relaxed">
+            他們沒有走接龍，所以不在上面的名單裡，<strong>「轉成收款」也不會包含他們</strong>
+            （避免與報到管理的繳費金額重複記帳）。報到與收費請在「報到管理」處理。
+          </p>
+          <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {webRegs.map(r => (
+              <div key={r.source_id} className="bg-white rounded-lg px-3 py-2 text-sm flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <span className="font-bold text-gray-900">{r.name}</span>
+                  {r.company && <span className="text-gray-400 text-xs ml-2 truncate">{r.company}</span>}
+                </div>
+                <span className={`text-[11px] font-bold shrink-0 ${r.checked_in ? 'text-green-600' : 'text-gray-300'}`}>
+                  {r.checked_in ? '已報到' : '未報到'}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {canEdit && (
         <button onClick={onDelete} className="text-xs text-gray-300 hover:text-red-500 font-bold">

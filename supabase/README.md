@@ -32,6 +32,7 @@ supabase/
 | `20260923000200_leadership_meetings.sql` | 執事會：內部活動旗標、會議記錄、待辦 |
 | `20260924000100_meeting_agenda.sql` | 執事會議程 8 段、來賓追蹤、續約追蹤 |
 | `20260924000200_notification_log.sql` | 通知發送紀錄（Telegram） |
+| `20260924000300_merge_activity_attendees.sql` | 合併網頁報名與接龍名單的 view |
 
 用 Supabase Dashboard 的 SQL Editor 貼上執行即可，不需要 CLI。
 
