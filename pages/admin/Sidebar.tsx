@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Calendar, Users, LogOut, ClipboardList, Building2, Shield, Banknote, Award, Cake, CalendarClock, X, UserCheck, FolderOpen, MessageSquare, BarChart3, ExternalLink, Wallet, ListOrdered, ReceiptText, Gavel } from 'lucide-react';
+import { LayoutDashboard, Calendar, Users, LogOut, ClipboardList, Building2, Shield, Banknote, Award, Cake, CalendarClock, X, UserCheck, FolderOpen, BarChart3, ExternalLink, Wallet, ListOrdered, ReceiptText, Gavel, Bell } from 'lucide-react';
 import { AdminUser, UserRole } from '../../types';
 import { CHAPTER_SHORT_NAME } from '../../chapterConfig';
 
@@ -142,8 +142,8 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout, isOpen, onClose }) =>
                 <span>文件管理</span>
               </Link>
               <Link to="/admin/line-groups" onClick={handleNavClick} className={linkClass(location.pathname.startsWith('/admin/line-groups'))}>
-                <MessageSquare size={20} />
-                <span>LINE {CHAPTER_SHORT_NAME}小幫手</span>
+                <Bell size={20} />
+                <span>通知設定</span>
               </Link>
             </>
           )}

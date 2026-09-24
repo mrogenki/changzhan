@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import {
-  MessageSquare,
   Users,
   CheckSquare,
   Square,
@@ -329,10 +328,15 @@ const LineGroupManager: React.FC<Props> = ({ canEdit, currentUser, onUploadImage
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold flex items-center gap-2">
-          <MessageSquare size={28} className="text-green-600" />
-          LINE {CHAPTER_SHORT_NAME}小幫手
-        </h1>
+        <div>
+          <h1 className="text-3xl font-bold flex items-center gap-2">
+            <Bell size={28} className="text-sky-500" />
+            通知設定
+          </h1>
+          <p className="text-sm text-gray-400 mt-1">
+            報名通知走 Telegram；LINE {CHAPTER_SHORT_NAME}小幫手負責群組自動回覆與訊息紀錄。
+          </p>
+        </div>
         <button
           onClick={() => { fetchAll(); fetchQuota(); }}
           className="flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900"

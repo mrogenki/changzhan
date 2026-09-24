@@ -317,7 +317,10 @@ npm run preview    # 本機預覽 build
 - Allow bot to join group chats：ON
 - 把 bot 加到群組後，bot 收到 `join` 事件就會自動進 `line_groups` 表
 
-**Admin 介面：** `/admin/line-groups`（由 `pages/admin/LineGroupManager.tsx` 提供）— 群組清單、報名通知群組設定、自動回覆公告、發送紀錄、本月額度
+**Admin 介面：** `/admin/line-groups`（由 `pages/admin/LineGroupManager.tsx` 提供），
+側欄與頁面標題叫「**通知設定**」——這頁現在同時管 Telegram 報名通知與 LINE 小幫手，
+再叫「LINE 小幫手」名實不符。**路由維持 `/admin/line-groups`**（只是換名字，不值得動路由）。
+內容：Telegram 報名通知、LINE 群組清單、自動回覆公告、發送紀錄、本月額度
 
 ⚠️ **後台的手動推播已停用**（避免誤觸消耗 LINE 額度）：
 - 「群發公告」UI 與 `handleSend` 已移除，`components/LineMessageTester.tsx` 已刪除
