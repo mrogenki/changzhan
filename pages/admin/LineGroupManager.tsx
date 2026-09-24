@@ -281,7 +281,7 @@ const LineGroupManager: React.FC<Props> = ({ canEdit, currentUser, onUploadImage
       const res = await callTelegram('probe');
       setTgChats(res?.chats ?? []);
       if ((res?.chats ?? []).length === 0) {
-        alert('找不到任何聊天室。請先把 bot 加進群組，並在群組裡隨便發一則訊息，再按一次。');
+        alert(res?.hint ?? '找不到任何聊天室。請先把 bot 加進群組，並在群組裡發一則訊息，再按一次。');
       }
     } catch (e: any) {
       alert(e?.message ?? String(e));

@@ -76,13 +76,16 @@ Deno.serve(async (req) => {
     }
 
     if (action === "probe") {
-      // bot 只看得到「加進聊天室之後」收到的訊息，所以要先在群組裡隨便發一則
       const res = await fetch(tgUrl(token, "getUpdates"));
       const data = await res.json();
-      if (!data?.ok) return json({ ok: false, error: data?.description ?? "getUpdates 失敗" }, 502);
+      if (!data?.ok) {
+        // 設了 webhook 的話 getUpdates 會回 409，訊息會被 webhook 收走
+        return json({ ok: false, error: data?.description ?? "getUpdates 失敗" }, 502);
+      }
       const seen = new Map<string, { chat_id: string; title: string; type: string }>();
       for (const u of data.result ?? []) {
-        const chat = u?.message?.chat ?? u?.channel_post?.chat ?? u?.my_chat_member?.chat;
+        const chat = u?.message?.chat ?? u?.channel_post?.chat
+          ?? u?.my_chat_member?.chat ?? u?.chat_member?.chat;
         if (!chat?.id) continue;
         seen.set(String(chat.id), {
           chat_id: String(chat.id),
@@ -90,7 +93,34 @@ Deno.serve(async (req) => {
           type: chat.type ?? "",
         });
       }
-      return json({ ok: true, chats: [...seen.values()] });
+      const chats = [...seen.values()];
+      if (chats.length > 0) return json({ ok: true, chats });
+
+      // 找不到就順便診斷，不要只回一句「找不到」讓人瞎猜
+      const [meRes, hookRes] = await Promise.all([
+        fetch(tgUrl(token, "getMe")).then(r => r.json()).catch(() => null),
+        fetch(tgUrl(token, "getWebhookInfo")).then(r => r.json()).catch(() => null),
+      ]);
+      const me = meRes?.result;
+      const hookUrl = hookRes?.result?.url;
+      const username = me?.username ? `@${me.username}` : "(取不到 bot 名稱)";
+      let hint: string;
+      if (hookUrl) {
+        hint = `這個 bot 設了 webhook（${hookUrl}），訊息都被它收走了，getUpdates 拿不到。`
+          + `要用這個方式抓 chat id 得先移除 webhook。`;
+      } else if (me && me.can_join_groups === false) {
+        hint = `${username} 被設定成不能加入群組。請在 BotFather 傳 /setjoingroups 選這個 bot 並 Enable。`;
+      } else if (me && me.can_read_all_group_messages === false) {
+        // 預設就是這個狀態，九成的情況是卡在這
+        hint = `${username} 的隱私模式是「開啟」，所以它看不到群組裡的一般訊息。兩個做法擇一：`
+          + `(A) 最快：直接在群組裡傳一則 /start${me.username ? "@" + me.username : ""} `
+          + `——指名給 bot 的指令就算隱私模式開著也收得到，傳完再按一次這顆按鈕。`
+          + `(B) 在 BotFather 傳 /setprivacy → 選這個 bot → Disable，然後把 bot 退出群組再重新加入。`;
+      } else {
+        hint = `${username} 的設定看起來正常，但還沒收到任何訊息。`
+          + `請確認 bot 已經加進群組，並在群組裡發一則訊息後再按一次。`;
+      }
+      return json({ ok: true, chats: [], hint, bot: username });
     }
 
     // ---- 取得目標 chat ----
