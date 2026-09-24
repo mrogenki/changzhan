@@ -63,12 +63,18 @@ interface Props {
 }
 
 const NOTIFY_SETTING_KEY = 'line_notify_registration_group_id';
+const TELEGRAM_CHAT_KEY = 'telegram_notify_chat_id';
 const BOT_ENABLED_KEY = 'bot_reply_enabled';
 const BOT_ANNOUNCEMENT_KEY = 'bot_reply_announcement_text';
 const BOT_ANNOUNCEMENT_UPDATED_KEY = 'bot_reply_announcement_updated_at';
 
 const LineGroupManager: React.FC<Props> = ({ canEdit, currentUser, onUploadImage }) => {
   const [groups, setGroups] = useState<LineGroup[]>([]);
+  // Telegram 報名通知（LINE 群組推播太吃額度，通知幹部這種訊息搬到 Telegram）
+  const [tgChatId, setTgChatId] = useState('');
+  const [tgSaving, setTgSaving] = useState(false);
+  const [tgBusy, setTgBusy] = useState('');
+  const [tgChats, setTgChats] = useState<{ chat_id: string; title: string; type: string }[]>([]);
   const [logs, setLogs] = useState<SendLogRow[]>([]);
   const [notifyGroupId, setNotifyGroupId] = useState<string>('');
   const [loading, setLoading] = useState(true);
@@ -93,7 +99,7 @@ const LineGroupManager: React.FC<Props> = ({ canEdit, currentUser, onUploadImage
   const fetchAll = async () => {
     setLoading(true);
     try {
-      const [groupRes, settingRes, logRes, botSettingsRes] = await Promise.all([
+      const [groupRes, settingRes, tgRes, logRes, botSettingsRes] = await Promise.all([
         supabase
           .from('line_groups')
           .select('*')
@@ -103,6 +109,11 @@ const LineGroupManager: React.FC<Props> = ({ canEdit, currentUser, onUploadImage
           .from('app_settings')
           .select('value')
           .eq('key', NOTIFY_SETTING_KEY)
+          .maybeSingle(),
+        supabase
+          .from('app_settings')
+          .select('value')
+          .eq('key', TELEGRAM_CHAT_KEY)
           .maybeSingle(),
         supabase
           .from('message_send_log')
@@ -117,6 +128,7 @@ const LineGroupManager: React.FC<Props> = ({ canEdit, currentUser, onUploadImage
       ]);
       if (groupRes.data) setGroups(groupRes.data as LineGroup[]);
       if (settingRes.data) setNotifyGroupId(settingRes.data.value || '');
+      if (tgRes.data) setTgChatId(tgRes.data.value || '');
       if (logRes.data) setLogs(logRes.data as SendLogRow[]);
       if (botSettingsRes.data) {
         const map: Record<string, string> = {};
@@ -234,6 +246,56 @@ const LineGroupManager: React.FC<Props> = ({ canEdit, currentUser, onUploadImage
     } finally {
       setSavingBot(false);
     }
+  };
+
+  // === Telegram 報名通知 ===
+  const saveTelegramChat = async () => {
+    setTgSaving(true);
+    try {
+      const { error } = await supabase.from('app_settings').upsert(
+        { key: TELEGRAM_CHAT_KEY, value: tgChatId.trim(), updated_at: new Date().toISOString() },
+        { onConflict: 'key' },
+      );
+      if (error) { alert('儲存失敗：' + error.message); return; }
+      alert('已儲存 Telegram 通知設定');
+    } finally { setTgSaving(false); }
+  };
+
+  /** functions.invoke 在 non-2xx 只給 FunctionsHttpError，真正訊息在 error.context 裡 */
+  const callTelegram = async (action: string) => {
+    const { data, error } = await supabase.functions.invoke('telegram-notify', { body: { action } });
+    if (error) {
+      let msg = error.message;
+      try {
+        const body = await (error as any).context?.json?.();
+        msg = body?.message || body?.error || msg;
+      } catch { /* 保留原訊息 */ }
+      throw new Error(msg);
+    }
+    return data;
+  };
+
+  const probeTelegram = async () => {
+    setTgBusy('probe');
+    try {
+      const res = await callTelegram('probe');
+      setTgChats(res?.chats ?? []);
+      if ((res?.chats ?? []).length === 0) {
+        alert('找不到任何聊天室。請先把 bot 加進群組，並在群組裡隨便發一則訊息，再按一次。');
+      }
+    } catch (e: any) {
+      alert(e?.message ?? String(e));
+    } finally { setTgBusy(''); }
+  };
+
+  const testTelegram = async () => {
+    setTgBusy('test');
+    try {
+      await callTelegram('test');
+      alert('已送出測試訊息，去 Telegram 看看有沒有收到。');
+    } catch (e: any) {
+      alert('測試失敗：' + (e?.message ?? String(e)));
+    } finally { setTgBusy(''); }
   };
 
   // === 報名通知群組設定 ===
@@ -362,14 +424,82 @@ const LineGroupManager: React.FC<Props> = ({ canEdit, currentUser, onUploadImage
         )}
       </section>
 
-      {/* === 區塊 1: 報名通知設定 === */}
+      {/* === 區塊 1: 報名通知（Telegram） === */}
       <section className="bg-white rounded-xl shadow p-6">
         <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-          <Bell size={20} className="text-amber-500" />
-          報名通知群組
+          <Bell size={20} className="text-sky-500" />
+          報名通知（Telegram）
         </h2>
         <p className="text-sm text-gray-600 mb-3">
-          有人在活動詳情頁報名後，會自動推送通知到所選群組。留空 = 不通知。
+          有人報名活動後，通知會送到這個 Telegram 聊天室。
+          <strong>Telegram 沒有訊息則數限制</strong>，所以通知幹部這種推播搬來這裡，
+          LINE 的額度留給真正要觸及會員與來賓的訊息。留空 = 不通知。
+        </p>
+        <div className="flex flex-col sm:flex-row gap-3">
+          <input
+            value={tgChatId}
+            onChange={e => setTgChatId(e.target.value)}
+            placeholder="chat id，例如 -1001234567890"
+            className="flex-grow border rounded-lg px-3 py-2 font-mono"
+          />
+          <button
+            onClick={saveTelegramChat}
+            disabled={tgSaving || !canEdit}
+            className="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg flex items-center gap-2 disabled:opacity-50"
+          >
+            {tgSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+            儲存
+          </button>
+        </div>
+        <div className="flex flex-wrap gap-2 mt-3">
+          <button
+            onClick={probeTelegram}
+            disabled={tgBusy !== ''}
+            className="px-3 py-2 border rounded-lg text-sm font-bold hover:bg-gray-50 disabled:opacity-50 flex items-center gap-1.5"
+          >
+            {tgBusy === 'probe' && <Loader2 size={14} className="animate-spin" />}
+            找出我的 chat id
+          </button>
+          <button
+            onClick={testTelegram}
+            disabled={tgBusy !== '' || !tgChatId.trim()}
+            className="px-3 py-2 border rounded-lg text-sm font-bold hover:bg-gray-50 disabled:opacity-50 flex items-center gap-1.5"
+          >
+            {tgBusy === 'test' && <Loader2 size={14} className="animate-spin" />}
+            發一則測試訊息
+          </button>
+        </div>
+        {tgChats.length > 0 && (
+          <div className="mt-3 border rounded-lg divide-y">
+            {tgChats.map(c => (
+              <button
+                key={c.chat_id}
+                onClick={() => setTgChatId(c.chat_id)}
+                className="w-full text-left px-3 py-2 hover:bg-sky-50 flex items-center justify-between gap-3"
+              >
+                <span className="font-bold text-gray-800">{c.title || '(無名稱)'}</span>
+                <span className="font-mono text-xs text-gray-500">{c.chat_id}　{c.type}</span>
+              </button>
+            ))}
+          </div>
+        )}
+        <p className="text-xs text-gray-400 mt-3">
+          設定步驟：① 在 Telegram 跟 @BotFather 建一個 bot，把 token 存到 Supabase 的
+          Edge Function Secrets（key 為 <code className="font-mono">TELEGRAM_BOT_TOKEN</code>）
+          ② 建一個群組、把 bot 加進去、在群組裡隨便發一則訊息
+          ③ 按「找出我的 chat id」選那個群組 ④ 儲存後發測試訊息確認。
+        </p>
+      </section>
+
+      {/* === 區塊 1b: 舊的 LINE 報名通知（已停用） === */}
+      <section className="bg-white rounded-xl shadow p-6 opacity-75">
+        <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+          <Bell size={20} className="text-gray-400" />
+          報名通知群組（LINE · 已停用）
+        </h2>
+        <p className="text-sm text-gray-600 mb-3">
+          報名通知已改送 Telegram，<strong>這裡的設定目前不會發送任何訊息</strong>。
+          設定保留著是為了要改回 LINE 時不用重設。
         </p>
         <div className="flex flex-col sm:flex-row gap-3">
           <select

@@ -363,8 +363,9 @@ const App: React.FC = () => {
         // 與報名確認信（Resend）：失敗都不影響報名動作，所以 fire-and-forget + 吞掉錯誤
         if (newId) {
             supabase.functions
-                .invoke('line-notify-registration', { body: { registrationId: newId } })
-                .catch((err) => console.warn('line-notify-registration failed:', err));
+                // 報名通知改送 Telegram：LINE 群組推播吃額度，通知幹部不值得用掉
+                .invoke('telegram-notify', { body: { registrationId: newId } })
+                .catch((err) => console.warn('telegram-notify failed:', err));
             supabase.functions
                 .invoke('send-registration-email', { body: { registrationId: newId } })
                 .catch((err) => console.warn('send-registration-email failed:', err));
@@ -413,8 +414,8 @@ const App: React.FC = () => {
         }
         if (notify && data?.id) {
             supabase.functions
-                .invoke('line-notify-registration', { body: { registrationId: data.id } })
-                .catch((err) => console.warn('line-notify-registration failed:', err));
+                .invoke('telegram-notify', { body: { registrationId: data.id } })
+                .catch((err) => console.warn('telegram-notify failed:', err));
         }
         await fetchData();
         return true;

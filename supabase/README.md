@@ -31,6 +31,7 @@ supabase/
 | `20260923000100_member_positions.sql` | 會員分會職務（取代小組長布林欄） |
 | `20260923000200_leadership_meetings.sql` | 執事會：內部活動旗標、會議記錄、待辦 |
 | `20260924000100_meeting_agenda.sql` | 執事會議程 8 段、來賓追蹤、續約追蹤 |
+| `20260924000200_notification_log.sql` | 通知發送紀錄（Telegram） |
 
 用 Supabase Dashboard 的 SQL Editor 貼上執行即可，不需要 CLI。
 
@@ -81,10 +82,12 @@ supabase functions deploy <name> --project-ref <新專案 ref>
 | `send-registration-email` | ✅ | 報名確認信（Resend） |
 | `invite-user` | ✅ | 邀請使用者 |
 | `leader-activity` | ✅ | 小組長在 LINE 發起組聚（伺服器端驗 LINE ID token） |
+| `telegram-notify` | ✅ | 報名通知送 Telegram（取代 LINE 群組推播） |
 
 **Secrets**（Dashboard → Edge Functions → Secrets）：
 
 - `LINE_CHANNEL_ACCESS_TOKEN`、`LINE_CHANNEL_SECRET`
+- `TELEGRAM_BOT_TOKEN`（報名通知用；沒設就安靜跳過）
 - `RESEND_API_KEY`、`RESEND_FROM`
 - `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` 由 Supabase 自動注入，不用自己設
 

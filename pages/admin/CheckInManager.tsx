@@ -330,7 +330,7 @@ const CheckInManager: React.FC<CheckInManagerProps> = ({ activities, registratio
                 <input type="checkbox" name="check_in_status" /> 同時標記為已報到
               </label>
               <label className="flex items-center gap-2 text-sm text-gray-600">
-                <input type="checkbox" name="notify" defaultChecked /> 發送 LINE 報名通知到群組（補登舊資料時請取消）
+                <input type="checkbox" name="notify" defaultChecked /> 發送報名通知到 Telegram（補登舊資料時請取消）
               </label>
               <div className="flex gap-4 pt-2">
                 <button type="button" onClick={() => setAddOpen(false)} disabled={adding} className="flex-1 border py-3 rounded-lg font-bold text-gray-500 hover:bg-gray-50 disabled:opacity-50">取消</button>

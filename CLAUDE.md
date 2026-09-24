@@ -325,9 +325,35 @@ npm run preview    # 本機預覽 build
 - 要恢復請看 git 歷史（commit 訊息含「群發」）
 
 **仍會自動送出、會消耗額度的路徑**（不是誤觸，但要知道）：
-- **報名通知**：每有人報名就推一則到 `app_settings.line_notify_registration_group_id` 指定的群組。把該設定清空即可停用。
 - **訪客報到歡迎訊息**：LIFF 報到成功後推給該位訪客本人（`LiffCheckin.tsx` → `send-line-message`）。
+  這則必須留在 LINE——收件者是來賓本人。
 - 自動回覆公告（`!公告`）走 LINE 的 reply API，**不計入推播額度**。
+- ~~報名通知~~ 已於 2026-09-24 改送 Telegram，見下一節。
+
+### 報名通知改送 Telegram（`telegram-notify`）
+
+有人報名 → 通知幹部。原本推到 LINE 群組，但**這種訊息不值得用掉 LINE 的推播額度**，
+而 Telegram Bot API 沒有則數限制，所以搬過去。
+
+- **觸發點不變**：`App.tsx::handleRegister`（公開報名）與 `handleAddRegistration`（代為報名）
+  fire-and-forget invoke `telegram-notify`，失敗不影響報名本身。
+- **只收 `{ registrationId }`**：收件對象與內容一律由伺服器用 service role 從 DB 組，
+  呼叫端無法指定，所以不會被拿去當免費發送管道（與 `send-registration-email` 同一個原則）。
+  訊息比 LINE 版多一行「這場目前共 N 人報名」。
+- **`action: 'probe'`** 列出 bot 看得到的聊天室與 chat id、**`action: 'test'`** 發測試訊息，
+  兩者都**要求呼叫者是 `admins` 表裡的人**（實測未登入呼叫回 401）。
+  一般的報名通知不能要求登入——公開報名流程是 anon。
+- **設定**：secret `TELEGRAM_BOT_TOKEN`（Supabase Dashboard → Edge Functions → Secrets），
+  聊天室存在 `app_settings.telegram_notify_chat_id`，後台 `/admin/line-groups` 最上面那塊可改，
+  附「找出我的 chat id」與「發測試訊息」兩顆按鈕。
+- **沒設定就安靜跳過**並在 `notification_log` 記一筆 `skipped`（報名已經成功，
+  不該因為通知沒設定而讓使用者看到錯誤）。發送結果一律寫 `notification_log`，
+  避免「沒送出也沒人知道」。
+- **`line-notify-registration` 仍部署著但已無人呼叫**，後台那塊 LINE 設定標成「已停用」並保留值，
+  要改回 LINE 只要把 `App.tsx` 兩處 invoke 的名字換回去。
+
+**驗證狀況**：未設定 token 時報名通知回 `{ok:true, skipped:"no_bot_token"}` 並寫入紀錄；
+probe/test 未登入呼叫回 401。**實際送出到 Telegram 沒辦法在這裡測**——需要你先建 bot 並設 token。
 
 **報名通知流程：** `App.tsx::handleRegister` insert 完 `registrations` 後 fire-and-forget invoke `line-notify-registration`，失敗不影響使用者報名動作。
 
