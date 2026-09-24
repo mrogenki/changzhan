@@ -12,6 +12,14 @@ export const CHAPTER_POSITIONS = [
   '活動組長', '培訓組長', '廣宣組長', '資訊組長', '接待組長',
 ] as const;
 
+/** PALMS 紅綠燈的顏色代碼。B 是新會員尚未完整計分的狀態 */
+export const TRAFFIC_LIGHT_STYLE: Record<string, { label: string; cls: string; dot: string }> = {
+  G: { label: '綠燈', cls: 'bg-green-100 text-green-700', dot: 'bg-green-500' },
+  Y: { label: '黃燈', cls: 'bg-amber-100 text-amber-700', dot: 'bg-amber-500' },
+  R: { label: '紅燈', cls: 'bg-red-100 text-red-700', dot: 'bg-red-500' },
+  B: { label: '藍燈', cls: 'bg-blue-100 text-blue-700', dot: 'bg-blue-500' },
+};
+
 /** 執事會的應到名單＝有這些職務的在籍會員。各組長與小組長不在此列。 */
 export const LEADERSHIP_MEETING_POSITIONS = ['主席', '副主席', '秘財', '導師', '執事'];
 

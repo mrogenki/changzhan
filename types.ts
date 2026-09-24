@@ -102,6 +102,27 @@ export interface MeetingMinutes {
     updated_at?: string;
 }
 
+/** 會員的最新紅綠燈（PALMS）。來源是 bni-report 上傳的報表，changzhan 只讀不寫 */
+export interface MemberTrafficLight {
+    member_id: number;
+    raw_name?: string;
+    light?: 'B' | 'G' | 'Y' | 'R' | string | null;
+    total_score?: number | null;
+    attendance_rate?: number | null;
+    attendance?: number | null;
+    absent?: number | null;
+    late?: number | null;
+    sick?: number | null;
+    substitute?: number | null;
+    guests?: number | null;
+    one_on_one?: number | null;
+    education?: number | null;
+    given_refs?: number | null;
+    received_refs?: number | null;
+    deal_value?: number | null;
+    date_range?: string | null;
+}
+
 /** 來賓追蹤：一位來賓一筆，狀況跨週延續。議程的今日／上週／之前是依 visit_date 分組 */
 export interface GuestFollowUp {
     id: number;

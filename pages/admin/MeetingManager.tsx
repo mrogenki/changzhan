@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import {
   Activity, ActivityType, AttendanceRecord, AttendanceStatus, Member, Registration,
-  MeetingActionItem, MeetingMinutes, GuestFollowUp, RenewalNote,
+  MeetingActionItem, MeetingMinutes, GuestFollowUp, RenewalNote, MemberTrafficLight,
 } from '../../types';
 import { LEADERSHIP_MEETING_POSITIONS } from '../../constants';
 import { CHAPTER_NAME } from '../../chapterConfig';
@@ -104,6 +104,9 @@ const MeetingManager: React.FC<Props> = ({
   const [openItems, setOpenItems] = useState<(MeetingActionItem & { meeting_date?: string })[]>([]);
   const [guests, setGuests] = useState<GuestFollowUp[]>([]);
   const [renewalNotes, setRenewalNotes] = useState<Record<number, RenewalNote>>({});
+  // 最新紅綠燈：續約段的「燈號」原本要手填，改成自動帶入 PALMS 的分數
+  const [lights, setLights] = useState<Record<number, MemberTrafficLight>>({});
+  const [lightRange, setLightRange] = useState('');
   const [notes, setNotes] = useState({
     attendance_note: '', application_note: '', guest_note: '',
     renewal_note: '', process_note: '', misc_note: '',
@@ -154,17 +157,20 @@ const MeetingManager: React.FC<Props> = ({
       const sameDay = regularMeetings.find(a => a.date === meetingDate);
       setLinkedId(String(mi?.regular_meeting_activity_id ?? sameDay?.id ?? ''));
 
-      const [{ data: its }, { data: gs }, { data: rn }, { data: allMinutes }, { data: pending }] = await Promise.all([
+      const [{ data: its }, { data: gs }, { data: rn }, { data: allMinutes }, { data: pending }, { data: tl }] = await Promise.all([
         mi ? supabase.from('meeting_action_items').select('*').eq('minutes_id', mi.id).order('id')
            : Promise.resolve({ data: [] as any[] }),
         supabase.from('guest_follow_ups').select('*').order('visit_date', { ascending: false }).limit(300),
         supabase.from('renewal_notes').select('*'),
         supabase.from('meeting_minutes').select('id, activity_id'),
         supabase.from('meeting_action_items').select('*').eq('status', 'pending'),
+        supabase.from('member_traffic_lights').select('*'),
       ]);
       setItems(its ?? []);
       setGuests(gs ?? []);
       setRenewalNotes(Object.fromEntries((rn ?? []).map((x: RenewalNote) => [x.member_id, x])));
+      setLights(Object.fromEntries((tl ?? []).map((x: MemberTrafficLight) => [x.member_id, x])));
+      setLightRange((tl ?? [])[0]?.date_range ?? '');
 
       const byId = new Map((allMinutes ?? []).map((x: any) => [x.id, x.activity_id]));
       setOpenItems((pending ?? [])
@@ -239,12 +245,15 @@ const MeetingManager: React.FC<Props> = ({
         const note = renewalNotes[Number(m.id)];
         return {
           member_id: Number(m.id), name: m.name ?? '', end_date: m.end_date ?? '', group_name: m.group_name,
-          status_note: note?.status_note ?? '', light: note?.light ?? null, committee: note?.committee ?? '',
+          status_note: note?.status_note ?? '',
+          // 沒手動填就用最新 PALMS 的分數（手填會蓋過自動值）
+          light: note?.light ?? lights[Number(m.id)]?.total_score ?? null,
+          committee: note?.committee ?? '',
           // 沒手動填就用系統算的：該會員引薦過的報名筆數
           guest_count: note?.guest_count ?? registrations.filter(r => (r.referrer ?? '').trim() === (m.name ?? '').trim()).length,
         };
       });
-  }, [activeMembers, renewalNotes, registrations, selected]);
+  }, [activeMembers, renewalNotes, registrations, selected, lights]);
 
   async function saveGuest(id: number, patch: Partial<GuestFollowUp>) {
     setGuests(prev => prev.map(g => (g.id === id ? { ...g, ...patch } : g)));
@@ -612,7 +621,10 @@ const MeetingManager: React.FC<Props> = ({
                       </table>
                     </div>
                   )}
-                  <p className="text-xs text-gray-400 mt-2">來賓數預設是系統依「引薦人」算的，可以直接改成 PALMS 的數字。</p>
+                  <p className="text-xs text-gray-400 mt-2">
+                    來賓數預設是系統依「引薦人」算的，可以直接改成 PALMS 的數字。
+                    燈號自動帶入最新紅綠燈報表{lightRange ? `（${lightRange}）` : ''}的分數，手動填過的以你填的為準。
+                  </p>
                   <textarea className={`${areaCls} mt-3 min-h-[60px]`} disabled={!canEdit} value={notes.renewal_note}
                     onChange={e => setNotes(n => ({ ...n, renewal_note: e.target.value }))} placeholder="補充說明（選填）" />
                 </Section>

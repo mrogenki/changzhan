@@ -1,8 +1,9 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Download, UserPlus, Edit, Trash2, Shield, Eye, EyeOff, Globe, CalendarDays, FileDown, Bell, AlertTriangle, X, UploadCloud, Loader2, Image as ImageIcon, FileSpreadsheet, Search, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
-import { Member } from '../../types';
-import { CHAPTER_POSITIONS, sortPositions } from '../../constants';
+import { Member, MemberTrafficLight } from '../../types';
+import { CHAPTER_POSITIONS, sortPositions, TRAFFIC_LIGHT_STYLE } from '../../constants';
 import MemberImportModal from './MemberImportModal';
+import { supabase } from '../../supabaseClient';
 
 interface MemberManagerProps {
   members: Member[];
@@ -26,6 +27,19 @@ const MemberManager: React.FC<MemberManagerProps> = ({ members, onAddMember, onU
 
   // 搜尋與排序狀態
   const [searchQuery, setSearchQuery] = useState('');
+
+  // 最新的紅綠燈（PALMS）。來源是 bni-report 上傳的報表，這裡只讀。
+  const [lights, setLights] = useState<Record<number, MemberTrafficLight>>({});
+  const [lightRange, setLightRange] = useState('');
+  useEffect(() => {
+    let alive = true;
+    supabase.from('member_traffic_lights').select('*').then(({ data }) => {
+      if (!alive || !data) return;
+      setLights(Object.fromEntries(data.map((t: MemberTrafficLight) => [t.member_id, t])));
+      setLightRange(data[0]?.date_range ?? '');
+    });
+    return () => { alive = false; };
+  }, []);
   const [sortField, setSortField] = useState<SortField>('member_no');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
 
@@ -344,6 +358,7 @@ const MemberManager: React.FC<MemberManagerProps> = ({ members, onAddMember, onU
                 <SortableHeader field="member_no" label="編號" />
                 <SortableHeader field="group_name" label="組別" />
                 <SortableHeader field="industry_chain" label="產業鏈" />
+                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest" title={lightRange ? `資料區間 ${lightRange}` : ''}>燈號</th>
                 <SortableHeader field="status" label="狀態" />
                 <SortableHeader field="company" label="品牌/公司" />
                 <SortableHeader field="name" label="姓名" />
@@ -389,6 +404,29 @@ const MemberManager: React.FC<MemberManagerProps> = ({ members, onAddMember, onU
                     }`}>
                       {member.industry_chain}
                     </span>
+                  </td>
+                  <td className="px-6 py-4">
+                    {(() => {
+                      const t = lights[Number(member.id)];
+                      if (!t?.light) return <span className="text-gray-300 text-sm">—</span>;
+                      const st = TRAFFIC_LIGHT_STYLE[t.light] ?? { label: t.light, cls: 'bg-gray-100 text-gray-600' };
+                      return (
+                        <span
+                          className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-bold ${st.cls}`}
+                          title={[
+                            lightRange && `資料區間：${lightRange}`,
+                            t.attendance_rate != null && `出席率 ${t.attendance_rate}%`,
+                            t.guests != null && `來賓 ${t.guests}`,
+                            t.one_on_one != null && `一對一 ${t.one_on_one}`,
+                            t.given_refs != null && `引薦出 ${t.given_refs}`,
+                            t.received_refs != null && `引薦入 ${t.received_refs}`,
+                          ].filter(Boolean).join('　')}
+                        >
+                          {st.label}
+                          {t.total_score != null && <span className="font-mono">{t.total_score}</span>}
+                        </span>
+                      );
+                    })()}
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex flex-col items-start gap-1">
