@@ -30,6 +30,7 @@ supabase/
 | `20260922000100_group_leader_self_service.sql` | 小組長欄位、活動發起人欄位 |
 | `20260923000100_member_positions.sql` | 會員分會職務（取代小組長布林欄） |
 | `20260923000200_leadership_meetings.sql` | 執事會：內部活動旗標、會議記錄、待辦 |
+| `20260924000100_meeting_agenda.sql` | 執事會議程 8 段、來賓追蹤、續約追蹤 |
 
 用 Supabase Dashboard 的 SQL Editor 貼上執行即可，不需要 CLI。
 

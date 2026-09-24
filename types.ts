@@ -89,11 +89,40 @@ export interface Activity {
 export interface MeetingMinutes {
     id: number;
     activity_id: number;
-    content?: string | null;    // 討論事項
-    decisions?: string | null;  // 決議
+    /** 對應的例會場次：出缺席報告與來賓分組都以它為準 */
+    regular_meeting_activity_id?: number | null;
+    attendance_note?: string | null;   // 1 出缺席報告補充
+    application_note?: string | null;  // 3 入會申請追蹤
+    guest_note?: string | null;        // 2/4/5 來賓追蹤補充
+    renewal_note?: string | null;      // 6 續約狀況補充
+    process_note?: string | null;      // 7 會議流程優化＆建議事項
+    misc_note?: string | null;         // 8 臨時動議
     created_by?: string | null;
     created_at?: string;
     updated_at?: string;
+}
+
+/** 來賓追蹤：一位來賓一筆，狀況跨週延續。議程的今日／上週／之前是依 visit_date 分組 */
+export interface GuestFollowUp {
+    id: number;
+    guest_name: string;
+    industry?: string | null;
+    group_name?: string | null;
+    member_name?: string | null;
+    interviewer?: string | null;
+    status_note?: string | null;
+    visit_date?: string | null;
+    state: 'tracking' | 'applied' | 'joined' | 'dropped';
+    registration_id?: number | null;
+}
+
+/** 363 續約追蹤：一位會員一筆，滾動更新（到期日與組別讀 members） */
+export interface RenewalNote {
+    member_id: number;
+    status_note?: string | null;
+    light?: number | null;
+    committee?: string | null;
+    guest_count?: number | null;
 }
 
 /** 會議待辦事項 */

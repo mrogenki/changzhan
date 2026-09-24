@@ -116,6 +116,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
               activities={props.activities}
               members={props.members}
               attendance={props.attendance}
+              registrations={props.registrations}
               currentUser={props.currentUser}
               onUpdateAttendance={props.onUpdateAttendance}
               onAddActivity={props.onAddActivity}
