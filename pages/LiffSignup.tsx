@@ -45,6 +45,9 @@ type SheetData = {
   activity: { id: number; title: string; date: string; time: string; location: string } | null;
   head_count: number;
   entries: Entry[];
+  /** 同一場活動從公開報名表進來的人（只有姓名）。他們沒走接龍，所以不能在這裡改／取消 */
+  web_count?: number;
+  web_entries?: { name: string }[];
 };
 
 type Phase =
@@ -306,6 +309,9 @@ const LiffSignup: React.FC = () => {
           <span className="inline-flex items-center gap-1.5 bg-red-50 text-red-600 px-3 py-1.5 rounded-full text-sm font-bold">
             <Users size={15} /> 目前 {data!.head_count} 人
             {sheet.max_people !== null && ` / ${sheet.max_people}`}
+            {(data!.web_count ?? 0) > 0 && (
+              <span className="text-gray-400">（另有 {data!.web_count} 人從網頁報名）</span>
+            )}
           </span>
           {(sheet.fee > 0 || (sheet.member_fee ?? 0) > 0) && (
             <span className="inline-flex items-center gap-1.5 bg-amber-50 text-amber-700 px-3 py-1.5 rounded-full text-sm font-bold">
@@ -354,7 +360,11 @@ const LiffSignup: React.FC = () => {
           報名名單
         </h2>
         {entries.length === 0 ? (
-          <p className="text-gray-300 text-sm text-center py-10">還沒有人報名，你可以是第一個</p>
+          <p className="text-gray-300 text-sm text-center py-10">
+            {(data!.web_count ?? 0) > 0
+              ? '接龍還沒有人，你可以是第一個'
+              : '還沒有人報名，你可以是第一個'}
+          </p>
         ) : (
           <ol className="space-y-2">
             {entries.map((e, i) => (
@@ -395,6 +405,24 @@ const LiffSignup: React.FC = () => {
               </li>
             ))}
           </ol>
+        )}
+
+        {(data!.web_entries?.length ?? 0) > 0 && (
+          <div className="mt-6">
+            <h2 className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-1">
+              從網頁報名
+            </h2>
+            <p className="text-xs text-gray-400 mb-3">
+              這些夥伴是從活動頁報名的，不在接龍裡，你不用重複幫他們 +1。
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {data!.web_entries!.map((w, i) => (
+                <span key={i} className="bg-white border border-gray-100 rounded-xl px-3 py-2 text-sm font-bold text-gray-700">
+                  {w.name}
+                </span>
+              ))}
+            </div>
+          </div>
         )}
       </div>
 

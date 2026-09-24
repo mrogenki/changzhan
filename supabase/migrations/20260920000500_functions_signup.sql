@@ -15,6 +15,8 @@ as $function$
 declare
   v_sheet public.signup_sheets;
   v_entries jsonb;
+  v_web jsonb;
+  v_web_count integer := 0;
   v_activity jsonb;
   v_head_count integer;
 begin
@@ -43,11 +45,19 @@ begin
   select coalesce(sum(1 + e.extra_count), 0) into v_head_count
   from public.signup_entries e where e.sheet_id = v_sheet.id;
 
-  -- 公開頁的日期／時間／地點一律取自綁定的活動，說明欄不需要重打
   if v_sheet.activity_id is not null then
     select jsonb_build_object('id', a.id, 'title', a.title, 'date', a.date, 'time', a.time, 'location', a.location)
       into v_activity
     from public.activities a where a.id = v_sheet.activity_id;
+
+    -- 同一場活動從公開報名表進來的人。只回姓名，不回電話——與 entries 一致。
+    -- 分開成 web_entries 而不是併進 entries：接龍的人可以改／取消自己那筆，
+    -- 網頁報名的人不行，畫面上要分得出來。
+    select coalesce(jsonb_agg(jsonb_build_object('name', r.name) order by r.created_at), '[]'::jsonb),
+           count(*)
+      into v_web, v_web_count
+    from public.registrations r
+    where r."activityId" = v_sheet.activity_id;
   end if;
 
   return jsonb_build_object(
@@ -66,13 +76,16 @@ begin
                 or (v_sheet.deadline is not null and now() > v_sheet.deadline)
     ),
     'activity', v_activity,
+    -- ⚠️ head_count 只算接龍的人：它同時是 public_signup_join 判斷人數上限的基準，
+    --    把網頁報名的人算進去等於改變上限行為。
     'head_count', v_head_count,
-    'entries', v_entries
+    'entries', v_entries,
+    'web_count', coalesce(v_web_count, 0),
+    'web_entries', coalesce(v_web, '[]'::jsonb)
   );
 end;
 $function$;
 
--- 報名／修改。同一個 LINE 帳號在同一張接龍只有一筆，所以這支同時是新增與更新。
 create or replace function public.public_signup_join(
   p_token text, p_line_user_id text, p_display_name text, p_real_name text,
   p_phone text default null::text, p_company text default null::text,
