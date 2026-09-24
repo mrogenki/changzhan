@@ -397,7 +397,20 @@ probe/test 未登入呼叫回 401；**2026-09-24 實際送出成功**，`notific
 讓會員 / 夥伴在 **LINE App 內**把會員名片直接分享給好友或群組，**不經後台、不吃 OA 推播額度**（走 `liff.shareTargetPicker`，訊息由使用者本人送出）。
 
 **組成：**
-- `lib/memberCard.ts` — flex builder：`buildMemberCardMessage`（單張 bubble）、`buildMemberCarouselMessage`（單則 carousel，上限 12）、`buildMemberShareMessages`（拆多則：每則 carousel 12、最多 5 則＝60 位）。版型：大頭照 + 產業別/姓名/職稱·公司/簡介 + 底部按鈕（撥打電話 `tel:` / 看官網 `uri` / 寫信給我 `mailto:`，只顯示有資料的）。
+- `lib/memberCard.ts` — flex builder：`buildMemberCardMessage`（單張 bubble）、
+  `buildMemberCarouselMessage`（單則 carousel，上限 12）、`buildMemberShareMessages`（拆多則）。
+  版型：大頭照 + 產業別/姓名/職稱·公司/簡介 + 底部按鈕（撥打電話 `tel:` / 看官網 `uri` /
+  寫信給我 `mailto:`，只顯示有資料的）＋**「分享這張名片」**。
+- **「分享這張名片」**（2026-09-25 新增）：收到名片的人可以直接往外轉傳。按鈕帶到
+  `https://liff.line.me/<VITE_LIFF_CARD_ID>?member=<id>`，就是既有的 LIFF 名片頁
+  （預覽 + `shareTargetPicker`），所以訊息是轉傳的人自己送出的，**不吃 OA 推播額度**。
+  carousel 裡每張各自帶自己的連結。
+- ⚠️ **LINE 的 10 KB 限制**（踩到才發現）：flex 訊息**每則 JSON 上限 10 KB**，不只是
+  「carousel 最多 12 張」。原本 `buildMemberShareMessages` 只按 12 張切、沒看大小——
+  **實測真實會員資料 9 張就 9.3 KB**，12 張必超過而被 LINE 拒收。現在改成邊塞邊量
+  （預算 9000 bytes，留 1KB 緩衝），實際大約 8 張一則。
+  **已驗證**：用 56 位真實會員資料測 1/9/20/60 位，每則都在上限內（8284〜8451 bytes）。
+  代價是一次能分享的人數從名目上的 60 位降到約 40 位（5 則 × 8 張），放不下的會提示分批。
 - `pages/LiffCard.tsx` — LIFF 頁，**雙模式**：
   - 帶參數（`?member=<id>` 或 `?ids=1,2,3`）→ 呼叫 `public_member_cards` → 預覽 → `shareTargetPicker`。
   - **無參數**（`/liff/card`）→ **多選挑選頁**：讀 `public_member_directory` 顯示可搜尋 / 產業鏈篩選的清單，勾選後抓 `public_member_cards` 組多則訊息一次分享。此無參數網址即 **OA 圖文選單**的入口。

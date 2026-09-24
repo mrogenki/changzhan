@@ -158,7 +158,8 @@ export default function LiffCard() {
     try {
       const { messages, truncated } = buildMemberShareMessages(list);
       if (truncated > 0) {
-        alert(`一次最多分享 60 位,超過的 ${truncated} 位本次不會送出`);
+        // 上限不是固定人數：LINE 限制每則訊息 10KB，所以實際能塞幾位看資料長度
+        alert(`一次能分享的張數受 LINE 的訊息大小限制，這次送出 ${list.length - truncated} 位，剩下的 ${truncated} 位請分批再分享一次`);
       }
       const res = await liff.shareTargetPicker(messages);
       if (res) setPhase({ kind: 'sent' });

@@ -3,7 +3,7 @@
 // 產生可透過 liff.shareTargetPicker() 分享，或經 send-line-message / line-broadcast
 // edge function 推播的 flex 訊息。單張用 bubble，整組用 carousel。
 
-import { CHAPTER_FULL_NAME } from '../chapterConfig';
+import { CHAPTER_FULL_NAME, LIFF_CARD_ID } from '../chapterConfig';
 
 /** 名片所需欄位（對應 public_member_cards RPC 回傳） */
 export interface MemberCardData {
@@ -141,6 +141,22 @@ export function buildMemberCardBubble(m: MemberCardData): any {
     });
   }
 
+  // 「分享這張名片」：收到名片的人可以直接往外轉傳。
+  // 帶去的是 LIFF 名片頁（?member=<id>），那頁本來就會預覽 + shareTargetPicker，
+  // 所以訊息是由轉傳的人自己送出的，不吃 OA 推播額度。
+  if (LIFF_CARD_ID && m.id) {
+    footerContents.push({
+      type: 'button',
+      style: 'link',
+      height: 'sm',
+      action: {
+        type: 'uri',
+        label: '分享這張名片',
+        uri: `https://liff.line.me/${LIFF_CARD_ID}?member=${m.id}`,
+      },
+    });
+  }
+
   const bubble: any = {
     type: 'bubble',
     hero: {
@@ -209,34 +225,60 @@ export function buildMemberCarouselMessage(members: MemberCardData[]): {
 
 /**
  * 把多位會員拆成多則訊息一次分享。
- * LINE 限制：carousel 每則上限 12 bubble、shareTargetPicker 一次上限 5 則。
- * 故最多 12 × 5 = 60 位；超過回傳截斷數。
+ *
+ * LINE 的限制有兩條，**兩條都會擋**：
+ *   · carousel 每則上限 12 bubble
+ *   · **每則 flex 訊息的 JSON 上限 10 KB**
+ *
+ * ⚠️ 原本只按「12 張一則」切，沒看大小。實測真實會員資料**9 張就 9.3 KB**，
+ *    12 張必定超過 10 KB 而被 LINE 拒收（簡介長、照片網址長的人尤其吃空間）。
+ *    所以改成邊塞邊量，超過預算就換下一則。
  */
+const BUBBLE_LIMIT = 12;      // LINE 的 carousel 上限
+const BYTE_BUDGET = 9000;     // 留 1KB 緩衝給 altText 與序列化差異
+const MAX_MSG = 5;            // shareTargetPicker 一次最多 5 則
+
 export function buildMemberShareMessages(members: MemberCardData[]): {
   messages: any[];
   truncated: number;
 } {
-  const PER_MSG = 12;
-  const MAX_MSG = 5;
-  const cap = PER_MSG * MAX_MSG;
-  const used = members.slice(0, cap);
-  const truncated = members.length - used.length;
+  const wrap = (chunk: MemberCardData[], bubbles: any[]) =>
+    chunk.length === 1
+      ? buildMemberCardMessage(chunk[0])
+      : {
+          type: 'flex',
+          altText: `${CHAPTER_FULL_NAME}會員名片（${chunk.length} 位）`,
+          contents: { type: 'carousel', contents: bubbles },
+        };
 
   const messages: any[] = [];
-  for (let i = 0; i < used.length; i += PER_MSG) {
-    const chunk = used.slice(i, i + PER_MSG);
-    messages.push(
-      chunk.length === 1
-        ? buildMemberCardMessage(chunk[0])
-        : {
-            type: 'flex',
-            altText: `${CHAPTER_FULL_NAME}會員名片（${used.length} 位）`,
-            contents: {
-              type: 'carousel',
-              contents: chunk.map(buildMemberCardBubble),
-            },
-          }
-    );
+  let chunk: MemberCardData[] = [];
+  let bubbles: any[] = [];
+  let used = 0;
+
+  const flush = () => {
+    if (chunk.length === 0) return;
+    messages.push(wrap(chunk, bubbles));
+    chunk = [];
+    bubbles = [];
+  };
+
+  for (const m of members) {
+    if (messages.length >= MAX_MSG) break;
+    const bubble = buildMemberCardBubble(m);
+    const nextBubbles = [...bubbles, bubble];
+    const tooBig = JSON.stringify(wrap([...chunk, m], nextBubbles)).length > BYTE_BUDGET;
+
+    if (chunk.length > 0 && (tooBig || nextBubbles.length > BUBBLE_LIMIT)) {
+      flush();
+      if (messages.length >= MAX_MSG) break;
+    }
+    chunk.push(m);
+    bubbles.push(bubble);
+    used++;
   }
-  return { messages, truncated };
+  flush();
+
+  // 超出 5 則放不下的部分
+  return { messages: messages.slice(0, MAX_MSG), truncated: Math.max(0, members.length - used) };
 }
