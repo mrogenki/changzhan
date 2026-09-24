@@ -352,8 +352,17 @@ npm run preview    # 本機預覽 build
 - **`line-notify-registration` 仍部署著但已無人呼叫**，後台那塊 LINE 設定標成「已停用」並保留值，
   要改回 LINE 只要把 `App.tsx` 兩處 invoke 的名字換回去。
 
+⚠️ **設定時一定會踩到的坑：bot 的隱私模式預設是開的**，所以 bot **看不到群組裡的一般訊息**，
+`getUpdates` 回空的、「找出我的 chat id」找不到任何聊天室。兩種解法：
+- 最快：在群組裡傳一則 `/start@<bot名稱>`——指名給 bot 的指令，隱私模式開著也收得到
+- 或在 BotFather 傳 `/setprivacy` → 選該 bot → Disable，**然後把 bot 退出群組再重新加入**
+  （設定只對之後加入的群組生效）
+
+probe 找不到聊天室時會自己查 `getMe` 與 `getWebhookInfo`，依實際狀態回具體指示
+（webhook 攔走 / 不能加入群組 / 隱私模式 / 都正常但沒收到訊息），不用瞎猜。
+
 **驗證狀況**：未設定 token 時報名通知回 `{ok:true, skipped:"no_bot_token"}` 並寫入紀錄；
-probe/test 未登入呼叫回 401。**實際送出到 Telegram 沒辦法在這裡測**——需要你先建 bot 並設 token。
+probe/test 未登入呼叫回 401；**2026-09-24 實際送出成功**，`notification_log` 有 `sent` 紀錄。
 
 **報名通知流程：** `App.tsx::handleRegister` insert 完 `registrations` 後 fire-and-forget invoke `line-notify-registration`，失敗不影響使用者報名動作。
 

@@ -88,6 +88,9 @@ supabase functions deploy <name> --project-ref <新專案 ref>
 
 - `LINE_CHANNEL_ACCESS_TOKEN`、`LINE_CHANNEL_SECRET`
 - `TELEGRAM_BOT_TOKEN`（報名通知用；沒設就安靜跳過）
+  ⚠️ 新分會設定時：bot 隱私模式預設開啟，**看不到群組裡的一般訊息**，
+  所以抓不到 chat id。在群組傳 `/start@<bot名稱>`，或用 BotFather 的
+  `/setprivacy` 關掉後把 bot 退出群組再加回去。
 - `RESEND_API_KEY`、`RESEND_FROM`
 - `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` 由 Supabase 自動注入，不用自己設
 
