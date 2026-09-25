@@ -187,6 +187,23 @@ async function formatSignupList(supabase: any): Promise<string> {
     .in("sheet_id", openSheets.map((s: any) => s.id))
     .order("created_at", { ascending: true });
 
+  // 同一場活動也可能有人從公開頁的報名表進來（不走接龍）。
+  // 不加進來的話「目前 N 人」會少算，甚至明明有人報名卻回「還沒有人報名」。
+  const webByActivity = new Map<string, string[]>();
+  if (actIds.length > 0) {
+    const { data: regs } = await supabase
+      .from("registrations")
+      .select('name, "activityId", created_at')
+      .in("activityId", actIds)
+      .order("created_at", { ascending: true });
+    (regs ?? []).forEach((r: any) => {
+      const k = String(r.activityId);
+      if (!webByActivity.has(k)) webByActivity.set(k, []);
+      webByActivity.get(k)!.push(r.name);
+    });
+  }
+  const webOf = (s: any) => (s.activity_id ? webByActivity.get(String(s.activity_id)) ?? [] : []);
+
   const entriesOf = (sheetId: number) =>
     (allEntries ?? []).filter((e: any) => e.sheet_id === sheetId);
   const headOf = (sheetId: number) =>
@@ -200,7 +217,9 @@ async function formatSignupList(supabase: any): Promise<string> {
       const when = a?.date ? `\n  📅 ${fmtActivityDate(a.date, a.time)}` : "";
       const where = a?.location ? `\n  📍 ${a.location}` : "";
       const deadline = s.deadline ? `\n  ⏰ 截止 ${fmtDeadline(s.deadline)}` : "";
-      return `▸ ${s.title}${when}${where}\n  👥 ${headOf(s.id)} 人${cap}${deadline}\n  🔗 ${signupUrl(s.token)}`;
+      const web = webOf(s).length;
+      const webNote = web > 0 ? `（含網頁報名 ${web}）` : "";
+      return `▸ ${s.title}${when}${where}\n  👥 ${headOf(s.id) + web} 人${cap}${webNote}${deadline}\n  🔗 ${signupUrl(s.token)}`;
     });
     return `📋 目前有 ${openSheets.length} 張接龍進行中\n\n${blocks.join("\n\n")}\n\n點連結即可報名並查看完整名單。`;
   }
@@ -213,10 +232,17 @@ async function formatSignupList(supabase: any): Promise<string> {
   const when = act?.date ? `\n📅 ${fmtActivityDate(act.date, act.time)}` : "";
   const where = act?.location ? `\n📍 ${act.location}` : "";
   const deadline = sheet.deadline ? `\n⏰ 截止：${fmtDeadline(sheet.deadline)}` : "";
-  const head = `📋 ${sheet.title}${when}${where}${feeLine(sheet)}\n👥 目前 ${headOf(sheet.id)} 人${cap}${deadline}`;
+  const webNames = webOf(sheet);
+  const total = headOf(sheet.id) + webNames.length;
+  const head = `📋 ${sheet.title}${when}${where}${feeLine(sheet)}\n👥 目前 ${total} 人${cap}${deadline}`;
+  // 網頁報名的人不在接龍裡，另外列一段，並提醒不用重複幫他們 +1
+  const webBlock = webNames.length > 0
+    ? `\n\n📝 從網頁報名（${webNames.length}）\n　${webNames.join("、")}\n（這些夥伴不在接龍裡，不用重複 +1）`
+    : "";
 
   if (rows.length === 0) {
-    return `${head}\n\n（還沒有人報名）\n\n🔗 我要報名：${signupUrl(sheet.token)}`;
+    const empty = webNames.length > 0 ? "（接龍還沒有人，可直接 +1）" : "（還沒有人報名）";
+    return `${head}\n\n${empty}${webBlock}\n\n🔗 我要報名：${signupUrl(sheet.token)}`;
   }
 
   // 組別取自會員資料；來賓與沒設組別的會員歸「未分組」
@@ -247,7 +273,7 @@ async function formatSignupList(supabase: any): Promise<string> {
       return `▪ ${g}（${heads}人）\n　${names.join("、")}`;
     });
 
-  return `${head}\n\n${lines.join("\n")}\n\n🔗 我要報名：${signupUrl(sheet.token)}`;
+  return `${head}\n\n${lines.join("\n")}${webBlock}\n\n🔗 我要報名：${signupUrl(sheet.token)}`;
 }
 
 function helpMessage(): string {
