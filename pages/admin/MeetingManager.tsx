@@ -243,14 +243,19 @@ const MeetingManager: React.FC<Props> = ({
       .sort((a, b) => String(a.end_date).localeCompare(String(b.end_date)) || String(a.name).localeCompare(String(b.name), 'zh-Hant'))
       .map(m => {
         const note = renewalNotes[Number(m.id)];
+        const tl = lights[Number(m.id)];
         return {
           member_id: Number(m.id), name: m.name ?? '', end_date: m.end_date ?? '', group_name: m.group_name,
           status_note: note?.status_note ?? '',
-          // 沒手動填就用最新 PALMS 的分數（手填會蓋過自動值）
-          light: note?.light ?? lights[Number(m.id)]?.total_score ?? null,
+          // 燈號與來賓數都來自同一份半年報表（手填會蓋過自動值）
+          light: note?.light ?? tl?.total_score ?? null,
           committee: note?.committee ?? '',
-          // 沒手動填就用系統算的：該會員引薦過的報名筆數
-          guest_count: note?.guest_count ?? registrations.filter(r => (r.referrer ?? '').trim() === (m.name ?? '').trim()).length,
+          // ⚠️ 原本用 registrations.referrer 算，但網頁報名的引薦人幾乎都沒填，
+          //    算出來幾乎都是 0（實測 PALMS 21 位的人這裡算成 1）。改用 PALMS 的數字，
+          //    沒有 PALMS 資料時才退回自己算。
+          guest_count: note?.guest_count
+            ?? tl?.guests
+            ?? registrations.filter(r => (r.referrer ?? '').trim() === (m.name ?? '').trim()).length,
         };
       });
   }, [activeMembers, renewalNotes, registrations, selected, lights]);
@@ -579,7 +584,8 @@ const MeetingManager: React.FC<Props> = ({
                 </Section>
 
                 {/* 6 續約 */}
-                <Section num={6} title={AGENDA[5]} hint="自動列出三個月內到期的會員">
+                <Section num={6} title={AGENDA[5]}
+                  hint={`自動列出三個月內到期的會員${lightRange ? `／燈號為半年報表 ${lightRange}` : ''}`}>
                   {renewals.length === 0 ? (
                     <p className="text-sm text-gray-400 py-2">未來三個月沒有會籍到期的會員。</p>
                   ) : (
@@ -622,8 +628,9 @@ const MeetingManager: React.FC<Props> = ({
                     </div>
                   )}
                   <p className="text-xs text-gray-400 mt-2">
-                    來賓數預設是系統依「引薦人」算的，可以直接改成 PALMS 的數字。
-                    燈號自動帶入最新紅綠燈報表{lightRange ? `（${lightRange}）` : ''}的分數，手動填過的以你填的為準。
+                    <strong>燈號與來賓數取自最新的半年紅綠燈報表</strong>
+                    {lightRange ? `（${lightRange}）` : ''}——BNI 的燈號本來就是半年累計，
+                    週報／月報沒有燈號。手動填過的欄位以你填的為準。
                   </p>
                   <textarea className={`${areaCls} mt-3 min-h-[60px]`} disabled={!canEdit} value={notes.renewal_note}
                     onChange={e => setNotes(n => ({ ...n, renewal_note: e.target.value }))} placeholder="補充說明（選填）" />

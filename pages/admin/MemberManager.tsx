@@ -283,7 +283,14 @@ const MemberManager: React.FC<MemberManagerProps> = ({ members, onAddMember, onU
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <h1 className="text-2xl font-bold">會員資料管理</h1>
+        <div>
+          <h1 className="text-2xl font-bold">會員資料管理</h1>
+          {lightRange && (
+            <p className="text-xs text-gray-400 mt-1">
+              燈號來自 bni-report 上傳的半年紅綠燈報表：{lightRange}
+            </p>
+          )}
+        </div>
         <div className="flex gap-2 flex-wrap">
           <button 
             onClick={() => setIsNotificationOpen(true)}
@@ -358,7 +365,10 @@ const MemberManager: React.FC<MemberManagerProps> = ({ members, onAddMember, onU
                 <SortableHeader field="member_no" label="編號" />
                 <SortableHeader field="group_name" label="組別" />
                 <SortableHeader field="industry_chain" label="產業鏈" />
-                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest" title={lightRange ? `資料區間 ${lightRange}` : ''}>燈號</th>
+                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap"
+                  title={lightRange ? `半年紅綠燈報表 ${lightRange}` : ''}>
+                  燈號<span className="normal-case font-medium text-gray-300">（半年）</span>
+                </th>
                 <SortableHeader field="status" label="狀態" />
                 <SortableHeader field="company" label="品牌/公司" />
                 <SortableHeader field="name" label="姓名" />
