@@ -34,6 +34,7 @@ supabase/
 | `20260924000200_notification_log.sql` | 通知發送紀錄（Telegram） |
 | `20260924000300_merge_activity_attendees.sql` | 合併網頁報名與接龍名單的 view |
 | `20260925000100_member_traffic_lights.sql` | 會員紅綠燈（**需要 bni-report 的表，新分會可跳過**） |
+| `20261002000100_drop_user_roles_jwt_sync.sql` | 停掉 user_roles→JWT 同步（權限只認 admins） |
 
 用 Supabase Dashboard 的 SQL Editor 貼上執行即可，不需要 CLI。
 

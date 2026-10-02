@@ -65,8 +65,15 @@
   「資料匯入／組別管理」
 - 有 1 位**已不在幹部名冊**的帳號，JWT 仍是 `editor`，權限還在——正是那次收斂想修掉的漏洞
 
-處理方式是**清掉 `auth.users.raw_app_meta_data` 裡的 `role`**，讓前端 fallback 到
-只認名冊的那條路；清完該使用者要重新登入。
+**已於 2026-10-02 處理**：移除 `user_roles` 上的 `on_user_role_changed` trigger，
+並清掉所有帳號 JWT 裡的 `role`（14 筆 → 0 筆）。現在權限一律回到 admins 這個單一來源，
+名冊改了就生效，不會再被舊 JWT 蓋過。**使用者要重新登入才會拿到新的 JWT。**
+
+清完的結果：admin 1 位、editor 12 位（名冊上的「管理員＋可編輯」）、
+1 位不在名冊的帳號失去權限。
+
+⚠️ 萬一有人因此進不去，檢查順序是：① 他在不在 `admins`；② `can_edit` 是不是 false；
+③ 有沒有重新登入。**不要再往 JWT 塞 role**——那等於把剛拔掉的後門裝回去。
 
 ⚠️ **動 RLS 政策或 SECURITY DEFINER functions 前要先檢查 bni-report 是否依賴**，反之亦然。
 
