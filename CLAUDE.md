@@ -52,6 +52,22 @@
 - **共用 tables**：`user_roles`（共用 RBAC）
 - **共用 functions**：`current_user_role()` SECURITY DEFINER（兩個系統的 RLS 都依賴此函式）
 
+**⚠️ 權限只有一個來源：分會幹部名冊 `admins`**（2026-09-21 由 bni-report 收斂）。
+`user_roles` 與 JWT 的 `app_metadata.role` **都已不再影響權限**，bni-report 也把
+「使用者管理」頁移除了——人員異動一律在 changzhan 後台 `/admin/users` 做。
+對應關係（兩邊必須逐字一致）：總管理員→admin、管理員→editor（`can_edit=false` 則 viewer）、
+其他→viewer、不在名冊→無權限。
+
+⚠️ **殘留的坑（2026-10-02 實際踩到）**：bni-report 前端**仍然優先相信 JWT 裡的
+`app_metadata.role`**，只有 JWT 沒有 role 時才去查 `admins`。而 `user_roles` 上
+還掛著 `sync_role_to_jwt` trigger。所以舊的 JWT role 會**蓋過**幹部名冊：
+- 11 位幹部（名冊是「管理員＋可編輯」）的 JWT 寫著 `viewer`，在引薦單報告看不到
+  「資料匯入／組別管理」
+- 有 1 位**已不在幹部名冊**的帳號，JWT 仍是 `editor`，權限還在——正是那次收斂想修掉的漏洞
+
+處理方式是**清掉 `auth.users.raw_app_meta_data` 裡的 `role`**，讓前端 fallback 到
+只認名冊的那條路；清完該使用者要重新登入。
+
 ⚠️ **動 RLS 政策或 SECURITY DEFINER functions 前要先檢查 bni-report 是否依賴**，反之亦然。
 
 ### 統一入口（不合併程式碼）

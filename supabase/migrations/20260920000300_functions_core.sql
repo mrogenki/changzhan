@@ -32,11 +32,14 @@ as $function$
   );
 $function$;
 
--- ⚠️ 以下三支與 bni-report 共用（依賴 user_roles 表）。
---    **實測踩到**：乾淨的新專案沒有 user_roles，函式建得起來（plpgsql 不會在建立時
---    解析表名），但一被呼叫就噴 relation "public.user_roles" does not exist。
---    而 member_aliases 的 RLS 政策就會呼叫 current_user_role()，等於新分會一用就炸。
---    所以這裡用 to_regclass 檢查表存在與否，不存在就跳過那段。
+-- ⚠️ 權限只有一個來源：分會幹部名冊（admins）。
+--    bni-report（引薦單報告）用的是同一支函式，前端的 chapterRoleToReportRole()
+--    必須與這裡逐字一致，否則會出現「畫面顯示可編輯、按下去被 RLS 擋掉」。
+--
+--    歷史：早期還有 user_roles 與 JWT 兩層 fallback，因為當時有 5 筆 admins 的
+--    email 還是舊制 `<手機>@changzhan.local`。email 遷移完成後，bni-report 於
+--    2026-09-21 把 fallback 拿掉——**留著反而有害**：實際發生過一位已從幹部名冊
+--    移除的人，仍靠 user_roles 保有 editor，可以上傳／刪除 PALMS 資料。
 create or replace function public.current_user_role()
  returns text
  language plpgsql
@@ -44,9 +47,8 @@ create or replace function public.current_user_role()
  set search_path to 'public'
 as $function$
 declare
-  chapter_role  text;
-  chapter_edit  boolean;
-  fallback_role text;
+  chapter_role text;
+  chapter_edit boolean;
 begin
   select a.role, a.can_edit
     into chapter_role, chapter_edit
@@ -54,25 +56,17 @@ begin
   where lower(a.email) = lower(coalesce(auth.jwt() ->> 'email', ''))
   limit 1;
 
-  if chapter_role is not null then
-    if chapter_role = '總管理員' then
-      return 'admin';
-    elsif chapter_role = '管理員' then
-      return case when chapter_edit is false then 'viewer' else 'editor' end;
-    else
-      return 'viewer';
-    end if;
+  if chapter_role is null then
+    return null;          -- 不是分會幹部就沒有任何權限
   end if;
 
-  -- 不在 admins：可能是 email 還沒從舊制 <手機>@changzhan.local 遷移，
-  -- 用 user_roles 接住（等 email 遷移完就能拿掉這段）。
-  -- 新分會沒有這張表，to_regclass 會回 null，直接回 null 當作「沒有權限」。
-  if to_regclass('public.user_roles') is null then
-    return null;
+  if chapter_role = '總管理員' then
+    return 'admin';
+  elsif chapter_role = '管理員' then
+    return case when chapter_edit is false then 'viewer' else 'editor' end;
+  else
+    return 'viewer';      -- 工作人員
   end if;
-  execute 'select role from public.user_roles where user_id = auth.uid() limit 1'
-    into fallback_role;
-  return fallback_role;
 end;
 $function$;
 
