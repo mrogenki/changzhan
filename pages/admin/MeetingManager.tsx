@@ -129,12 +129,58 @@ const MeetingManager: React.FC<Props> = ({
     return regularMeetings.find(a => String(a.date) < String(linked.date)) ?? null;
   }, [linked, regularMeetings]);
 
+  // 組名排序與接龍名單、報到管理同一套：1→2→10→20→三尊，沒設組別的排最後
+  const GROUPLESS = '（未分組）';
+  const groupOf = (m: Member) => (m.group_name || '').trim() || GROUPLESS;
+  const byGroup = (a: Member, b: Member) => {
+    const ga = groupOf(a), gb = groupOf(b);
+    if (ga !== gb) {
+      if (ga === GROUPLESS) return 1;
+      if (gb === GROUPLESS) return -1;
+      return ga.localeCompare(gb, 'zh-Hant', { numeric: true });
+    }
+    return String(a.name ?? '').localeCompare(String(b.name ?? ''), 'zh-Hant');
+  };
+
   const expected = useMemo(
     () => members.filter(m => (m.status === undefined || m.status === 'active')
       && (m.positions ?? []).some(p => LEADERSHIP_MEETING_POSITIONS.includes(p)))
-      .sort((a, b) => Number(a.member_no ?? 0) - Number(b.member_no ?? 0)),
+      .sort(byGroup),
     [members],
   );
+
+  // 版面：左欄執事、右欄導師，主席／副主席／秘財獨立放最下方。
+  // 目前沒有人同時是執事與導師；真的出現時以執事為準（先比對執事），不會重複列出。
+  const TOP_POSITIONS = ['主席', '副主席', '秘財'];
+  const signInGroups = useMemo(() => {
+    const has = (m: Member, p: string) => (m.positions ?? []).includes(p);
+    const tops = expected.filter(m => TOP_POSITIONS.some(p => has(m, p)));
+    const rest = expected.filter(m => !tops.includes(m));
+    const deacons = rest.filter(m => has(m, '執事'));
+    const mentors = rest.filter(m => has(m, '導師') && !deacons.includes(m));
+    const others = rest.filter(m => !deacons.includes(m) && !mentors.includes(m));
+
+    // 依小組把執事與導師配成一列，左右才對得齊（第 N 組的執事與導師同一行）。
+    // 某一組缺其中一邊就留白——那本身也是資訊（例如第 10、13 組沒有導師）。
+    const groups = Array.from(new Set([...deacons, ...mentors].map(groupOf)))
+      .sort((a, b) => {
+        if (a === b) return 0;
+        if (a === GROUPLESS) return 1;
+        if (b === GROUPLESS) return -1;
+        return a.localeCompare(b, 'zh-Hant', { numeric: true });
+      });
+    const pairs = groups.map(g => ({
+      group: g,
+      deacon: deacons.find(m => groupOf(m) === g) ?? null,
+      mentor: mentors.find(m => groupOf(m) === g) ?? null,
+    }));
+    // 同一組有兩位以上執事／導師時，多出來的接在後面單獨成列
+    const extras = [
+      ...deacons.filter(m => pairs.find(p => p.deacon?.id === m.id) === undefined),
+      ...mentors.filter(m => pairs.find(p => p.mentor?.id === m.id) === undefined),
+    ];
+    return { tops, deacons, mentors, others, pairs, extras };
+  }, [expected]);
   const activeMembers = useMemo(
     () => members.filter(m => m.status === undefined || m.status === 'active'), [members],
   );
@@ -329,6 +375,70 @@ const MeetingManager: React.FC<Props> = ({
   const statusOf = (memberId: string | number) =>
     attendance.find(r => String(r.activity_id) === selectedId && String(r.member_id) === String(memberId))?.status;
 
+  /** 一個人的簽到格：姓名 + 職務 + 三顆狀態鈕 */
+  const SignInCell: React.FC<{ m: Member | null }> = ({ m }) => {
+    if (!m) return <div className="py-2 text-sm text-gray-200">—</div>;
+    const st = statusOf(m.id);
+    return (
+      <div className="flex items-center justify-between py-2 gap-3">
+        <div className="min-w-0">
+          <p className="font-bold text-gray-900 truncate">{m.name}</p>
+          <p className="text-xs text-gray-400 truncate">{(m.positions ?? []).join('、')}</p>
+        </div>
+        <div className="flex gap-1 shrink-0">
+          {STATUS_OPTIONS.map(opt => (
+            <button key={opt.value} disabled={!canEdit}
+              onClick={() => selected && onUpdateAttendance(String(selected.id), String(m.id), opt.value)}
+              className={`px-2.5 py-1.5 rounded-lg text-xs font-bold disabled:opacity-40 ${st === opt.value ? opt.cls : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  /** 簽到的一欄：標題 + 人數，每列顯示小組編號、姓名、職務與三顆狀態鈕 */
+  const SignInColumn: React.FC<{ title: string; rows: Member[]; columns?: boolean }> = ({ title, rows, columns }) => {
+    if (rows.length === 0) return null;
+    const here = rows.filter(m => statusOf(m.id) === AttendanceStatus.PRESENT).length;
+    return (
+      <div>
+        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">
+          {title}
+          <span className="ml-2 text-gray-300">{here}/{rows.length}</span>
+        </p>
+        <div className={columns ? 'grid grid-cols-1 md:grid-cols-2 gap-x-8' : ''}>
+          {rows.map(m => {
+            const st = statusOf(m.id);
+            return (
+              <div key={m.id} className="flex items-center justify-between py-2 gap-3 border-b border-gray-50 last:border-0">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="w-9 shrink-0 text-center text-xs font-bold text-gray-500 bg-gray-100 rounded px-1 py-0.5">
+                    {groupOf(m) === GROUPLESS ? '—' : groupOf(m)}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="font-bold text-gray-900 truncate">{m.name}</p>
+                    <p className="text-xs text-gray-400 truncate">{(m.positions ?? []).join('、')}</p>
+                  </div>
+                </div>
+                <div className="flex gap-1 shrink-0">
+                  {STATUS_OPTIONS.map(opt => (
+                    <button key={opt.value} disabled={!canEdit}
+                      onClick={() => selected && onUpdateAttendance(String(selected.id), String(m.id), opt.value)}
+                      className={`px-2.5 py-1.5 rounded-lg text-xs font-bold disabled:opacity-40 ${st === opt.value ? opt.cls : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
   const toGuestRows = (rows: GuestFollowUp[]): GuestRow[] => rows.map(g => ({ ...g }));
 
   const report = (): MeetingReport => ({
@@ -488,28 +598,42 @@ const MeetingManager: React.FC<Props> = ({
                       沒有人有執事會的職務。請先到「會員管理」設定職務（{LEADERSHIP_MEETING_POSITIONS.join('、')}）。
                     </p>
                   ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 divide-y md:divide-y-0 divide-gray-50">
-                      {expected.map(m => {
-                        const st = statusOf(m.id);
-                        return (
-                          <div key={m.id} className="flex items-center justify-between py-2 gap-3">
-                            <div className="min-w-0">
-                              <p className="font-bold text-gray-900 truncate">{m.name}</p>
-                              <p className="text-xs text-gray-400 truncate">{(m.positions ?? []).join('、')}</p>
-                            </div>
-                            <div className="flex gap-1 shrink-0">
-                              {STATUS_OPTIONS.map(opt => (
-                                <button key={opt.value} disabled={!canEdit}
-                                  onClick={() => onUpdateAttendance(String(selected.id), String(m.id), opt.value)}
-                                  className={`px-2.5 py-1.5 rounded-lg text-xs font-bold disabled:opacity-40 ${st === opt.value ? opt.cls : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>
-                                  {opt.label}
-                                </button>
-                              ))}
+                    <>
+                      {/* 一列一組：左邊執事、右邊導師，組別在最左 */}
+                      <div className="hidden md:grid grid-cols-[3rem_1fr_1fr] gap-x-6 pb-1 text-xs font-bold text-gray-400 uppercase tracking-widest">
+                        <span>組別</span>
+                        <span>執事 <span className="text-gray-300">{signInGroups.deacons.filter(m => statusOf(m.id) === AttendanceStatus.PRESENT).length}/{signInGroups.deacons.length}</span></span>
+                        <span>導師 <span className="text-gray-300">{signInGroups.mentors.filter(m => statusOf(m.id) === AttendanceStatus.PRESENT).length}/{signInGroups.mentors.length}</span></span>
+                      </div>
+                      <div className="divide-y divide-gray-50">
+                        {signInGroups.pairs.map(p => (
+                          <div key={p.group} className="grid grid-cols-[3rem_1fr] md:grid-cols-[3rem_1fr_1fr] gap-x-6 items-center">
+                            <span className="text-sm font-bold text-gray-500 bg-gray-100 rounded px-1 py-0.5 text-center my-2">
+                              {p.group === GROUPLESS ? '—' : p.group}
+                            </span>
+                            <SignInCell m={p.deacon} />
+                            <div className="col-start-2 md:col-start-3">
+                              <SignInCell m={p.mentor} />
                             </div>
                           </div>
-                        );
-                      })}
-                    </div>
+                        ))}
+                      </div>
+                      {signInGroups.extras.length > 0 && (
+                        <div className="mt-4 pt-4 border-t">
+                          <SignInColumn title="同組其他執事／導師" rows={signInGroups.extras} columns />
+                        </div>
+                      )}
+                      {signInGroups.others.length > 0 && (
+                        <div className="mt-4 pt-4 border-t">
+                          <SignInColumn title="其他職務" rows={signInGroups.others} columns />
+                        </div>
+                      )}
+                      {signInGroups.tops.length > 0 && (
+                        <div className="mt-4 pt-4 border-t">
+                          <SignInColumn title={TOP_POSITIONS.join('・')} rows={signInGroups.tops} columns />
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
 
