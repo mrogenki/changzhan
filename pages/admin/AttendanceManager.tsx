@@ -28,6 +28,9 @@ const AttendanceManager: React.FC<AttendanceManagerProps> = ({ activities, membe
 
   const [selectedActivityId, setSelectedActivityId] = useState(defaultActivityId);
   const [searchTerm, setSearchTerm] = useState('');
+  // 依組別檢視：組長代為確認自己那組時最常用
+  const [groupFilter, setGroupFilter] = useState('all');
+  const [groupBy, setGroupBy] = useState(false);
 
   useEffect(() => {
     if (!selectedActivityId && defaultActivityId) {
@@ -36,6 +39,20 @@ const AttendanceManager: React.FC<AttendanceManagerProps> = ({ activities, membe
   }, [defaultActivityId]);
 
   const activeMembers = members.filter(m => m.status === undefined || m.status === 'active');
+
+  // 組名排序與接龍名單同一套：1→2→10→20→三尊，沒設組別的排最後
+  const GROUPLESS = '未分組';
+  const groupOf = (m: Member) => (m.group_name || '').trim() || GROUPLESS;
+  const compareGroup = (a: string, b: string) => {
+    if (a === b) return 0;
+    if (a === GROUPLESS) return 1;
+    if (b === GROUPLESS) return -1;
+    return a.localeCompare(b, 'zh-Hant', { numeric: true });
+  };
+  const groupOptions = React.useMemo(
+    () => Array.from(new Set(activeMembers.map(groupOf))).sort(compareGroup),
+    [activeMembers],
+  );
 
   const sortedMembers = [...activeMembers].sort((a, b) => {
     const valA = a.member_no !== undefined && a.member_no !== null ? String(a.member_no) : '';
@@ -47,10 +64,36 @@ const AttendanceManager: React.FC<AttendanceManagerProps> = ({ activities, membe
   });
 
   const filteredMembers = sortedMembers.filter(m =>
-    m.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    m.company.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (m.member_no && String(m.member_no).includes(searchTerm))
+    (groupFilter === 'all' || groupOf(m) === groupFilter) &&
+    (m.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+     m.company.toLowerCase().includes(searchTerm.toLowerCase()) ||
+     (m.member_no && String(m.member_no).includes(searchTerm)))
   );
+
+  // 依組別檢視時把名單切成一段一段，每段前面插一條小標
+  const sections = React.useMemo(() => {
+    if (!groupBy) return [{ group: '', rows: filteredMembers }];
+    const buckets = new Map<string, Member[]>();
+    filteredMembers.forEach(m => {
+      const g = groupOf(m);
+      if (!buckets.has(g)) buckets.set(g, []);
+      buckets.get(g)!.push(m);
+    });
+    return Array.from(buckets.keys()).sort(compareGroup)
+      .map(group => ({ group, rows: buckets.get(group)! }));
+  }, [groupBy, filteredMembers]);
+
+  /** 某一組的到場人數：出席＋遲到＋代理都算人到了，與執事會的 P 算法一致 */
+  const groupStat = (rows: Member[]) => {
+    const here = rows.filter(m => {
+      const st = attendance.find(r => String(r.activity_id) === String(selectedActivityId)
+        && String(r.member_id) === String(m.id))?.status;
+      return st === AttendanceStatus.PRESENT || st === AttendanceStatus.LATE || st === AttendanceStatus.SUBSTITUTE;
+    }).length;
+    const unmarked = rows.filter(m => !attendance.some(r =>
+      String(r.activity_id) === String(selectedActivityId) && String(r.member_id) === String(m.id))).length;
+    return { here, total: rows.length, unmarked };
+  };
 
   const stats = React.useMemo(() => {
     const records = attendance.filter(r => String(r.activity_id) === String(selectedActivityId));
@@ -234,15 +277,35 @@ const AttendanceManager: React.FC<AttendanceManagerProps> = ({ activities, membe
       </div>
 
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-        <div className="p-4 border-b border-gray-100 bg-gray-50/50 flex items-center gap-2">
-          <Search size={18} className="text-gray-400" />
-          <input
-            type="text"
-            placeholder="搜尋會員編號、姓名或公司..."
-            value={searchTerm}
-            onChange={e => setSearchTerm(e.target.value)}
-            className="bg-transparent outline-none w-full text-sm"
-          />
+        <div className="p-4 border-b border-gray-100 bg-gray-50/50 flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2 flex-grow min-w-[200px]">
+            <Search size={18} className="text-gray-400" />
+            <input
+              type="text"
+              placeholder="搜尋會員編號、姓名或公司..."
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              className="bg-transparent outline-none w-full text-sm"
+            />
+          </div>
+          <select
+            value={groupFilter}
+            onChange={e => setGroupFilter(e.target.value)}
+            className="border rounded-lg px-3 py-2 text-sm bg-white font-bold text-gray-700"
+          >
+            <option value="all">全部組別</option>
+            {groupOptions.map(g => (
+              <option key={g} value={g}>{g === GROUPLESS ? g : `第 ${g} 組`}</option>
+            ))}
+          </select>
+          <button
+            onClick={() => setGroupBy(v => !v)}
+            className={`px-3 py-2 rounded-lg text-sm font-bold border transition-colors ${
+              groupBy ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-600 hover:bg-gray-50'
+            }`}
+          >
+            依組別分段
+          </button>
         </div>
 
         <div className="overflow-x-auto max-h-[600px]">
@@ -257,7 +320,25 @@ const AttendanceManager: React.FC<AttendanceManagerProps> = ({ activities, membe
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {filteredMembers.map(member => {
+              {sections.map(section => (
+                <React.Fragment key={section.group || 'all'}>
+                  {section.group && (() => {
+                    const st = groupStat(section.rows);
+                    return (
+                      <tr className="bg-gray-100/80">
+                        <td colSpan={5} className="px-6 py-2">
+                          <span className="font-bold text-gray-800">
+                            {section.group === GROUPLESS ? GROUPLESS : `第 ${section.group} 組`}
+                          </span>
+                          <span className="ml-3 text-xs text-gray-500">
+                            到場 {st.here}/{st.total}
+                            {st.unmarked > 0 && <span className="text-red-500 font-bold">　未點名 {st.unmarked}</span>}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })()}
+                  {section.rows.map(member => {
                  const record = getMemberRecord(member.id);
                  const currentStatus = record?.status;
                  const updatedAt = record?.updated_at;
@@ -307,7 +388,9 @@ const AttendanceManager: React.FC<AttendanceManagerProps> = ({ activities, membe
                     </td>
                   </tr>
                  );
-              })}
+                  })}
+                </React.Fragment>
+              ))}
             </tbody>
           </table>
         </div>
