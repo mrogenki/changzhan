@@ -68,8 +68,13 @@ const MemberManager: React.FC<MemberManagerProps> = ({ members, onAddMember, onU
       landline: formData.get('landline') as string,
       address: formData.get('address') as string,
       group_name: formData.get('group_name') as string,
-      // checkbox 全部同名 position，getAll 拿到所有勾起來的
-      positions: sortPositions(formData.getAll('position') as string[]),
+      // checkbox 全部同名 position，getAll 拿到所有勾起來的。
+      // ⚠️ 只有「表單真的有職務欄位」時才覆寫（靠 positions_present 這個隱藏欄位判斷）。
+      //    不然舊版頁面（還沒重新整理、沒有這些 checkbox）一按儲存就會把職務清空
+      //    ——實際發生過：一位小組長的職務被洗掉，結果不能在 LINE 發起組聚。
+      positions: formData.has('positions_present')
+        ? sortPositions(formData.getAll('position') as string[])
+        : editingMember?.positions,
     };
 
     if (editingMember) onUpdateMember(memberData);
@@ -565,6 +570,8 @@ const MemberManager: React.FC<MemberManagerProps> = ({ members, onAddMember, onU
                 </div>
                 <div className="col-span-2">
                   <label className="block text-sm font-bold text-gray-700 mb-1">分會職務</label>
+                  {/* 有這個欄位才代表「這份表單管得到職務」，見 handleSubmit */}
+                  <input type="hidden" name="positions_present" value="1" />
                   <div className="border rounded-lg p-3 flex flex-wrap gap-x-4 gap-y-2">
                     {CHAPTER_POSITIONS.map(p => (
                       <label key={p} className="flex items-center gap-1.5 text-sm text-gray-700 cursor-pointer">
