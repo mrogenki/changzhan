@@ -259,7 +259,9 @@ async function formatSignupList(supabase: any, keyword = ""): Promise<string> {
   const { data: allEntries } = openSheets.length > 0
     ? await supabase
         .from("signup_entries")
-        .select("sheet_id, real_name, extra_count, member_id, created_at")
+        // ⚠️ company / referrer 一定要撈：來賓要靠 referrer 歸到引薦人的組，
+        //    還要顯示單位。漏掉不會報錯，只會安靜地全部變成「未分組」。
+        .select("sheet_id, real_name, extra_count, member_id, company, referrer, created_at")
         .in("sheet_id", openSheets.map((s: any) => s.id))
         .order("created_at", { ascending: true })
     : { data: [] as any[] };
@@ -373,21 +375,29 @@ async function formatSignupList(supabase: any, keyword = ""): Promise<string> {
   // --- 接龍名單：依報名者自己的組別 ---
   const sheetSection = () => {
     if (t.kind !== "sheet") return "";
-    const buckets = new Map<string, string[]>();
+    // 存 { 顯示字串, 人頭數 }；原本是從顯示字串 split("+") 回推人頭，
+    // 單位名稱一含 "+" 就會算錯，所以不要再解析自己印出來的字。
+    const buckets = new Map<string, { label: string; heads: number }[]>();
     entriesOf(t.sheet.id).forEach((e: any) => {
       // 會員用自己的組；非會員（來賓）掛在引薦人的組下面
       const g = (e.member_id
         ? groupById.get(String(e.member_id))
         : groupByName.get(String(e.referrer ?? "").trim())) || GROUPLESS;
       if (!buckets.has(g)) buckets.set(g, []);
-      buckets.get(g)!.push(`${e.real_name}${e.extra_count > 0 ? `+${e.extra_count}` : ""}`);
+      // 會員彼此認得，不必印單位；來賓補上單位（signup_entries 沒有職務欄）
+      const org = e.member_id ? "" : String(e.company ?? "").trim();
+      const extra = Number(e.extra_count) || 0;
+      buckets.get(g)!.push({
+        label: `${e.real_name}${org ? `（${org}）` : ""}${extra > 0 ? `+${extra}` : ""}`,
+        heads: 1 + extra,
+      });
     });
     if (buckets.size === 0) return "";
     return Array.from(buckets.keys()).sort(compareGroup).map((g) => {
-      const names = buckets.get(g)!;
+      const rows = buckets.get(g)!;
       // 人頭數含同行者，跟上方的「目前 N 人」對得起來
-      const heads = names.reduce((sum, n) => sum + 1 + (Number(n.split("+")[1]) || 0), 0);
-      return `▪ ${groupLabel(g)}（${heads}人）\n　${names.join("、")}`;
+      const heads = rows.reduce((sum, r) => sum + r.heads, 0);
+      return `▪ ${groupLabel(g)}（${heads}人）\n　${rows.map((r) => r.label).join("、")}`;
     }).join("\n");
   };
 
