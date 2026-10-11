@@ -56,14 +56,6 @@ async function verifySignature(secret: string, body: string, signature: string):
 }
 
 // === 指令解析 ===
-function parseCommand(text: string | undefined | null): string | null {
-  if (!text) return null;
-  const t = text.trim();
-  if (!t.startsWith("!") && !t.startsWith("！")) return null;
-  const stripped = t.slice(1).trim();
-  if (!stripped) return null;
-  return stripped.split(/\s+/)[0].toLowerCase();
-}
 
 const CMD_ANNOUNCEMENT = new Set(["公告", "最新公告", "announcement", "news"]);
 const CMD_ACTIVITIES   = new Set(["活動", "近期活動", "events"]);
@@ -73,6 +65,37 @@ const CMD_GROUP_MEET   = new Set(["組聚", "咖啡", "咖啡會議", "coffee", 
 const CMD_TRAINING     = new Set(["培訓", "商務培訓", "training"]);
 const CMD_SIGNUP       = new Set(["名單", "接龍", "報名", "signup", "list"]);
 const CMD_HELP         = new Set(["幫助", "說明", "help", "?", "？", "menu"]);
+
+const ALL_COMMANDS = [
+  ...CMD_ANNOUNCEMENT, ...CMD_ACTIVITIES, ...CMD_REGULAR,
+  ...CMD_GROUP_MEET, ...CMD_TRAINING, ...CMD_SIGNUP, ...CMD_HELP,
+].sort((a, b) => b.length - a.length);   // 長的先比，避免 "名單" 先吃掉 "名單查詢"
+
+/**
+ * 解析指令與後面的參數。
+ * 「!名單 商機日」會拆成 { cmd: "名單", arg: "商機日" }。
+ * ⚠️ 中文輸入常常不打空格（「!名單商機日」），所以沒有空白時再用前綴比對一次。
+ */
+function parseCommand(text: string | undefined | null): { cmd: string; arg: string } | null {
+  if (!text) return null;
+  const t = text.trim();
+  if (!t.startsWith("!") && !t.startsWith("！")) return null;
+  const stripped = t.slice(1).trim();
+  if (!stripped) return null;
+
+  const spaceIdx = stripped.search(/\s/);
+  if (spaceIdx > 0) {
+    return {
+      cmd: stripped.slice(0, spaceIdx).toLowerCase(),
+      arg: stripped.slice(spaceIdx + 1).trim(),
+    };
+  }
+
+  const lower = stripped.toLowerCase();
+  const hit = ALL_COMMANDS.find((c) => lower.startsWith(c) && lower.length > c.length);
+  if (hit) return { cmd: hit, arg: stripped.slice(hit.length).trim() };
+  return { cmd: lower, arg: "" };
+}
 
 // === 按類型查未來活動 ===
 async function fetchUpcoming(supabase: any, type: string | null, limit: number) {
@@ -152,7 +175,31 @@ const compareGroup = (a: string, b: string) => {
 // 同一張接龍可以貼到多個群（共用同一份名單），但接龍本身不綁群組，
 // 所以同時有多張進行中時無法推斷要回哪一張 → 多張就列清單讓使用者選。
 // 截止時間在程式裡篩，不用 PostgREST 的 or() 帶 ISO 時間字串（解析容易出意外）。
-async function formatSignupList(supabase: any): Promise<string> {
+// `!名單`：列出報名名單。
+//
+// 兩種來源都要算進來，否則會漏：
+//   · **接龍**（signup_sheets）——LINE 裡 +1 的
+//   · **只有網頁報名的活動**——沒開接龍的場次（例會、擴大商機日那種），
+//     原本整個查不到；實際發生過「11 人報名但 !名單 叫不出來」。
+//
+// 接龍不綁群組，同時有多張時無法推斷要回哪一張，所以：
+//   · 剛好一個對象 → 直接列完整名單
+//   · 多個 → 列清單讓人點，或用 `!名單 關鍵字` 指定
+type ListTarget = {
+  kind: "sheet" | "activity";
+  title: string;
+  activity: any | null;
+  sheet: any | null;
+  count: number;        // 顯示用的人頭數
+};
+
+const todayTpe = () =>
+  new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Taipei" }).format(new Date());
+
+async function formatSignupList(supabase: any, keyword = ""): Promise<string> {
+  const kw = keyword.trim().toLowerCase();
+
+  // --- 1) 進行中的接龍 ---
   const { data: sheets } = await supabase
     .from("signup_sheets")
     .select("id, token, title, description, deadline, max_people, fee, member_fee, activity_id")
@@ -165,103 +212,174 @@ async function formatSignupList(supabase: any): Promise<string> {
     (s: any) => !s.deadline || new Date(s.deadline).getTime() > now,
   );
 
-  if (openSheets.length === 0) {
-    return "📋 目前沒有進行中的接龍。";
-  }
+  // --- 2) 近期活動（用來補標題、也用來找「只有網頁報名」的場次）---
+  const { data: acts } = await supabase
+    .from("activities")
+    .select("id, title, date, time, location, type, status, is_internal")
+    .or("status.eq.active,status.is.null")
+    .gte("date", todayTpe())
+    .order("date", { ascending: true })
+    .limit(60);
+  const upcoming = (acts ?? []).filter((a: any) => !a.is_internal);
 
-  // 日期地點來自綁定的活動；自由主題的接龍沒有這些資訊
-  const actIds = openSheets.map((s: any) => s.activity_id).filter(Boolean);
+  const sheetActIds = new Set(openSheets.map((s: any) => String(s.activity_id)).filter(Boolean));
   const actById = new Map<string, any>();
-  if (actIds.length > 0) {
-    const { data: acts } = await supabase
-      .from("activities")
-      .select("id, title, date, time, location")
-      .in("id", actIds);
-    (acts ?? []).forEach((a: any) => actById.set(String(a.id), a));
+  upcoming.forEach((a: any) => actById.set(String(a.id), a));
+  // 接龍綁的活動可能已經過去（例如今天稍早），補撈回來才顯示得出日期地點
+  const missingIds = [...sheetActIds].filter((id) => !actById.has(id));
+  if (missingIds.length > 0) {
+    const { data: more } = await supabase
+      .from("activities").select("id, title, date, time, location, type").in("id", missingIds);
+    (more ?? []).forEach((a: any) => actById.set(String(a.id), a));
   }
-  const actOf = (s: any) => (s.activity_id ? actById.get(String(s.activity_id)) : null);
+  const actOf = (s: any) => (s.activity_id ? actById.get(String(s.activity_id)) ?? null : null);
 
-  const { data: allEntries } = await supabase
-    .from("signup_entries")
-    .select("sheet_id, real_name, extra_count, member_id, created_at")
-    .in("sheet_id", openSheets.map((s: any) => s.id))
-    .order("created_at", { ascending: true });
-
-  // 同一場活動也可能有人從公開頁的報名表進來（不走接龍）。
-  // 不加進來的話「目前 N 人」會少算，甚至明明有人報名卻回「還沒有人報名」。
-  const webByActivity = new Map<string, string[]>();
-  if (actIds.length > 0) {
+  // --- 3) 報名資料 ---
+  const allActIds = [...new Set([...sheetActIds, ...upcoming.map((a: any) => String(a.id))])];
+  const regsByActivity = new Map<string, any[]>();
+  if (allActIds.length > 0) {
     const { data: regs } = await supabase
       .from("registrations")
-      .select('name, "activityId", created_at')
-      .in("activityId", actIds)
+      .select('name, phone, "activityId", created_at')
+      .in("activityId", allActIds)
       .order("created_at", { ascending: true });
     (regs ?? []).forEach((r: any) => {
       const k = String(r.activityId);
-      if (!webByActivity.has(k)) webByActivity.set(k, []);
-      webByActivity.get(k)!.push(r.name);
+      if (!regsByActivity.has(k)) regsByActivity.set(k, []);
+      regsByActivity.get(k)!.push(r);
     });
   }
-  const webOf = (s: any) => (s.activity_id ? webByActivity.get(String(s.activity_id)) ?? [] : []);
+  const webOf = (activityId: any) =>
+    activityId ? regsByActivity.get(String(activityId)) ?? [] : [];
 
+  const { data: allEntries } = openSheets.length > 0
+    ? await supabase
+        .from("signup_entries")
+        .select("sheet_id, real_name, extra_count, member_id, created_at")
+        .in("sheet_id", openSheets.map((s: any) => s.id))
+        .order("created_at", { ascending: true })
+    : { data: [] as any[] };
   const entriesOf = (sheetId: number) =>
     (allEntries ?? []).filter((e: any) => e.sheet_id === sheetId);
   const headOf = (sheetId: number) =>
     entriesOf(sheetId).reduce((sum: number, e: any) => sum + 1 + (e.extra_count ?? 0), 0);
 
-  // 多張 → 列清單，各自附上日期與連結
-  if (openSheets.length > 1) {
-    const blocks = openSheets.map((s: any) => {
+  // --- 4) 把兩種來源併成同一份候選清單 ---
+  const targets: ListTarget[] = [
+    ...openSheets.map((s: any) => {
       const a = actOf(s);
-      const cap = s.max_people ? ` / ${s.max_people}` : "";
+      return {
+        kind: "sheet" as const,
+        title: s.title || a?.title || "（未命名接龍）",
+        activity: a,
+        sheet: s,
+        count: headOf(s.id) + webOf(s.activity_id).length,
+      };
+    }),
+    // 沒開接龍、但已經有人從網頁報名的活動
+    ...upcoming
+      .filter((a: any) => !sheetActIds.has(String(a.id)) && webOf(a.id).length > 0)
+      .map((a: any) => ({
+        kind: "activity" as const,
+        title: a.title,
+        activity: a,
+        sheet: null,
+        count: webOf(a.id).length,
+      })),
+  ];
+
+  // 照活動日期排，近的在前；沒綁活動的排最後（22 張接龍時這個差很多）
+  targets.sort((a, b) => {
+    const da = a.activity?.date ?? "9999-99-99";
+    const db = b.activity?.date ?? "9999-99-99";
+    if (da !== db) return da.localeCompare(db);
+    return String(a.activity?.time ?? "").localeCompare(String(b.activity?.time ?? ""));
+  });
+
+  if (targets.length === 0) {
+    return "📋 目前沒有進行中的接龍，也沒有已報名的近期活動。";
+  }
+
+  // --- 5) 關鍵字篩選 ---
+  const matched = kw
+    ? targets.filter((t) =>
+        t.title.toLowerCase().includes(kw) ||
+        String(t.activity?.title ?? "").toLowerCase().includes(kw))
+    : targets;
+
+  if (kw && matched.length === 0) {
+    const names = targets.map((t) => `▸ ${t.title}`).join("\n");
+    return `🔍 找不到含「${keyword}」的活動。\n\n目前有這些：\n${names}\n\n可以換個關鍵字，或直接打 !名單`;
+  }
+
+  // --- 6) 多筆 → 列清單 ---
+  if (matched.length > 1) {
+    const blocks = matched.map((t) => {
+      const a = t.activity;
       const when = a?.date ? `\n  📅 ${fmtActivityDate(a.date, a.time)}` : "";
       const where = a?.location ? `\n  📍 ${a.location}` : "";
-      const deadline = s.deadline ? `\n  ⏰ 截止 ${fmtDeadline(s.deadline)}` : "";
-      const web = webOf(s).length;
-      const webNote = web > 0 ? `（含網頁報名 ${web}）` : "";
-      return `▸ ${s.title}${when}${where}\n  👥 ${headOf(s.id) + web} 人${cap}${webNote}${deadline}\n  🔗 ${signupUrl(s.token)}`;
+      if (t.kind === "sheet") {
+        const cap = t.sheet.max_people ? ` / ${t.sheet.max_people}` : "";
+        const deadline = t.sheet.deadline ? `\n  ⏰ 截止 ${fmtDeadline(t.sheet.deadline)}` : "";
+        return `▸ ${t.title}${when}${where}\n  👥 ${t.count} 人${cap}${deadline}\n  🔗 ${signupUrl(t.sheet.token)}`;
+      }
+      return `▸ ${t.title}（網頁報名）${when}${where}\n  👥 ${t.count} 人\n  🔗 ${SITE_URL}/activity/${a.id}`;
     });
-    return `📋 目前有 ${openSheets.length} 張接龍進行中\n\n${blocks.join("\n\n")}\n\n點連結即可報名並查看完整名單。`;
+    // 範例關鍵字挑「不含空白、最短」的標題，免得切出「3 組1」這種怪字串
+    const sample = matched
+      .map((x) => x.title.replace(/\s+/g, ""))
+      .filter((x) => x.length >= 2)
+      .sort((a, b) => a.length - b.length)[0];
+    const hint = sample
+      ? `想看完整名單請打「!名單 關鍵字」，例如：!名單 ${sample.slice(0, 6)}`
+      : "想看完整名單請打「!名單」加上活動名稱裡的幾個字";
+    return `📋 共 ${matched.length} 場有報名資料\n\n${blocks.join("\n\n")}\n\n${hint}`;
   }
 
-  // 只有一張 → 依組別列出名單
-  const sheet = openSheets[0];
-  const act = actOf(sheet);
-  const rows = entriesOf(sheet.id);
-  const cap = sheet.max_people ? ` / ${sheet.max_people}` : "";
+  // --- 7) 只有一筆 → 列完整名單 ---
+  const t = matched[0];
+  const act = t.activity;
   const when = act?.date ? `\n📅 ${fmtActivityDate(act.date, act.time)}` : "";
   const where = act?.location ? `\n📍 ${act.location}` : "";
-  const deadline = sheet.deadline ? `\n⏰ 截止：${fmtDeadline(sheet.deadline)}` : "";
-  const webNames = webOf(sheet);
-  const total = headOf(sheet.id) + webNames.length;
-  const head = `📋 ${sheet.title}${when}${where}${feeLine(sheet)}\n👥 目前 ${total} 人${cap}${deadline}`;
-  // 網頁報名的人不在接龍裡，另外列一段，並提醒不用重複幫他們 +1
-  const webBlock = webNames.length > 0
-    ? `\n\n📝 從網頁報名（${webNames.length}）\n　${webNames.join("、")}\n（這些夥伴不在接龍裡，不用重複 +1）`
-    : "";
 
-  if (rows.length === 0) {
-    const empty = webNames.length > 0 ? "（接龍還沒有人，可直接 +1）" : "（還沒有人報名）";
-    return `${head}\n\n${empty}${webBlock}\n\n🔗 我要報名：${signupUrl(sheet.token)}`;
-  }
-
-  // 組別取自會員資料；來賓與沒設組別的會員歸「未分組」
-  const memberIds = rows.map((e: any) => e.member_id).filter(Boolean);
+  // 組別取自會員資料；來賓與沒設組別的歸「未分組」
+  const { data: allMembers } = await supabase
+    .from("members").select("id, name, group_name");
   const groupById = new Map<string, string>();
-  if (memberIds.length > 0) {
-    const { data: ms } = await supabase
-      .from("members")
-      .select("id, group_name")
-      .in("id", memberIds);
-    (ms ?? []).forEach((m: any) => groupById.set(String(m.id), m.group_name || ""));
-  }
+  const groupByName = new Map<string, string>();
+  (allMembers ?? []).forEach((m: any) => {
+    groupById.set(String(m.id), m.group_name || "");
+    if (m.name) groupByName.set(String(m.name).trim(), m.group_name || "");
+  });
 
   const buckets = new Map<string, string[]>();
-  for (const e of rows) {
-    const g = (e.member_id ? groupById.get(String(e.member_id)) : "") || GROUPLESS;
-    const label = `${e.real_name}${e.extra_count > 0 ? `+${e.extra_count}` : ""}`;
+  const push = (group: string, label: string) => {
+    const g = group || GROUPLESS;
     if (!buckets.has(g)) buckets.set(g, []);
     buckets.get(g)!.push(label);
+  };
+
+  if (t.kind === "sheet") {
+    entriesOf(t.sheet.id).forEach((e: any) => {
+      push(e.member_id ? groupById.get(String(e.member_id)) ?? "" : "",
+        `${e.real_name}${e.extra_count > 0 ? `+${e.extra_count}` : ""}`);
+    });
+  }
+  // 網頁報名的人：用姓名對會員拿組別，對不到就是來賓 → 未分組
+  webOf(t.sheet ? t.sheet.activity_id : act?.id).forEach((r: any) => {
+    push(groupByName.get(String(r.name ?? "").trim()) ?? "", String(r.name ?? "—"));
+  });
+
+  const cap = t.sheet?.max_people ? ` / ${t.sheet.max_people}` : "";
+  const deadline = t.sheet?.deadline ? `\n⏰ 截止：${fmtDeadline(t.sheet.deadline)}` : "";
+  const fee = t.sheet ? feeLine(t.sheet) : "";
+  const head = `📋 ${t.title}${when}${where}${fee}\n👥 目前 ${t.count} 人${cap}${deadline}`;
+  const link = t.sheet
+    ? `\n\n🔗 我要報名：${signupUrl(t.sheet.token)}`
+    : (act ? `\n\n🔗 報名：${SITE_URL}/activity/${act.id}` : "");
+
+  if (t.count === 0) {
+    return `${head}\n\n（還沒有人報名）${link}`;
   }
 
   const lines = Array.from(buckets.keys())
@@ -273,7 +391,8 @@ async function formatSignupList(supabase: any): Promise<string> {
       return `▪ ${g}（${heads}人）\n　${names.join("、")}`;
     });
 
-  return `${head}\n\n${lines.join("\n")}${webBlock}\n\n🔗 我要報名：${signupUrl(sheet.token)}`;
+  const note = t.kind === "activity" ? "\n\n（這場沒有開接龍，名單來自網頁報名）" : "";
+  return `${head}\n\n${lines.join("\n")}${note}${link}`;
 }
 
 function helpMessage(): string {
@@ -285,7 +404,8 @@ function helpMessage(): string {
     "!例會   — 下一場例會",
     "!組聚   — 下一場組聚",
     "!培訓   — 下一場商務培訓",
-    "!名單   — 接龍報名名單（依組別）",
+    "!名單   — 報名名單（依組別）",
+    "!名單 關鍵字 — 指定活動，例如 !名單 商機日",
     "!幫助   — 顯示這張選單",
     "",
     `🔗 完整資訊：${SITE_URL}`,
@@ -310,6 +430,7 @@ async function replyText(token: string, replyToken: string, text: string) {
 // === 指令路由 ===
 async function handleCommand(
   cmd: string,
+  arg: string,
   replyToken: string,
   supabase: any,
   token: string,
@@ -341,7 +462,7 @@ async function handleCommand(
     return true;
   }
   if (CMD_SIGNUP.has(cmd)) {
-    await replyText(token, replyToken, await formatSignupList(supabase));
+    await replyText(token, replyToken, await formatSignupList(supabase, arg));
     return true;
   }
   if (CMD_HELP.has(cmd)) {
@@ -428,9 +549,9 @@ Deno.serve(async (req) => {
 
       if (event.type === "message" && event.message?.type === "text" && event.replyToken) {
         if (!botEnabled) continue;
-        const cmd = parseCommand(event.message.text);
-        if (!cmd) continue;
-        await handleCommand(cmd, event.replyToken, supabase, channelToken, settings);
+        const parsed = parseCommand(event.message.text);
+        if (!parsed) continue;
+        await handleCommand(parsed.cmd, parsed.arg, event.replyToken, supabase, channelToken, settings);
       }
     } catch (e) {
       console.error("event handler error:", e);
