@@ -27,6 +27,8 @@ const SITE_URL = "https://changzhan.vercel.app";
 // 接龍報名的 LIFF app（與前端 VITE_LIFF_SIGNUP_ID 一致）
 const LIFF_SIGNUP_ID = "2009854899-KEtH0Qad";
 const GROUPLESS = "未分組";
+// 網頁報名沒填引薦人、但報名者本人就是會員時，用這個當分段 key（不會跟任何人名撞到）
+const SELF_KEY = "\u0000self";
 const WEEKDAYS = ["日", "一", "二", "三", "四", "五", "六"];
 
 const corsHeaders = {
@@ -240,7 +242,9 @@ async function formatSignupList(supabase: any, keyword = ""): Promise<string> {
   if (allActIds.length > 0) {
     const { data: regs } = await supabase
       .from("registrations")
-      .select('name, phone, "activityId", created_at')
+      // ⚠️ company / title / referrer 一定要撈：名單要依引薦人分組並顯示單位職務。
+      //    漏掉的話畫面不會報錯，只會安靜地全部變成「未分組・未填引薦人」——實際踩過。
+      .select('name, phone, company, title, referrer, "activityId", created_at')
       .in("activityId", allActIds)
       .order("created_at", { ascending: true });
     (regs ?? []).forEach((r: any) => {
@@ -398,10 +402,13 @@ async function formatSignupList(supabase: any, keyword = ""): Promise<string> {
     const byGroup = new Map<string, Map<string, Row[]>>();
     regs.forEach((r: any) => {
       const ref = String(r.referrer ?? "").trim();
-      const g = groupByName.get(ref) || GROUPLESS;
+      const self = String(r.name ?? "").trim();
+      // 沒填引薦人時，報名的可能是會員自己（例如組聚自己報自己），用他本人的組別
+      const selfGroup = ref ? undefined : groupByName.get(self);
+      const g = groupByName.get(ref) || selfGroup || GROUPLESS;
       if (!byGroup.has(g)) byGroup.set(g, new Map());
       const byRef = byGroup.get(g)!;
-      const key = ref || "";
+      const key = ref || (selfGroup !== undefined ? SELF_KEY : "");
       if (!byRef.has(key)) byRef.set(key, []);
       byRef.get(key)!.push({
         name: String(r.name ?? "—").trim(),
@@ -414,8 +421,9 @@ async function formatSignupList(supabase: any, keyword = ""): Promise<string> {
     Array.from(byGroup.keys()).sort(compareGroup).forEach((g) => {
       const byRef = byGroup.get(g)!;
       Array.from(byRef.keys()).sort((a, b) => {
-        if (!a) return 1;          // 沒填引薦人的排最後
-        if (!b) return -1;
+        const wa = !a || a === SELF_KEY ? 1 : 0;   // 沒引薦人／自行報名的排最後
+        const wb = !b || b === SELF_KEY ? 1 : 0;
+        if (wa !== wb) return wa - wb;
         return a.localeCompare(b, "zh-Hant");
       }).forEach((ref) => {
         const rows = byRef.get(ref)!;
@@ -423,7 +431,7 @@ async function formatSignupList(supabase: any, keyword = ""): Promise<string> {
           const job = [x.company, x.title].filter(Boolean).join(" ");
           return `　・${x.name}${job ? `｜${job}` : ""}`;
         }).join("\n");
-        const by = ref ? `· 引薦人 ${ref}` : "· 未填引薦人";
+        const by = ref === SELF_KEY ? "· 會員自行報名" : ref ? `· 引薦人 ${ref}` : "· 未填引薦人";
         blocks.push(`▪ ${groupLabel(g)}（${rows.length}人）${by}\n${who}`);
       });
     });
