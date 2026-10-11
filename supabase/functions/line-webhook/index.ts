@@ -342,7 +342,7 @@ async function formatSignupList(supabase: any, keyword = ""): Promise<string> {
   const when = act?.date ? `\n📅 ${fmtActivityDate(act.date, act.time)}` : "";
   const where = act?.location ? `\n📍 ${act.location}` : "";
 
-  // 組別取自會員資料；來賓與沒設組別的歸「未分組」
+  // 組別取自會員資料
   const { data: allMembers } = await supabase
     .from("members").select("id, name, group_name");
   const groupById = new Map<string, string>();
@@ -350,24 +350,6 @@ async function formatSignupList(supabase: any, keyword = ""): Promise<string> {
   (allMembers ?? []).forEach((m: any) => {
     groupById.set(String(m.id), m.group_name || "");
     if (m.name) groupByName.set(String(m.name).trim(), m.group_name || "");
-  });
-
-  const buckets = new Map<string, string[]>();
-  const push = (group: string, label: string) => {
-    const g = group || GROUPLESS;
-    if (!buckets.has(g)) buckets.set(g, []);
-    buckets.get(g)!.push(label);
-  };
-
-  if (t.kind === "sheet") {
-    entriesOf(t.sheet.id).forEach((e: any) => {
-      push(e.member_id ? groupById.get(String(e.member_id)) ?? "" : "",
-        `${e.real_name}${e.extra_count > 0 ? `+${e.extra_count}` : ""}`);
-    });
-  }
-  // 網頁報名的人：用姓名對會員拿組別，對不到就是來賓 → 未分組
-  webOf(t.sheet ? t.sheet.activity_id : act?.id).forEach((r: any) => {
-    push(groupByName.get(String(r.name ?? "").trim()) ?? "", String(r.name ?? "—"));
   });
 
   const cap = t.sheet?.max_people ? ` / ${t.sheet.max_people}` : "";
@@ -382,17 +364,80 @@ async function formatSignupList(supabase: any, keyword = ""): Promise<string> {
     return `${head}\n\n（還沒有人報名）${link}`;
   }
 
-  const lines = Array.from(buckets.keys())
-    .sort(compareGroup)
-    .map((g) => {
+  const groupLabel = (g: string) => (g === GROUPLESS ? g : /^\d+$/.test(g) ? `第 ${g} 組` : g);
+
+  // --- 接龍名單：依報名者自己的組別 ---
+  const sheetSection = () => {
+    if (t.kind !== "sheet") return "";
+    const buckets = new Map<string, string[]>();
+    entriesOf(t.sheet.id).forEach((e: any) => {
+      // 會員用自己的組；非會員（來賓）掛在引薦人的組下面
+      const g = (e.member_id
+        ? groupById.get(String(e.member_id))
+        : groupByName.get(String(e.referrer ?? "").trim())) || GROUPLESS;
+      if (!buckets.has(g)) buckets.set(g, []);
+      buckets.get(g)!.push(`${e.real_name}${e.extra_count > 0 ? `+${e.extra_count}` : ""}`);
+    });
+    if (buckets.size === 0) return "";
+    return Array.from(buckets.keys()).sort(compareGroup).map((g) => {
       const names = buckets.get(g)!;
       // 人頭數含同行者，跟上方的「目前 N 人」對得起來
       const heads = names.reduce((sum, n) => sum + 1 + (Number(n.split("+")[1]) || 0), 0);
-      return `▪ ${g}（${heads}人）\n　${names.join("、")}`;
+      return `▪ ${groupLabel(g)}（${heads}人）\n　${names.join("、")}`;
+    }).join("\n");
+  };
+
+  // --- 網頁報名：依「引薦人的組別 → 引薦人」分段，並顯示單位與職務 ---
+  //
+  // 來賓本人不是會員，用他自己的名字查組別永遠查不到（原本整段都落在「未分組」）。
+  // 每位引薦人都屬於某一組，所以組別要從**引薦人**推。
+  const webSection = () => {
+    const regs = webOf(t.sheet ? t.sheet.activity_id : act?.id);
+    if (regs.length === 0) return "";
+    type Row = { name: string; company: string; title: string };
+    const byGroup = new Map<string, Map<string, Row[]>>();
+    regs.forEach((r: any) => {
+      const ref = String(r.referrer ?? "").trim();
+      const g = groupByName.get(ref) || GROUPLESS;
+      if (!byGroup.has(g)) byGroup.set(g, new Map());
+      const byRef = byGroup.get(g)!;
+      const key = ref || "";
+      if (!byRef.has(key)) byRef.set(key, []);
+      byRef.get(key)!.push({
+        name: String(r.name ?? "—").trim(),
+        company: String(r.company ?? "").trim(),
+        title: String(r.title ?? "").trim(),
+      });
     });
 
+    const blocks: string[] = [];
+    Array.from(byGroup.keys()).sort(compareGroup).forEach((g) => {
+      const byRef = byGroup.get(g)!;
+      Array.from(byRef.keys()).sort((a, b) => {
+        if (!a) return 1;          // 沒填引薦人的排最後
+        if (!b) return -1;
+        return a.localeCompare(b, "zh-Hant");
+      }).forEach((ref) => {
+        const rows = byRef.get(ref)!;
+        const who = rows.map((x) => {
+          const job = [x.company, x.title].filter(Boolean).join(" ");
+          return `　・${x.name}${job ? `｜${job}` : ""}`;
+        }).join("\n");
+        const by = ref ? `· 引薦人 ${ref}` : "· 未填引薦人";
+        blocks.push(`▪ ${groupLabel(g)}（${rows.length}人）${by}\n${who}`);
+      });
+    });
+    return blocks.join("\n");
+  };
+
+  const sheetPart = sheetSection();
+  const webPart = webSection();
+  const webHeading = sheetPart && webPart ? "\n\n📝 從網頁報名\n" : "";
+  const body = [sheetPart, webHeading ? webHeading.trim() + "\n" + webPart : webPart]
+    .filter(Boolean).join(sheetPart && webPart ? "\n\n" : "");
+
   const note = t.kind === "activity" ? "\n\n（這場沒有開接龍，名單來自網頁報名）" : "";
-  return `${head}\n\n${lines.join("\n")}${note}${link}`;
+  return `${head}\n\n${body}${note}${link}`;
 }
 
 function helpMessage(): string {
