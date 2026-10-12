@@ -83,6 +83,27 @@ const GUEST_FIELDS: { key: keyof GuestFollowUp; label: string; w: string }[] = [
   { key: 'status_note', label: '狀況', w: 'flex-1 min-w-[160px]' },
 ];
 
+// 來賓依組別排序，規則與接龍名單、報到管理、!名單 指令同一套：
+// 1→2→10→20→三尊（numeric 比較），沒填組別的排最後；同組再依會員、來賓姓名。
+// 組別是這張表上可以手打的欄位，所以空白、全形空白都要當成「沒填」。
+const byGuestGroup = (a: GuestFollowUp, b: GuestFollowUp) => {
+  const ga = String(a.group_name ?? '').trim();
+  const gb = String(b.group_name ?? '').trim();
+  if (ga !== gb) {
+    if (!ga) return 1;
+    if (!gb) return -1;
+    return ga.localeCompare(gb, 'zh-Hant', { numeric: true });
+  }
+  const ma = String(a.member_name ?? ''), mb = String(b.member_name ?? '');
+  if (ma !== mb) return ma.localeCompare(mb, 'zh-Hant');
+  return String(a.guest_name ?? '').localeCompare(String(b.guest_name ?? ''), 'zh-Hant');
+};
+
+// 「入會申請」與「之前來賓」橫跨多場例會，純照組別排會把不同來訪日混在一起，
+// 所以那兩段仍以來訪日期為主、組別為輔。
+const byDateThenGroup = (a: GuestFollowUp, b: GuestFollowUp) =>
+  String(b.visit_date ?? '').localeCompare(String(a.visit_date ?? '')) || byGuestGroup(a, b);
+
 const MeetingManager: React.FC<Props> = ({
   canEdit, activities, members, attendance, registrations, currentUser,
   onUpdateAttendance, onAddActivity, onRefreshAttendance,
@@ -271,14 +292,18 @@ const MeetingManager: React.FC<Props> = ({
   }, [linked, attendance, activeMembers, registrations]);
 
   // ===== 2/3/4/5 來賓分組 =====
+  // filter() 已經回傳新陣列，就地 sort 不會動到 guests 本身
   const todayGuests = useMemo(
-    () => guests.filter(g => g.state !== 'dropped' && linked && g.visit_date === linked.date), [guests, linked]);
+    () => guests.filter(g => g.state !== 'dropped' && linked && g.visit_date === linked.date).sort(byGuestGroup),
+    [guests, linked]);
   const lastWeekGuests = useMemo(
-    () => guests.filter(g => g.state !== 'dropped' && prevRegular && g.visit_date === prevRegular.date), [guests, prevRegular]);
-  const earlierGuests = useMemo(
-    () => guests.filter(g => g.state === 'tracking' && (!prevRegular || String(g.visit_date ?? '') < String(prevRegular.date))),
+    () => guests.filter(g => g.state !== 'dropped' && prevRegular && g.visit_date === prevRegular.date).sort(byGuestGroup),
     [guests, prevRegular]);
-  const applications = useMemo(() => guests.filter(g => g.state === 'applied'), [guests]);
+  const earlierGuests = useMemo(
+    () => guests.filter(g => g.state === 'tracking' && (!prevRegular || String(g.visit_date ?? '') < String(prevRegular.date)))
+      .sort(byDateThenGroup),
+    [guests, prevRegular]);
+  const applications = useMemo(() => guests.filter(g => g.state === 'applied').sort(byDateThenGroup), [guests]);
 
   // ===== 6 續約（自動列出三個月內到期） =====
   const renewals: RenewalRow[] = useMemo(() => {
