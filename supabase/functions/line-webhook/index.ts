@@ -427,23 +427,39 @@ async function formatSignupList(supabase: any, keyword = ""): Promise<string> {
       });
     });
 
+    const refLabel = (ref: string) =>
+      ref === SELF_KEY ? "會員自行報名" : ref ? `引薦人 ${ref}` : "未填引薦人";
+    const personLine = (x: Row, indent: string) => {
+      const job = [x.company, x.title].filter(Boolean).join(" ");
+      return `${indent}・${x.name}${job ? `｜${job}` : ""}`;
+    };
+
     const blocks: string[] = [];
     Array.from(byGroup.keys()).sort(compareGroup).forEach((g) => {
       const byRef = byGroup.get(g)!;
-      Array.from(byRef.keys()).sort((a, b) => {
+      const refs = Array.from(byRef.keys()).sort((a, b) => {
         const wa = !a || a === SELF_KEY ? 1 : 0;   // 沒引薦人／自行報名的排最後
         const wb = !b || b === SELF_KEY ? 1 : 0;
         if (wa !== wb) return wa - wb;
         return a.localeCompare(b, "zh-Hant");
-      }).forEach((ref) => {
-        const rows = byRef.get(ref)!;
-        const who = rows.map((x) => {
-          const job = [x.company, x.title].filter(Boolean).join(" ");
-          return `　・${x.name}${job ? `｜${job}` : ""}`;
-        }).join("\n");
-        const by = ref === SELF_KEY ? "· 會員自行報名" : ref ? `· 引薦人 ${ref}` : "· 未填引薦人";
-        blocks.push(`▪ ${groupLabel(g)}（${rows.length}人）${by}\n${who}`);
       });
+      const total = refs.reduce((n, r) => n + byRef.get(r)!.length, 0);
+
+      // ⚠️ 組抬頭一組只能出現一次。原本是「一位引薦人一個區塊」，所以同一組有兩位
+      //    引薦人時會印出兩個「第 14 組」，看起來像資料重複——實際踩到。
+      //    一位引薦人（絕大多數）維持單行抬頭；兩位以上才把引薦人降成子層。
+      if (refs.length === 1) {
+        const rows = byRef.get(refs[0])!;
+        blocks.push(`▪ ${groupLabel(g)}（${total}人）· ${refLabel(refs[0])}\n`
+          + rows.map((x) => personLine(x, "　")).join("\n"));
+        return;
+      }
+      const sub = refs.map((ref) => {
+        const rows = byRef.get(ref)!;
+        return `　· ${refLabel(ref)}（${rows.length}人）\n`
+          + rows.map((x) => personLine(x, "　　")).join("\n");
+      });
+      blocks.push(`▪ ${groupLabel(g)}（${total}人）\n${sub.join("\n")}`);
     });
     return blocks.join("\n");
   };
