@@ -270,6 +270,12 @@ npm run preview    # 本機預覽 build
 
 部署：push 到 `main` 分支 → Vercel 自動部署。
 
+⚠️ **改完後在畫面上看不到效果時，先確認部署跑完了沒有，不要先懷疑程式**。
+GitHub → Vercel 的 webhook 實測延遲過 **6 分鐘**（2026-10-12），加上 build 時間，
+push 完到真的上線可能要好幾分鐘。確認方式：看 Vercel 的部署狀態是不是 `READY`，
+或比對 `curl -s https://changzhan.vercel.app/ | grep -o 'index-[A-Za-z0-9_-]*\.js'`
+的 bundle 檔名有沒有換掉。上線後瀏覽器仍可能用快取的舊 JS，要 Cmd+Shift+R 強制重整。
+
 ---
 
 ## 八、已知狀況 / 待辦
