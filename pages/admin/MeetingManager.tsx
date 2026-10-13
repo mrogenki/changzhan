@@ -206,6 +206,21 @@ const MeetingManager: React.FC<Props> = ({
     () => members.filter(m => m.status === undefined || m.status === 'active'), [members],
   );
 
+  // 每一組的執事，供 363 續約的「組別執事」欄自動帶入。
+  // 一組可能不只一位執事（簽到那邊也處理過這種情況），都列出來用「、」串起來。
+  const deaconsByGroup = useMemo(() => {
+    const m = new Map<string, string[]>();
+    activeMembers
+      .filter(x => (x.positions ?? []).includes('執事'))
+      .forEach(x => {
+        const g = (x.group_name || '').trim();
+        if (!g) return;              // 沒設組別的執事對不到任何一組，略過
+        if (!m.has(g)) m.set(g, []);
+        m.get(g)!.push(String(x.name ?? '').trim());
+      });
+    return m;
+  }, [activeMembers]);
+
   useEffect(() => { if (!selectedId && meetings.length > 0) setSelectedId(String(meetings[0].id)); }, [meetings, selectedId]);
   useEffect(() => { if (selectedId) load(selectedId); /* eslint-disable-next-line */ }, [selectedId]);
 
@@ -320,7 +335,10 @@ const MeetingManager: React.FC<Props> = ({
           status_note: note?.status_note ?? '',
           // 燈號與來賓數都來自同一份半年報表（手填會蓋過自動值）
           light: note?.light ?? tl?.total_score ?? null,
-          committee: note?.committee ?? '',
+          // 組別執事自動帶入該組的執事；手填過的以人填的為準（與燈號／來賓同一個原則）。
+          // 用 || 而不是 ??：欄位清空存成空字串，那就該退回自動值。
+          committee: String(note?.committee ?? '').trim()
+            || (deaconsByGroup.get(String(m.group_name ?? '').trim()) ?? []).join('、'),
           // ⚠️ 原本用 registrations.referrer 算，但網頁報名的引薦人幾乎都沒填，
           //    算出來幾乎都是 0（實測 PALMS 21 位的人這裡算成 1）。改用 PALMS 的數字，
           //    沒有 PALMS 資料時才退回自己算。
@@ -329,7 +347,7 @@ const MeetingManager: React.FC<Props> = ({
             ?? registrations.filter(r => (r.referrer ?? '').trim() === (m.name ?? '').trim()).length,
         };
       });
-  }, [activeMembers, renewalNotes, registrations, selected, lights]);
+  }, [activeMembers, renewalNotes, registrations, selected, lights, deaconsByGroup]);
 
   async function saveGuest(id: number, patch: Partial<GuestFollowUp>) {
     setGuests(prev => prev.map(g => (g.id === id ? { ...g, ...patch } : g)));
@@ -745,7 +763,7 @@ const MeetingManager: React.FC<Props> = ({
                             <th className="pb-1 pr-2">姓名</th><th className="pb-1 pr-2">到期日</th>
                             <th className="pb-1 pr-2 w-44">狀況</th><th className="pb-1 pr-2 w-16">來賓</th>
                             <th className="pb-1 pr-2 w-16">燈號</th><th className="pb-1 pr-2">組別</th>
-                            <th className="pb-1 w-28">組別委員</th>
+                            <th className="pb-1 w-28">組別執事</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50">

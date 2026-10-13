@@ -85,7 +85,7 @@ const GUEST_HEADERS = ['組別', '會員', '來賓', '專業類別', '訪談人'
 const guestCells = (g: GuestRow) =>
   [g.group_name ?? '', g.member_name ?? '', g.guest_name, g.industry ?? '', g.interviewer ?? '', g.status_note ?? ''];
 
-const RENEWAL_HEADERS = ['姓名', '到期日', '狀況', '來賓', '燈號', '組別', '組別委員'];
+const RENEWAL_HEADERS = ['姓名', '到期日', '狀況', '來賓', '燈號', '組別', '組別執事'];
 const renewalCells = (r: RenewalRow) => [
   r.name, r.end_date ?? '', r.status_note ?? '',
   r.guest_count == null ? '' : String(r.guest_count),
