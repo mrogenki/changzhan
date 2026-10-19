@@ -784,6 +784,12 @@ const MeetingManager: React.FC<Props> = ({
                           <p className="text-2xl font-bold text-gray-700">{attendanceSummary.totalMembers}</p></div>
                         <div><span className="text-xs text-gray-400 font-bold">V 來賓</span>
                           <p className="text-2xl font-bold text-gray-700">{attendanceSummary.guestCount}</p></div>
+                        <div><span className="text-xs text-gray-400 font-bold">出席率</span>
+                          <p className="text-2xl font-bold text-gray-700">
+                            {attendanceSummary.totalMembers
+                              ? Math.round(attendanceSummary.presentTotal / attendanceSummary.totalMembers * 100)
+                              : 0}%
+                          </p></div>
                       </div>
                       <div className="space-y-1.5 text-sm">
                         {([['A', '缺席', attendanceSummary.absentNames], ['L', '遲到/早退', attendanceSummary.lateNames],

@@ -123,8 +123,9 @@ export function buildMinutesText(r: MeetingReport): string {
   const a = r.attendance;
   L.push('', `一、${AGENDA[0]}`);
   if (a) {
+    const rate = a.totalMembers ? Math.round(a.presentTotal / a.totalMembers * 100) : 0;
     L.push(`例會：${a.meetingDate}　會員人數 ${a.totalMembers} 人`);
-    L.push(`P 出席 ${a.presentTotal} 人`);
+    L.push(`P 出席 ${a.presentTotal} 人（出席率 ${rate}%）`);
     L.push(`A 缺席 ${a.absentNames.length} 人${a.absentNames.length ? `（${a.absentNames.join('、')}）` : ''}`);
     L.push(`L 遲到/早退 ${a.lateNames.length} 人${a.lateNames.length ? `（${a.lateNames.join('、')}）` : ''}`);
     L.push(`M 緊急醫療 ${a.medicalNames.length} 人${a.medicalNames.length ? `（${a.medicalNames.join('、')}）` : ''}`);
@@ -294,7 +295,9 @@ export async function exportMeetingPptx(r: MeetingReport, fileName: string) {
     s1.addText([
       { text: 'P  出席　', options: { bold: true, color: RED } },
       { text: `${a.presentTotal} 人`, options: { bold: true, fontSize: 24 } },
-      { text: `　／　會員人數 ${a.totalMembers} 人　／　V 來賓 ${a.guestCount} 人`, options: { color: GRAY, fontSize: 13 } },
+      { text: `　／　會員人數 ${a.totalMembers} 人　／　出席率 `
+        + `${a.totalMembers ? Math.round(a.presentTotal / a.totalMembers * 100) : 0}%`
+        + `　／　V 來賓 ${a.guestCount} 人`, options: { color: GRAY, fontSize: 13 } },
     ], { x: 0.5, y: 1.4, w: 9, h: 0.5, fontSize: 16, fontFace: 'Calibri', isTextBox: true, margin: 0 });
 
     const rows: { k: string; label: string; names: string[] }[] = [
