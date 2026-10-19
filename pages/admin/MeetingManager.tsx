@@ -226,15 +226,17 @@ const MeetingManager: React.FC<Props> = ({
   }, [activeMembers]);
 
   /**
-   * 續約名單的「組別執事」要填誰。
-   * 一般情況是該組的執事；**但執事自己續約時掛導師**——總不能自己追蹤自己。
-   * ⚠️ 有些組沒有導師（實際資料：第 10、13 組），那種情況只能留白由人填。
+   * 續約名單的「組別執事」「組別導師」各自帶入該組的人。
+   *
+   * ⚠️ 自己不會出現在自己那一欄：續約的人本身就是該組執事時，執事欄留白而不是
+   *    印他自己（總不能自己追蹤自己）；導師欄同理。另一欄照常帶入。
+   *    有些組沒有導師（實際資料：第 10、13 組），那欄本來就會是空的。
    */
-  const committeeFor = (groupName: string | null | undefined, memberName: string) => {
+  const roleFor = (groupName: string | null | undefined, memberName: string, key: 'deacons' | 'mentors') => {
     const r = rolesByGroup.get(String(groupName ?? '').trim());
     if (!r) return '';
     const self = String(memberName ?? '').trim();
-    return (r.deacons.includes(self) ? r.mentors : r.deacons).join('、');
+    return r[key].filter(n => n !== self).join('、');
   };
 
   useEffect(() => { if (!selectedId && meetings.length > 0) setSelectedId(String(meetings[0].id)); }, [meetings, selectedId]);
@@ -351,9 +353,10 @@ const MeetingManager: React.FC<Props> = ({
           status_note: note?.status_note ?? '',
           // 燈號與來賓數都來自同一份半年報表（手填會蓋過自動值）
           light: note?.light ?? tl?.total_score ?? null,
-          // 組別執事自動帶入；手填過的以人填的為準（與燈號／來賓同一個原則）。
+          // 組別執事／導師自動帶入；手填過的以人填的為準（與燈號／來賓同一個原則）。
           // 用 || 而不是 ??：欄位清空存成空字串，那就該退回自動值。
-          committee: String(note?.committee ?? '').trim() || committeeFor(m.group_name, m.name ?? ''),
+          committee: String(note?.committee ?? '').trim() || roleFor(m.group_name, m.name ?? '', 'deacons'),
+          mentor: String(note?.mentor ?? '').trim() || roleFor(m.group_name, m.name ?? '', 'mentors'),
           // ⚠️ 原本用 registrations.referrer 算，但網頁報名的引薦人幾乎都沒填，
           //    算出來幾乎都是 0（實測 PALMS 21 位的人這裡算成 1）。改用 PALMS 的數字，
           //    沒有 PALMS 資料時才退回自己算。
@@ -840,7 +843,7 @@ const MeetingManager: React.FC<Props> = ({
                             <th className="pb-1 pr-2">姓名</th><th className="pb-1 pr-2">到期日</th>
                             <th className="pb-1 pr-2 w-44">狀況</th><th className="pb-1 pr-2 w-16">來賓</th>
                             <th className="pb-1 pr-2 w-16">燈號</th><th className="pb-1 pr-2">組別</th>
-                            <th className="pb-1 w-28">組別執事</th>
+                            <th className="pb-1 pr-2 w-24">組別執事</th><th className="pb-1 w-24">組別導師</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50">
@@ -861,9 +864,13 @@ const MeetingManager: React.FC<Props> = ({
                                   onBlur={e => saveRenewal(m.member_id, { light: e.target.value === '' ? null : Number(e.target.value) })} />
                               </td>
                               <td className="py-1.5 pr-2 text-gray-500">{m.group_name ?? '—'}</td>
-                              <td className="py-1.5">
+                              <td className="py-1.5 pr-2">
                                 <input className={inputCls} disabled={!canEdit} defaultValue={m.committee ?? ''}
                                   onBlur={e => e.target.value !== (m.committee ?? '') && saveRenewal(m.member_id, { committee: e.target.value })} />
+                              </td>
+                              <td className="py-1.5">
+                                <input className={inputCls} disabled={!canEdit} defaultValue={m.mentor ?? ''}
+                                  onBlur={e => e.target.value !== (m.mentor ?? '') && saveRenewal(m.member_id, { mentor: e.target.value })} />
                               </td>
                             </tr>
                           ))}

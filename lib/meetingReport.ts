@@ -39,6 +39,7 @@ export type RenewalRow = {
   status_note?: string | null;
   light?: number | null;
   committee?: string | null;
+  mentor?: string | null;
   guest_count?: number | null;
 };
 
@@ -85,12 +86,12 @@ const GUEST_HEADERS = ['組別', '會員', '來賓', '專業類別', '訪談人'
 const guestCells = (g: GuestRow) =>
   [g.group_name ?? '', g.member_name ?? '', g.guest_name, g.industry ?? '', g.interviewer ?? '', g.status_note ?? ''];
 
-const RENEWAL_HEADERS = ['姓名', '到期日', '狀況', '來賓', '燈號', '組別', '組別執事'];
+const RENEWAL_HEADERS = ['姓名', '到期日', '狀況', '來賓', '燈號', '組別', '組別執事', '組別導師'];
 const renewalCells = (r: RenewalRow) => [
   r.name, r.end_date ?? '', r.status_note ?? '',
   r.guest_count == null ? '' : String(r.guest_count),
   r.light == null ? '' : String(r.light),
-  r.group_name ?? '', r.committee ?? '',
+  r.group_name ?? '', r.committee ?? '', r.mentor ?? '',
 ];
 
 /** 簽到狀態 → 中文 */
@@ -368,7 +369,7 @@ export async function exportMeetingPptx(r: MeetingReport, fileName: string) {
       const s = slide(renewalPages.length > 1 ? `${AGENDA[5]}（${i + 1}/${renewalPages.length}）` : AGENDA[5], 6);
       s.addTable([headerRow(RENEWAL_HEADERS), ...page.map(m => renewalCells(m).map((t, ci) => ({
         text: t, options: ci >= 3 && ci <= 5 ? { align: 'center' as const } : {},
-      })))], { ...tableOpts, colW: [1.2, 1.3, 2.2, 0.7, 0.7, 0.7, 2.2], rowH: 0.42 });
+      })))], { ...tableOpts, colW: [1.1, 1.15, 1.95, 0.6, 0.6, 0.6, 1.5, 1.5], rowH: 0.42 });
     });
   }
 

@@ -142,7 +142,8 @@ export interface RenewalNote {
     member_id: number;
     status_note?: string | null;
     light?: number | null;
-    committee?: string | null;
+    committee?: string | null;   // 組別執事
+    mentor?: string | null;      // 組別導師
     guest_count?: number | null;
 }
 
