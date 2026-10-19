@@ -107,9 +107,17 @@ export function buildMinutesText(r: MeetingReport): string {
   const present = r.signIn.filter(s => s.status === 'present').map(s => s.name);
   const leave = r.signIn.filter(s => s.status === 'medical').map(s => s.name);
   const absent = r.signIn.filter(s => s.status === 'absent').map(s => s.name);
-  L.push('', `執事簽到（${present.length}/${r.signIn.length}）：${present.join('、') || '—'}`);
+  // 完全沒有紀錄的人＝還沒點名，和「缺席」是兩回事。原本這裡沒列，等於貼出去的
+  // 記錄會讓沒點到的人憑空消失（人數也對不起來）。
+  const unmarked = r.signIn.filter(s => !s.status).map(s => s.name);
+  const rate = r.signIn.length ? Math.round(present.length / r.signIn.length * 100) : 0;
+  L.push('', `執事簽到　應到 ${r.signIn.length}／出席 ${present.length}（${rate}%）`
+    + `／請假 ${leave.length}／缺席 ${absent.length}`
+    + (unmarked.length ? `／未點名 ${unmarked.length}` : ''));
+  L.push(`出席：${present.join('、') || '—'}`);
   if (leave.length) L.push(`請假：${leave.join('、')}`);
   if (absent.length) L.push(`缺席：${absent.join('、')}`);
+  if (unmarked.length) L.push(`未點名：${unmarked.join('、')}`);
 
   const a = r.attendance;
   L.push('', `一、${AGENDA[0]}`);

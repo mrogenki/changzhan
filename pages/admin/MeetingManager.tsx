@@ -433,6 +433,33 @@ const MeetingManager: React.FC<Props> = ({
   const statusOf = (memberId: string | number) =>
     attendance.find(r => String(r.activity_id) === selectedId && String(r.member_id) === String(memberId))?.status;
 
+  /**
+   * 執事簽到統計。標題的「34/41」把請假、缺席與**還沒點名**混在一起看不出來，
+   * 開會時最需要知道的其實是「還有誰沒點」。所以四種狀態分開算，各自附名單。
+   */
+  const signInStats = useMemo(() => {
+    const tally = (rows: Member[]) => {
+      const names = (st?: string) =>
+        rows.filter(m => statusOf(m.id) === st).map(m => m.name ?? '');
+      return {
+        total: rows.length,
+        present: names(AttendanceStatus.PRESENT),
+        leave: names(AttendanceStatus.MEDICAL),
+        absent: names(AttendanceStatus.ABSENT),
+        // 完全沒有 attendance 紀錄的人＝還沒點名，與「缺席」是兩回事
+        unmarked: rows.filter(m => !statusOf(m.id)).map(m => m.name ?? ''),
+      };
+    };
+    return {
+      all: tally(expected),
+      deacons: tally(signInGroups.deacons),
+      mentors: tally(signInGroups.mentors),
+      tops: tally(signInGroups.tops),
+      others: tally(signInGroups.others),
+    };
+    // statusOf 讀的是 attendance 與 selectedId，所以兩個都要進 deps
+  }, [expected, signInGroups, attendance, selectedId]);
+
   /** 一個人的簽到格：姓名 + 職務 + 三顆狀態鈕 */
   const SignInCell: React.FC<{ m: Member | null }> = ({ m }) => {
     if (!m) return <div className="py-2 text-sm text-gray-200">—</div>;
@@ -657,6 +684,41 @@ const MeetingManager: React.FC<Props> = ({
                     </p>
                   ) : (
                     <>
+                      {/* 統計：四種狀態分開，還沒點名的標紅——開會時那才是要處理的 */}
+                      <div className="bg-gray-50 rounded-lg p-3 mb-4">
+                        <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm">
+                          <span className="text-gray-500">應到 <strong className="text-gray-900">{signInStats.all.total}</strong></span>
+                          <span className="text-gray-500">出席 <strong className="text-green-700">{signInStats.all.present.length}</strong></span>
+                          <span className="text-gray-500">請假 <strong className="text-amber-600">{signInStats.all.leave.length}</strong></span>
+                          <span className="text-gray-500">缺席 <strong className="text-gray-900">{signInStats.all.absent.length}</strong></span>
+                          {signInStats.all.unmarked.length > 0 && (
+                            <span className="text-gray-500">未點名 <strong className="text-red-600">{signInStats.all.unmarked.length}</strong></span>
+                          )}
+                          <span className="text-gray-400">
+                            出席率 {signInStats.all.total
+                              ? Math.round(signInStats.all.present.length / signInStats.all.total * 100)
+                              : 0}%
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap gap-x-5 gap-y-1 mt-2 text-xs text-gray-400">
+                          {([
+                            ['執事', signInStats.deacons], ['導師', signInStats.mentors],
+                            ['主席/副主席/秘財', signInStats.tops], ['其他職務', signInStats.others],
+                          ] as const).filter(([, t]) => t.total > 0).map(([label, t]) => (
+                            <span key={label}>{label} <span className="text-gray-500 font-bold">{t.present.length}/{t.total}</span></span>
+                          ))}
+                        </div>
+                        {([
+                          ['請假', signInStats.all.leave, 'text-amber-600'],
+                          ['缺席', signInStats.all.absent, 'text-gray-500'],
+                          ['未點名', signInStats.all.unmarked, 'text-red-600'],
+                        ] as const).filter(([, names]) => names.length > 0).map(([label, names, cls]) => (
+                          <p key={label} className="text-xs mt-1.5 text-gray-400">
+                            <span className={`font-bold ${cls}`}>{label}</span>　{names.join('、')}
+                          </p>
+                        ))}
+                      </div>
+
                       {/* 一列一組：左邊執事、右邊導師，組別在最左 */}
                       <div className="hidden md:grid grid-cols-[3rem_1fr_1fr] gap-x-6 pb-1 text-xs font-bold text-gray-400 uppercase tracking-widest">
                         <span>組別</span>
