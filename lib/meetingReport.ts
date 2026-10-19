@@ -216,6 +216,76 @@ export async function exportMeetingPptx(r: MeetingReport, fileName: string) {
   const headerRow = (cells: string[]) =>
     cells.map(t => ({ text: t, options: { bold: true, color: 'FFFFFF', fill: { color: NAVY } } }));
 
+  // 執事簽到（放在議程之前，與「複製全文」的順序一致）
+  //
+  // ⚠️ 分類的優先順序要跟畫面上的 signInGroups 一致：先比主席／副主席／秘財，
+  //    再執事、再導師。有人同時掛兩個職務時兩邊才不會算到不同類去。
+  const signInCategory = (positions: string[]) =>
+    positions.some(x => ['主席', '副主席', '秘財'].includes(x)) ? '主席/副主席/秘財'
+      : positions.includes('執事') ? '執事'
+      : positions.includes('導師') ? '導師' : '其他職務';
+
+  if (r.signIn.length > 0) {
+    const s0 = slide('執事簽到');
+    const pick = (rows: typeof r.signIn, st?: string) =>
+      st ? rows.filter(x => x.status === st) : rows.filter(x => !x.status);
+    const names = (rows: typeof r.signIn) => rows.map(x => x.name);
+
+    const presentAll = pick(r.signIn, 'present');
+    const rate = Math.round(presentAll.length / r.signIn.length * 100);
+    s0.addText([
+      { text: '出席　', options: { bold: true, color: RED } },
+      { text: `${presentAll.length} 人`, options: { bold: true, fontSize: 24 } },
+      { text: `　／　應到 ${r.signIn.length} 人　／　出席率 ${rate}%`, options: { color: GRAY, fontSize: 13 } },
+    ], { x: 0.5, y: 1.4, w: 9, h: 0.5, fontSize: 16, fontFace: 'Calibri', isTextBox: true, margin: 0 });
+
+    // 只列實際有人的分類，免得印出一排 0
+    const cats = ['執事', '導師', '主席/副主席/秘財', '其他職務']
+      .map(c => ({ c, rows: r.signIn.filter(x => signInCategory(x.positions) === c) }))
+      .filter(x => x.rows.length > 0);
+    const countsOf = (rows: typeof r.signIn) => [
+      String(rows.length), String(pick(rows, 'present').length),
+      String(pick(rows, 'medical').length), String(pick(rows, 'absent').length),
+      String(pick(rows).length),
+    ];
+    s0.addTable([
+      headerRow(['類別', '應到', '出席', '請假', '缺席', '未點名']),
+      ...cats.map(x => [
+        { text: x.c, options: { bold: true } },
+        ...countsOf(x.rows).map(t => ({ text: t, options: { align: 'center' as const } })),
+      ]),
+      [
+        { text: '合計', options: { bold: true, fill: { color: 'F3F4F6' } } },
+        ...countsOf(r.signIn).map(t => ({
+          text: t, options: { align: 'center' as const, bold: true, fill: { color: 'F3F4F6' } },
+        })),
+      ],
+    ], { ...tableOpts, y: 2.0, colW: [2.4, 1.1, 1.1, 1.1, 1.1, 2.2], rowH: 0.36 });
+
+    // 請假／缺席／未點名各列一行名單——出席的人太多，列出來反而看不到重點
+    const lines: { label: string; rows: typeof r.signIn; color: string }[] = [
+      { label: '請假', rows: pick(r.signIn, 'medical'), color: GRAY },
+      { label: '缺席', rows: pick(r.signIn, 'absent'), color: GRAY },
+      { label: '未點名', rows: pick(r.signIn), color: RED },
+    ].filter(x => x.rows.length > 0);
+    // ⚠️ 行距要依實際字數算，不能用固定值。未點名 41 位時那行會折成 3〜4 行，
+    //    固定行距會讓下一行疊上來（本機產檔時實際看到的）。
+    //    11pt 在 9 吋寬大約放得下 55 個中文字，這裡抓 50 留餘裕。
+    let y = 2.0 + (cats.length + 1) * 0.36 + 0.15;
+    lines.forEach((x) => {
+      const body = names(x.rows).join('、');
+      const wrapped = Math.max(1, Math.ceil((body.length + x.label.length + 5) / 50));
+      s0.addText([
+        { text: `${x.label}（${x.rows.length}）　`, options: { bold: true, color: x.color } },
+        { text: body, options: { color: '111827' } },
+      ], {
+        x: 0.5, y, w: 9, h: 0.22 * wrapped,
+        fontSize: 11, fontFace: 'Calibri', isTextBox: true, margin: 0,
+      });
+      y += 0.22 * wrapped + 0.1;
+    });
+  }
+
   // 1 出缺席報告
   const s1 = slide(AGENDA[0], 1);
   const a = r.attendance;
