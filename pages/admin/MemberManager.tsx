@@ -75,6 +75,11 @@ const MemberManager: React.FC<MemberManagerProps> = ({ members, onAddMember, onU
       positions: formData.has('positions_present')
         ? sortPositions(formData.getAll('position') as string[])
         : editingMember?.positions,
+      // 同上：只有表單真的有這個欄位時才覆寫，舊頁面按儲存不會把資料清掉
+      mentor_groups: formData.has('positions_present')
+        ? (formData.get('mentor_groups') as string ?? '')
+            .split(/[、,，\s]+/).map(v => v.trim()).filter(Boolean)
+        : editingMember?.mentor_groups,
     };
 
     if (editingMember) onUpdateMember(memberData);
@@ -587,6 +592,16 @@ const MemberManager: React.FC<MemberManagerProps> = ({ members, onAddMember, onU
                     ))}
                   </div>
                   <p className="text-xs text-gray-400 mt-1">可複選；沒有職務就不用勾。勾「小組長」的人可以在 LINE 裡自助發起組聚。</p>
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-sm font-bold text-gray-700 mb-1">兼任導師的其他組別</label>
+                  <input name="mentor_groups" defaultValue={(editingMember?.mentor_groups ?? []).join('、')}
+                    className="w-full border rounded-lg px-3 py-3 outline-none focus:ring-2 focus:ring-red-500"
+                    placeholder="例如：10（多組用「、」分隔）" />
+                  <p className="text-xs text-gray-400 mt-1">
+                    只有「導師」需要填，而且<strong>上面的組別不用重複填</strong>。
+                    一位導師同時帶兩組時填在這裡，執事會的 363 續約名單才對得到該組的導師。
+                  </p>
                 </div>
                 <div className="col-span-2">
                   <label className="block text-sm font-bold text-gray-700 mb-1">產業鏈</label>

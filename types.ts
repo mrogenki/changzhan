@@ -213,6 +213,8 @@ export interface Member {
     /** 分會職務（可複選），有效值見 constants.tsx 的 CHAPTER_POSITIONS。
      *  含「小組長」的人可以在 LINE 自助發起組聚（/liff/signup?host=1）。 */
     positions?: string[];
+    /** 兼任導師的其他組別（自己的 group_name 不必重複填），只在職務含「導師」時有意義 */
+    mentor_groups?: string[];
 }
 
 export interface AttendanceRecord {

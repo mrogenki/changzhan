@@ -216,11 +216,15 @@ const MeetingManager: React.FC<Props> = ({
     };
     activeMembers.forEach(x => {
       const g = (x.group_name || '').trim();
-      if (!g) return;                // 沒設組別的人對不到任何一組，略過
       const name = String(x.name ?? '').trim();
       const pos = x.positions ?? [];
-      if (pos.includes('執事')) put(g, 'deacons', name);
-      if (pos.includes('導師')) put(g, 'mentors', name);
+      if (g && pos.includes('執事')) put(g, 'deacons', name);
+      if (pos.includes('導師')) {
+        // 一位導師可能同時帶兩組（陳政斌帶 9、10；張文昱帶 12、13）。members.group_name
+        // 只放得下一個，兼任的那幾組記在 mentor_groups，兩邊都要算進來。
+        const groups = new Set([g, ...(x.mentor_groups ?? []).map(v => String(v).trim())]);
+        groups.forEach(mg => { if (mg) put(mg, 'mentors', name); });
+      }
     });
     return m;
   }, [activeMembers]);
