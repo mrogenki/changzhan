@@ -49,8 +49,8 @@
 這個系統 **與 [`bni-report`](https://github.com/mrogenki/bni-report) 共用同一個 Supabase project**：
 
 - **Supabase Project ID**：`qxoglhkfxxqsjefynzqn`（名稱：changzhan）
-- **共用 tables**：`user_roles`（共用 RBAC）
-- **共用 functions**：`current_user_role()` SECURITY DEFINER（兩個系統的 RLS 都依賴此函式）
+- **權限來源**：分會幹部名冊 `admins`（`user_roles` 已不再是共用 RBAC，見下方 2026-09-21）
+- **權限判定**：兩邊不再依賴 `current_user_role()`；2026-10-02 起權限一律回到 `admins`（見下方）
 
 **⚠️ 權限只有一個來源：分會幹部名冊 `admins`**（2026-09-21 由 bni-report 收斂）。
 `user_roles` 與 JWT 的 `app_metadata.role` **都已不再影響權限**，bni-report 也把
@@ -291,6 +291,7 @@ push 完到真的上線可能要好幾分鐘。確認方式：看 Vercel 的部�
 - ✅ `check_message_recently_sent` / `handle_new_user` / `sync_role_to_jwt` 撤掉對外的 EXECUTE。**注意**：Postgres 預設把 EXECUTE 給 `PUBLIC`，只撤 anon/authenticated 沒有用，要連 PUBLIC 一起撤。
 
 **仍待處理：**
+- 🔴 **`admins.password` 是明文殘留**：2026-09-19 記錄當時 14 列全部有值，且無一是 bcrypt hash。該表讀取政策是 `is_changzhan_admin()`，等於任何一位幹部都讀得到其他幹部的密碼。後台登入早已改走 Supabase Auth，這欄不再需要，應清空並 drop。⚠️ 動手前先確認 `manage-admin` Edge Function 有沒有在寫它（原始碼不在 repo 內）。
 - 🟡 `message_send_log` 允許 anon insert/update — LIFF 訪客報到的歡迎訊息以 anon 身分呼叫 `send-line-message`，該函式要寫紀錄。要收緊得先改成由 edge function 以 service role 寫入。
 - 🟡 `line_groups` 有一條 anon 的 `FOR ALL` 政策 — 唯讀帳號仍可繞過前端直接改群組資料。要收緊得先確認 `line-webhook` 用哪個 key 寫入。
 - 🟡 `list_unbound_members()` 對 anon 開放（LIFF 會員綁定的下拉選單需要），等於未綁定會員的姓名可被列舉。
