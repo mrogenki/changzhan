@@ -203,15 +203,19 @@ export async function exportMeetingPptx(r: MeetingReport, fileName: string) {
       fontFace: 'Calibri', isTextBox: true, margin: 0,
     });
     s.addText(`${r.chapterName}執事會　${r.date}`, {
-      x: 0.5, y: 0.95, w: 9, h: 0.3, fontSize: 11, color: GRAY,
+      x: 0.5, y: 0.95, w: 9, h: 0.32, fontSize: 13, color: GRAY,
       fontFace: 'Calibri', isTextBox: true, margin: 0,
     });
     return s;
   };
 
+  // 執事簽到那張的表格位置／列高——名單要接在表格下面，所以兩邊都得用同一組值
+  const SIGNIN_TABLE_Y = 1.95;
+  const SIGNIN_ROW_H = 0.44;
+
   const tableOpts = {
     x: 0.5, y: 1.45, w: 9,
-    fontSize: 12, fontFace: 'Calibri', color: '111827',
+    fontSize: 14, fontFace: 'Calibri', color: '111827',
     border: { type: 'solid' as const, pt: 1, color: 'E5E7EB' },
     autoPage: false,
   };
@@ -237,9 +241,9 @@ export async function exportMeetingPptx(r: MeetingReport, fileName: string) {
     const rate = Math.round(presentAll.length / r.signIn.length * 100);
     s0.addText([
       { text: '出席　', options: { bold: true, color: RED } },
-      { text: `${presentAll.length} 人`, options: { bold: true, fontSize: 24 } },
-      { text: `　／　應到 ${r.signIn.length} 人　／　出席率 ${rate}%`, options: { color: GRAY, fontSize: 13 } },
-    ], { x: 0.5, y: 1.4, w: 9, h: 0.5, fontSize: 16, fontFace: 'Calibri', isTextBox: true, margin: 0 });
+      { text: `${presentAll.length} 人`, options: { bold: true, fontSize: 28 } },
+      { text: `　／　應到 ${r.signIn.length} 人　／　出席率 ${rate}%`, options: { color: GRAY, fontSize: 15 } },
+    ], { x: 0.5, y: 1.33, w: 9, h: 0.5, fontSize: 18, fontFace: 'Calibri', isTextBox: true, margin: 0 });
 
     // 只列實際有人的分類，免得印出一排 0
     const cats = ['執事', '導師', '主席/副主席/秘財', '其他職務']
@@ -262,7 +266,7 @@ export async function exportMeetingPptx(r: MeetingReport, fileName: string) {
           text: t, options: { align: 'center' as const, bold: true, fill: { color: 'F3F4F6' } },
         })),
       ],
-    ], { ...tableOpts, y: 2.0, colW: [2.4, 1.1, 1.1, 1.1, 1.1, 2.2], rowH: 0.36 });
+    ], { ...tableOpts, y: SIGNIN_TABLE_Y, colW: [2.4, 1.1, 1.1, 1.1, 1.1, 2.2], rowH: SIGNIN_ROW_H });
 
     // 請假／缺席／未點名各列一行名單——出席的人太多，列出來反而看不到重點
     const lines: { label: string; rows: typeof r.signIn; color: string }[] = [
@@ -270,35 +274,50 @@ export async function exportMeetingPptx(r: MeetingReport, fileName: string) {
       { label: '缺席', rows: pick(r.signIn, 'absent'), color: GRAY },
       { label: '未點名', rows: pick(r.signIn), color: RED },
     ].filter(x => x.rows.length > 0);
-    // ⚠️ 行距要依實際字數算，不能用固定值。未點名 41 位時那行會折成 3〜4 行，
-    //    固定行距會讓下一行疊上來（本機產檔時實際看到的）。
-    //    11pt 在 9 吋寬大約放得下 55 個中文字，這裡抓 50 留餘裕。
-    let y = 2.0 + (cats.length + 1) * 0.36 + 0.15;
-    lines.forEach((x) => {
-      const body = names(x.rows).join('、');
-      const wrapped = Math.max(1, Math.ceil((body.length + x.label.length + 5) / 50));
+    // ⚠️ 表格底部要用「列數 × 列高」自己算，**而且列數要含標題列與合計列**。
+    //    原本只算了分類列，名單就直接疊在合計那一行上（實際印出來才看到）。
+    //    pptxgenjs 在 XML 寫的表格高度是名目值、不等於實際佔位，量 XML 驗不出這個錯。
+    const tableRows = cats.length + 2;                 // 標題列 + 各分類 + 合計列
+    const tableBottom = SIGNIN_TABLE_Y + tableRows * SIGNIN_ROW_H;
+
+    // 行距依字數估算：未點名 41 位時那行會折成好幾行，固定行距會讓下一行疊上來。
+    // 字太大時整塊會掉出投影片（41 位全未點名那種情況），所以由大到小試，取第一個放得下的。
+    // 階梯要夠密：只有 14/12 兩段時，41 人在 12pt 仍超出版面 0.06 吋（實際量出來的）。
+    const layout = [14, 13, 12, 11, 10].map((fs) => {
+      const perLine = Math.floor(9 / (fs / 72) * 0.62);   // 9 吋寬放得下幾個中文字
+      const lh = fs / 72 * 1.35;
+      let y = tableBottom + 0.18;
+      const placed = lines.map((x) => {
+        const body = names(x.rows).join('、');
+        const wrapped = Math.max(1, Math.ceil((body.length + x.label.length + 5) / perLine));
+        const item = { x, y, h: lh * wrapped, fs, body };
+        y += lh * wrapped + 0.08;
+        return item;
+      });
+      return { fs, bottom: y, placed };
+    }).find((v, i, arr) => v.bottom <= 5.45 || i === arr.length - 1)!;
+
+    layout.placed.forEach(({ x, y, h, fs, body }) => {
       s0.addText([
         { text: `${x.label}（${x.rows.length}）　`, options: { bold: true, color: x.color } },
         { text: body, options: { color: '111827' } },
-      ], {
-        x: 0.5, y, w: 9, h: 0.22 * wrapped,
-        fontSize: 11, fontFace: 'Calibri', isTextBox: true, margin: 0,
-      });
-      y += 0.22 * wrapped + 0.1;
+      ], { x: 0.5, y, w: 9, h, fontSize: fs, fontFace: 'Calibri', isTextBox: true, margin: 0 });
     });
   }
 
   // 1 出缺席報告
+  const ATT_TABLE_Y = 1.95, ATT_ROW_H = 0.5;
+  let attBottom = ATT_TABLE_Y;   // 沒有對應例會時後面的文字就接在表格起點下面
   const s1 = slide(AGENDA[0], 1);
   const a = r.attendance;
   if (a) {
     s1.addText([
       { text: 'P  出席　', options: { bold: true, color: RED } },
-      { text: `${a.presentTotal} 人`, options: { bold: true, fontSize: 24 } },
+      { text: `${a.presentTotal} 人`, options: { bold: true, fontSize: 28 } },
       { text: `　／　會員人數 ${a.totalMembers} 人　／　出席率 `
         + `${a.totalMembers ? Math.round(a.presentTotal / a.totalMembers * 100) : 0}%`
-        + `　／　V 來賓 ${a.guestCount} 人`, options: { color: GRAY, fontSize: 13 } },
-    ], { x: 0.5, y: 1.4, w: 9, h: 0.5, fontSize: 16, fontFace: 'Calibri', isTextBox: true, margin: 0 });
+        + `　／　V 來賓 ${a.guestCount} 人`, options: { color: GRAY, fontSize: 15 } },
+    ], { x: 0.5, y: 1.33, w: 9, h: 0.5, fontSize: 18, fontFace: 'Calibri', isTextBox: true, margin: 0 });
 
     const rows: { k: string; label: string; names: string[] }[] = [
       { k: 'A', label: '缺席', names: a.absentNames },
@@ -312,21 +331,26 @@ export async function exportMeetingPptx(r: MeetingReport, fileName: string) {
         { text: x.k, options: { bold: true, color: RED, align: 'center' as const } },
         { text: x.label, options: { bold: true } },
         { text: `${x.names.length} 人`, options: { align: 'center' as const } },
-        { text: x.names.join('、') || '—', options: { fontSize: 11 } },
+        { text: x.names.join('、') || '—', options: { fontSize: 13 } },
       ]),
-    ], { ...tableOpts, y: 2.1, colW: [0.5, 1.6, 1, 5.9], rowH: 0.45 });
+    ], { ...tableOpts, y: ATT_TABLE_Y, colW: [0.5, 1.6, 1, 5.9], rowH: ATT_ROW_H });
 
+    // 同簽到那張：底部要用「列數 × 列高」算，列數含標題列
+    attBottom = ATT_TABLE_Y + (rows.length + 1) * ATT_ROW_H;
     if (a.unmarked > 0) {
       s1.addText(`還有 ${a.unmarked} 位會員沒有點名紀錄`, {
-        x: 0.5, y: 4.5, w: 9, h: 0.3, fontSize: 11, color: RED, fontFace: 'Calibri', isTextBox: true, margin: 0,
+        x: 0.5, y: attBottom + 0.1, w: 9, h: 0.3, fontSize: 13, color: RED,
+        fontFace: 'Calibri', isTextBox: true, margin: 0,
       });
+      attBottom += 0.4;
     }
   } else {
     s1.addText('尚未對應例會場次', { x: 0.5, y: 2, w: 9, h: 0.5, fontSize: 16, color: GRAY, fontFace: 'Calibri', isTextBox: true });
   }
   if (r.attendanceNote?.trim()) {
     s1.addText(r.attendanceNote.trim(), {
-      x: 0.5, y: 4.8, w: 9, h: 0.5, fontSize: 12, color: GRAY, fontFace: 'Calibri', isTextBox: true, margin: 0,
+      x: 0.5, y: attBottom + 0.12, w: 9, h: 0.5, fontSize: 14, color: GRAY,
+      fontFace: 'Calibri', isTextBox: true, margin: 0,
     });
   }
 
@@ -341,7 +365,7 @@ export async function exportMeetingPptx(r: MeetingReport, fileName: string) {
     pages.forEach((page, i) => {
       const s = slide(pages.length > 1 ? `${title}（${i + 1}/${pages.length}）` : title, index);
       s.addTable([headerRow(GUEST_HEADERS), ...page.map(g => guestCells(g).map(t => ({ text: t })))],
-        { ...tableOpts, colW: [0.7, 1.1, 1.3, 2.3, 1.3, 2.3], rowH: 0.45 });
+        { ...tableOpts, colW: [0.7, 1.1, 1.3, 2.3, 1.3, 2.3], rowH: 0.5 });
     });
   };
 
@@ -356,7 +380,7 @@ export async function exportMeetingPptx(r: MeetingReport, fileName: string) {
     appLines.length
       ? appLines.map((t, i) => ({ text: t, options: { bullet: true, breakLine: i < appLines.length - 1 } }))
       : [{ text: '（無）', options: { color: GRAY } }],
-    { x: 0.6, y: 1.5, w: 8.8, h: 3.5, fontSize: 15, fontFace: 'Calibri', color: '111827', isTextBox: true, paraSpaceAfter: 8 },
+    { x: 0.6, y: 1.5, w: 8.8, h: 3.5, fontSize: 17, fontFace: 'Calibri', color: '111827', isTextBox: true, paraSpaceAfter: 8 },
   );
 
   guestSlides(AGENDA[3], 4, r.lastWeekGuests);
@@ -372,7 +396,7 @@ export async function exportMeetingPptx(r: MeetingReport, fileName: string) {
       const s = slide(renewalPages.length > 1 ? `${AGENDA[5]}（${i + 1}/${renewalPages.length}）` : AGENDA[5], 6);
       s.addTable([headerRow(RENEWAL_HEADERS), ...page.map(m => renewalCells(m).map((t, ci) => ({
         text: t, options: ci >= 3 && ci <= 5 ? { align: 'center' as const } : {},
-      })))], { ...tableOpts, colW: [1.1, 1.15, 1.95, 0.6, 0.6, 0.6, 1.5, 1.5], rowH: 0.42 });
+      })))], { ...tableOpts, colW: [1.1, 1.15, 1.95, 0.6, 0.6, 0.6, 1.5, 1.5], rowH: 0.46 });
     });
   }
 
@@ -384,7 +408,7 @@ export async function exportMeetingPptx(r: MeetingReport, fileName: string) {
       lines.length
         ? lines.map((t, i) => ({ text: t, options: { bullet: true, breakLine: i < lines.length - 1 } }))
         : [{ text: '（無）', options: { color: GRAY } }],
-      { x: 0.6, y: 1.5, w: 8.8, h: 3.5, fontSize: 15, fontFace: 'Calibri', color: '111827', isTextBox: true, paraSpaceAfter: 8 },
+      { x: 0.6, y: 1.5, w: 8.8, h: 3.5, fontSize: 17, fontFace: 'Calibri', color: '111827', isTextBox: true, paraSpaceAfter: 8 },
     );
   };
   noteSlide(AGENDA[6], 7, r.processNote);
@@ -401,7 +425,7 @@ export async function exportMeetingPptx(r: MeetingReport, fileName: string) {
         { text: i.owner_name ?? '' },
         { text: i.due_date ?? '' },
       ]),
-    ], { ...tableOpts, colW: [0.5, 5.3, 1.6, 1.6], rowH: 0.42, fill: { color: LIGHT } });
+    ], { ...tableOpts, colW: [0.5, 5.3, 1.6, 1.6], rowH: 0.48, fill: { color: LIGHT } });
   }
 
   await pres.writeFile({ fileName });
