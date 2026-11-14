@@ -87,8 +87,14 @@ const guestCells = (g: GuestRow) =>
   [g.group_name ?? '', g.member_name ?? '', g.guest_name, g.industry ?? '', g.interviewer ?? '', g.status_note ?? ''];
 
 const RENEWAL_HEADERS = ['姓名', '到期日', '狀況', '來賓', '燈號', '組別', '組別執事', '組別導師'];
+/** 到期日只留月／日——年份在「未來三個月」的名單裡沒有資訊量，卻寬到逼整列折行 */
+const shortDate = (d?: string | null) => {
+  const m = /^\d{4}-(\d{2})-(\d{2})$/.exec(String(d ?? ''));
+  return m ? `${+m[1]}/${+m[2]}` : String(d ?? '');
+};
+
 const renewalCells = (r: RenewalRow) => [
-  r.name, r.end_date ?? '', r.status_note ?? '',
+  r.name, shortDate(r.end_date), r.status_note ?? '',
   r.guest_count == null ? '' : String(r.guest_count),
   r.light == null ? '' : String(r.light),
   r.group_name ?? '', r.committee ?? '', r.mentor ?? '',
@@ -425,7 +431,7 @@ export async function exportMeetingPptx(
 
   // 2 / 4 / 5 來賓（表格，超過 7 列自動分頁）
   const guestSlides = (title: string, index: number, rows: GuestRow[]) => {
-    const pages = chunk(rows, 6);   // 字放大後一頁只放得下 6 列
+    const pages = chunk(rows, 5);   // 同續約：rowH 擋不住折行，寧可少放一列
     if (pages.length === 0) {
       const s = slide(title, index);
       s.addText('（無）', { x: 0.5, y: 2, w: 9, h: 0.4, fontSize: 16, color: T.sub, fontFace: 'Calibri', isTextBox: true });
@@ -434,7 +440,7 @@ export async function exportMeetingPptx(
     pages.forEach((page, i) => {
       const s = slide(pages.length > 1 ? `${title}（${i + 1}/${pages.length}）` : title, index);
       s.addTable([headerRow(GUEST_HEADERS), ...page.map(g => guestCells(g).map(t => ({ text: t })))],
-        { ...tableOpts, colW: [0.7, 1.1, 1.3, 2.3, 1.3, 2.3], rowH: 0.56 });
+        { ...tableOpts, colW: [0.65, 1.0, 1.2, 2.45, 1.2, 2.5], rowH: 0.56 });
     });
   };
 
@@ -456,7 +462,7 @@ export async function exportMeetingPptx(
   guestSlides(AGENDA[4], 5, r.earlierGuests);
 
   // 6 續約（每頁 8 列，與原簡報一致）
-  const renewalPages = chunk(r.renewals, 6);   // 同上；原本 8 列是配小字
+  const renewalPages = chunk(r.renewals, 5);   // rowH 是最小值，折行會長高，見下方註解
   if (renewalPages.length === 0) {
     const s = slide(AGENDA[5], 6);
     s.addText('未來三個月無到期會員', { x: 0.5, y: 2, w: 9, h: 0.4, fontSize: 16, color: T.sub, fontFace: 'Calibri', isTextBox: true });
@@ -465,7 +471,7 @@ export async function exportMeetingPptx(
       const s = slide(renewalPages.length > 1 ? `${AGENDA[5]}（${i + 1}/${renewalPages.length}）` : AGENDA[5], 6);
       s.addTable([headerRow(RENEWAL_HEADERS), ...page.map(m => renewalCells(m).map((t, ci) => ({
         text: t, options: ci >= 3 && ci <= 5 ? { align: 'center' as const } : {},
-      })))], { ...tableOpts, colW: [1.1, 1.15, 1.95, 0.6, 0.6, 0.6, 1.5, 1.5], rowH: 0.54 });
+      })))], { ...tableOpts, colW: [1.1, 0.95, 2.2, 0.62, 0.62, 0.62, 1.4, 1.49], rowH: 0.54 });
     });
   }
 
