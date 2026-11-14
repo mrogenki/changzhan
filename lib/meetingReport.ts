@@ -242,7 +242,7 @@ const chunk = <T,>(rows: T[], size: number): T[][] => {
 };
 
 export async function exportMeetingPptx(
-  r: MeetingReport, fileName: string, themeKey: ReportThemeKey = 'classic',
+  r: MeetingReport, fileName: string, themeKey: ReportThemeKey = 'bni',
 ) {
   const PptxGenJS = (await import('pptxgenjs')).default;
   const pres = new PptxGenJS();

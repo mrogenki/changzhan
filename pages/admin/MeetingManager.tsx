@@ -144,7 +144,7 @@ const MeetingManager: React.FC<Props> = ({
   // 不值得為它多一張設定表；要全分會統一再搬去 app_settings。
   const [theme, setTheme] = useState<ReportThemeKey>(() => {
     const v = typeof localStorage !== 'undefined' ? localStorage.getItem('meetingPptTheme') : null;
-    return (v && v in REPORT_THEMES ? v : 'classic') as ReportThemeKey;
+    return (v && v in REPORT_THEMES ? v : 'bni') as ReportThemeKey;   // 分會選定 BNI 紅
   });
   const pickTheme = (v: ReportThemeKey) => {
     setTheme(v);
