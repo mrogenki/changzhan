@@ -12,7 +12,8 @@ import { CHAPTER_NAME } from '../../chapterConfig';
 import { supabase } from '../../supabaseClient';
 import CheckinQrPanel from '../../components/CheckinQrPanel';
 import {
-  AGENDA, buildMinutesText, exportMeetingPptx, GuestRow, MeetingReport, RenewalRow,
+  AGENDA, buildMinutesText, exportMeetingPptx, REPORT_THEMES, type ReportThemeKey,
+  GuestRow, MeetingReport, RenewalRow,
 } from '../../lib/meetingReport';
 
 // 執事會：簽到 + 照議程的會議記錄 + 待辦追蹤
@@ -138,6 +139,17 @@ const MeetingManager: React.FC<Props> = ({
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState('');
   const [showQr, setShowQr] = useState(false);
+
+  // 簡報風格。存 localStorage 而不是 DB——這是「誰匯出誰決定」的個人偏好，
+  // 不值得為它多一張設定表；要全分會統一再搬去 app_settings。
+  const [theme, setTheme] = useState<ReportThemeKey>(() => {
+    const v = typeof localStorage !== 'undefined' ? localStorage.getItem('meetingPptTheme') : null;
+    return (v && v in REPORT_THEMES ? v : 'classic') as ReportThemeKey;
+  });
+  const pickTheme = (v: ReportThemeKey) => {
+    setTheme(v);
+    try { localStorage.setItem('meetingPptTheme', v); } catch { /* 無痕模式會丟錯，忽略 */ }
+  };
   const [showNew, setShowNew] = useState(false);
   const [copied, setCopied] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -557,7 +569,7 @@ const MeetingManager: React.FC<Props> = ({
     if (!selected) return;
     setExporting(true);
     try {
-      await exportMeetingPptx(report(), `${CHAPTER_NAME}執事會${selected.date.replace(/-/g, '')}.pptx`);
+      await exportMeetingPptx(report(), `${CHAPTER_NAME}執事會${selected.date.replace(/-/g, '')}.pptx`, theme);
     } catch (e: any) {
       alert('匯出失敗：' + (e?.message ?? String(e)));
     } finally { setExporting(false); }
@@ -654,10 +666,19 @@ const MeetingManager: React.FC<Props> = ({
                     <button onClick={copyText} className="border border-gray-200 px-3 py-2 rounded-lg text-sm font-bold flex items-center gap-1.5 hover:bg-gray-50">
                       {copied ? <><Check size={16} /> 已複製</> : <><Copy size={16} /> 複製全文</>}
                     </button>
-                    <button onClick={exportPptx} disabled={exporting}
-                      className="border border-gray-200 px-3 py-2 rounded-lg text-sm font-bold flex items-center gap-1.5 hover:bg-gray-50 disabled:opacity-50">
-                      {exporting ? <Loader2 size={16} className="animate-spin" /> : <FileDown size={16} />} 匯出簡報
-                    </button>
+                    <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden">
+                      <button onClick={exportPptx} disabled={exporting}
+                        className="px-3 py-2 text-sm font-bold flex items-center gap-1.5 hover:bg-gray-50 disabled:opacity-50">
+                        {exporting ? <Loader2 size={16} className="animate-spin" /> : <FileDown size={16} />} 匯出簡報
+                      </button>
+                      <select value={theme} onChange={e => pickTheme(e.target.value as ReportThemeKey)}
+                        title={REPORT_THEMES[theme].desc}
+                        className="border-l border-gray-200 bg-white text-sm px-2 py-2 outline-none hover:bg-gray-50">
+                        {(Object.keys(REPORT_THEMES) as ReportThemeKey[]).map(k => (
+                          <option key={k} value={k}>{REPORT_THEMES[k].label}</option>
+                        ))}
+                      </select>
+                    </div>
                     {canEdit && (
                       <button onClick={saveMinutes} disabled={saving}
                         className="bg-gray-900 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-1.5 disabled:opacity-50">

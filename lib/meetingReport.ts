@@ -178,10 +178,60 @@ export function buildMinutesText(r: MeetingReport): string {
 
 // ============ 簡報檔 ============
 
-const NAVY = '1F2A44';
-const RED = 'C8102E';
-const GRAY = '6B7280';
-const LIGHT = 'F3F4F6';
+// ============ 簡報風格 ============
+//
+// 版型結構是共用的，風格只換顏色與標題的裝飾——這樣新增一種風格不會動到版面邏輯，
+// 也不會把「名單疊到表格上」那類位置計算的坑重新引入一次。
+export type ReportThemeKey = 'classic' | 'bni' | 'dark' | 'section';
+
+type Theme = {
+  label: string;
+  desc: string;
+  bg?: string;          // 投影片底色，不給就是白底
+  title: string;        // 標題文字
+  sub: string;          // 副標（分會名／日期）
+  accent: string;       // 強調色（大數字、A/L/M/S 代號）
+  head: string;         // 表頭底色
+  headText: string;
+  text: string;         // 內文
+  border: string;       // 表格框線
+  zebra: string;        // 合計列／待辦表的底色
+  bar?: boolean;        // 標題左邊畫一條色塊
+  palette?: string[];   // 有給的話，每一段議程輪替不同主色
+};
+
+export const REPORT_THEMES: Record<ReportThemeKey, Theme> = {
+  classic: {
+    label: '簡潔藍', desc: '目前的樣式：白底、深藍標題、細灰線',
+    title: '1F2A44', sub: '6B7280', accent: 'C8102E',
+    head: '1F2A44', headText: 'FFFFFF', text: '111827',
+    border: 'E5E7EB', zebra: 'F3F4F6',
+  },
+  bni: {
+    label: 'BNI 紅', desc: '分會識別色：標題左側紅色粗條、紅色表頭',
+    title: '1A1A1A', sub: '8A8A8A', accent: 'C8102E',
+    head: 'C8102E', headText: 'FFFFFF', text: '1A1A1A',
+    border: 'E3D6D8', zebra: 'FBF0F1', bar: true,
+  },
+  dark: {
+    label: '深色投影', desc: '深藍底白字，暗房投影對比最好',
+    bg: '12192B',
+    title: 'FFFFFF', sub: '94A3B8', accent: 'FF6B7F',
+    head: '2B3A57', headText: 'FFFFFF', text: 'E5E7EB',
+    border: '3A4A69', zebra: '1C273D', bar: true,
+  },
+  section: {
+    label: '彩色分區', desc: '每段議程一個主色，翻頁有節奏感',
+    title: '1F2A44', sub: '6B7280', accent: 'C8102E',
+    head: '1F2A44', headText: 'FFFFFF', text: '111827',
+    border: 'E5E7EB', zebra: 'F3F4F6', bar: true,
+    // 簽到、出缺席、來賓、入會、上週、之前、續約、流程、臨時動議、待辦
+    palette: ['0F766E', '1D4ED8', 'B45309', 'B45309', 'B45309', 'B45309',
+              '15803D', '6D28D9', '6D28D9', '334155'],
+  },
+};
+
+// 簡報的顏色一律走 REPORT_THEMES，這裡不再留全域色票（留著容易又寫死一個）
 
 /** 表格太長要分頁，不然會超出投影片 */
 const chunk = <T,>(rows: T[], size: number): T[][] => {
@@ -191,19 +241,38 @@ const chunk = <T,>(rows: T[], size: number): T[][] => {
   return out;
 };
 
-export async function exportMeetingPptx(r: MeetingReport, fileName: string) {
+export async function exportMeetingPptx(
+  r: MeetingReport, fileName: string, themeKey: ReportThemeKey = 'classic',
+) {
   const PptxGenJS = (await import('pptxgenjs')).default;
   const pres = new PptxGenJS();
   pres.layout = 'LAYOUT_16x9'; // 10 x 5.625 英吋
 
+  const T = REPORT_THEMES[themeKey] ?? REPORT_THEMES.classic;
+  // 「彩色分區」每段換色，其餘風格整份同一色。headerRow 不知道自己在哪一張，
+  // 所以由 slide() 更新這個值。
+  let accent = T.palette?.[0] ?? T.head;
+  let slideSeq = 0;
+
   const slide = (title: string, index?: number) => {
     const s = pres.addSlide();
+    if (T.bg) s.background = { color: T.bg };
+    accent = T.palette?.[slideSeq % T.palette.length] ?? T.head;
+    slideSeq += 1;
+
+    const titleX = T.bar ? 0.72 : 0.5;
+    if (T.bar) {
+      s.addShape(pres.ShapeType.rect, {
+        x: 0.5, y: 0.37, w: 0.1, h: 0.62, fill: { color: accent },
+      });
+    }
     s.addText(index ? `${index}. ${title}` : title, {
-      x: 0.5, y: 0.35, w: 9, h: 0.6, fontSize: 30, bold: true, color: NAVY,
+      x: titleX, y: 0.35, w: 9.5 - titleX, h: 0.6, fontSize: 30, bold: true,
+      color: T.palette ? accent : T.title,
       fontFace: 'Calibri', isTextBox: true, margin: 0,
     });
     s.addText(`${r.chapterName}執事會　${r.date}`, {
-      x: 0.5, y: 0.95, w: 9, h: 0.32, fontSize: 13, color: GRAY,
+      x: titleX, y: 0.95, w: 9.5 - titleX, h: 0.32, fontSize: 13, color: T.sub,
       fontFace: 'Calibri', isTextBox: true, margin: 0,
     });
     return s;
@@ -215,12 +284,12 @@ export async function exportMeetingPptx(r: MeetingReport, fileName: string) {
 
   const tableOpts = {
     x: 0.5, y: 1.45, w: 9,
-    fontSize: 14, fontFace: 'Calibri', color: '111827',
-    border: { type: 'solid' as const, pt: 1, color: 'E5E7EB' },
+    fontSize: 14, fontFace: 'Calibri', color: T.text,
+    border: { type: 'solid' as const, pt: 1, color: T.border },
     autoPage: false,
   };
   const headerRow = (cells: string[]) =>
-    cells.map(t => ({ text: t, options: { bold: true, color: 'FFFFFF', fill: { color: NAVY } } }));
+    cells.map(t => ({ text: t, options: { bold: true, color: T.headText, fill: { color: accent } } }));
 
   // 執事簽到（放在議程之前，與「複製全文」的順序一致）
   //
@@ -240,9 +309,9 @@ export async function exportMeetingPptx(r: MeetingReport, fileName: string) {
     const presentAll = pick(r.signIn, 'present');
     const rate = Math.round(presentAll.length / r.signIn.length * 100);
     s0.addText([
-      { text: '出席　', options: { bold: true, color: RED } },
+      { text: '出席　', options: { bold: true, color: T.accent } },
       { text: `${presentAll.length} 人`, options: { bold: true, fontSize: 28 } },
-      { text: `　／　應到 ${r.signIn.length} 人　／　出席率 ${rate}%`, options: { color: GRAY, fontSize: 15 } },
+      { text: `　／　應到 ${r.signIn.length} 人　／　出席率 ${rate}%`, options: { color: T.sub, fontSize: 15 } },
     ], { x: 0.5, y: 1.33, w: 9, h: 0.5, fontSize: 18, fontFace: 'Calibri', isTextBox: true, margin: 0 });
 
     // 只列實際有人的分類，免得印出一排 0
@@ -261,18 +330,18 @@ export async function exportMeetingPptx(r: MeetingReport, fileName: string) {
         ...countsOf(x.rows).map(t => ({ text: t, options: { align: 'center' as const } })),
       ]),
       [
-        { text: '合計', options: { bold: true, fill: { color: 'F3F4F6' } } },
+        { text: '合計', options: { bold: true, fill: { color: T.zebra } } },
         ...countsOf(r.signIn).map(t => ({
-          text: t, options: { align: 'center' as const, bold: true, fill: { color: 'F3F4F6' } },
+          text: t, options: { align: 'center' as const, bold: true, fill: { color: T.zebra } },
         })),
       ],
     ], { ...tableOpts, y: SIGNIN_TABLE_Y, colW: [2.4, 1.1, 1.1, 1.1, 1.1, 2.2], rowH: SIGNIN_ROW_H });
 
     // 請假／缺席／未點名各列一行名單——出席的人太多，列出來反而看不到重點
     const lines: { label: string; rows: typeof r.signIn; color: string }[] = [
-      { label: '請假', rows: pick(r.signIn, 'medical'), color: GRAY },
-      { label: '缺席', rows: pick(r.signIn, 'absent'), color: GRAY },
-      { label: '未點名', rows: pick(r.signIn), color: RED },
+      { label: '請假', rows: pick(r.signIn, 'medical'), color: T.sub },
+      { label: '缺席', rows: pick(r.signIn, 'absent'), color: T.sub },
+      { label: '未點名', rows: pick(r.signIn), color: T.accent },
     ].filter(x => x.rows.length > 0);
     // ⚠️ 表格底部要用「列數 × 列高」自己算，**而且列數要含標題列與合計列**。
     //    原本只算了分類列，名單就直接疊在合計那一行上（實際印出來才看到）。
@@ -300,7 +369,7 @@ export async function exportMeetingPptx(r: MeetingReport, fileName: string) {
     layout.placed.forEach(({ x, y, h, fs, body }) => {
       s0.addText([
         { text: `${x.label}（${x.rows.length}）　`, options: { bold: true, color: x.color } },
-        { text: body, options: { color: '111827' } },
+        { text: body, options: { color: T.text } },
       ], { x: 0.5, y, w: 9, h, fontSize: fs, fontFace: 'Calibri', isTextBox: true, margin: 0 });
     });
   }
@@ -312,11 +381,11 @@ export async function exportMeetingPptx(r: MeetingReport, fileName: string) {
   const a = r.attendance;
   if (a) {
     s1.addText([
-      { text: 'P  出席　', options: { bold: true, color: RED } },
+      { text: 'P  出席　', options: { bold: true, color: T.accent } },
       { text: `${a.presentTotal} 人`, options: { bold: true, fontSize: 28 } },
       { text: `　／　會員人數 ${a.totalMembers} 人　／　出席率 `
         + `${a.totalMembers ? Math.round(a.presentTotal / a.totalMembers * 100) : 0}%`
-        + `　／　V 來賓 ${a.guestCount} 人`, options: { color: GRAY, fontSize: 15 } },
+        + `　／　V 來賓 ${a.guestCount} 人`, options: { color: T.sub, fontSize: 15 } },
     ], { x: 0.5, y: 1.33, w: 9, h: 0.5, fontSize: 18, fontFace: 'Calibri', isTextBox: true, margin: 0 });
 
     const rows: { k: string; label: string; names: string[] }[] = [
@@ -328,7 +397,7 @@ export async function exportMeetingPptx(r: MeetingReport, fileName: string) {
     s1.addTable([
       headerRow(['', '項目', '人數', '名單']),
       ...rows.map(x => [
-        { text: x.k, options: { bold: true, color: RED, align: 'center' as const } },
+        { text: x.k, options: { bold: true, color: T.accent, align: 'center' as const } },
         { text: x.label, options: { bold: true } },
         { text: `${x.names.length} 人`, options: { align: 'center' as const } },
         { text: x.names.join('、') || '—', options: { fontSize: 13 } },
@@ -339,17 +408,17 @@ export async function exportMeetingPptx(r: MeetingReport, fileName: string) {
     attBottom = ATT_TABLE_Y + (rows.length + 1) * ATT_ROW_H;
     if (a.unmarked > 0) {
       s1.addText(`還有 ${a.unmarked} 位會員沒有點名紀錄`, {
-        x: 0.5, y: attBottom + 0.1, w: 9, h: 0.3, fontSize: 13, color: RED,
+        x: 0.5, y: attBottom + 0.1, w: 9, h: 0.3, fontSize: 13, color: T.accent,
         fontFace: 'Calibri', isTextBox: true, margin: 0,
       });
       attBottom += 0.4;
     }
   } else {
-    s1.addText('尚未對應例會場次', { x: 0.5, y: 2, w: 9, h: 0.5, fontSize: 16, color: GRAY, fontFace: 'Calibri', isTextBox: true });
+    s1.addText('尚未對應例會場次', { x: 0.5, y: 2, w: 9, h: 0.5, fontSize: 16, color: T.sub, fontFace: 'Calibri', isTextBox: true });
   }
   if (r.attendanceNote?.trim()) {
     s1.addText(r.attendanceNote.trim(), {
-      x: 0.5, y: attBottom + 0.12, w: 9, h: 0.5, fontSize: 14, color: GRAY,
+      x: 0.5, y: attBottom + 0.12, w: 9, h: 0.5, fontSize: 14, color: T.sub,
       fontFace: 'Calibri', isTextBox: true, margin: 0,
     });
   }
@@ -359,7 +428,7 @@ export async function exportMeetingPptx(r: MeetingReport, fileName: string) {
     const pages = chunk(rows, 7);
     if (pages.length === 0) {
       const s = slide(title, index);
-      s.addText('（無）', { x: 0.5, y: 2, w: 9, h: 0.4, fontSize: 16, color: GRAY, fontFace: 'Calibri', isTextBox: true });
+      s.addText('（無）', { x: 0.5, y: 2, w: 9, h: 0.4, fontSize: 16, color: T.sub, fontFace: 'Calibri', isTextBox: true });
       return;
     }
     pages.forEach((page, i) => {
@@ -379,8 +448,8 @@ export async function exportMeetingPptx(r: MeetingReport, fileName: string) {
   s3.addText(
     appLines.length
       ? appLines.map((t, i) => ({ text: t, options: { bullet: true, breakLine: i < appLines.length - 1 } }))
-      : [{ text: '（無）', options: { color: GRAY } }],
-    { x: 0.6, y: 1.5, w: 8.8, h: 3.5, fontSize: 17, fontFace: 'Calibri', color: '111827', isTextBox: true, paraSpaceAfter: 8 },
+      : [{ text: '（無）', options: { color: T.sub } }],
+    { x: 0.6, y: 1.5, w: 8.8, h: 3.5, fontSize: 17, fontFace: 'Calibri', color: T.text, isTextBox: true, paraSpaceAfter: 8 },
   );
 
   guestSlides(AGENDA[3], 4, r.lastWeekGuests);
@@ -390,7 +459,7 @@ export async function exportMeetingPptx(r: MeetingReport, fileName: string) {
   const renewalPages = chunk(r.renewals, 8);
   if (renewalPages.length === 0) {
     const s = slide(AGENDA[5], 6);
-    s.addText('未來三個月無到期會員', { x: 0.5, y: 2, w: 9, h: 0.4, fontSize: 16, color: GRAY, fontFace: 'Calibri', isTextBox: true });
+    s.addText('未來三個月無到期會員', { x: 0.5, y: 2, w: 9, h: 0.4, fontSize: 16, color: T.sub, fontFace: 'Calibri', isTextBox: true });
   } else {
     renewalPages.forEach((page, i) => {
       const s = slide(renewalPages.length > 1 ? `${AGENDA[5]}（${i + 1}/${renewalPages.length}）` : AGENDA[5], 6);
@@ -407,8 +476,8 @@ export async function exportMeetingPptx(r: MeetingReport, fileName: string) {
     s.addText(
       lines.length
         ? lines.map((t, i) => ({ text: t, options: { bullet: true, breakLine: i < lines.length - 1 } }))
-        : [{ text: '（無）', options: { color: GRAY } }],
-      { x: 0.6, y: 1.5, w: 8.8, h: 3.5, fontSize: 17, fontFace: 'Calibri', color: '111827', isTextBox: true, paraSpaceAfter: 8 },
+        : [{ text: '（無）', options: { color: T.sub } }],
+      { x: 0.6, y: 1.5, w: 8.8, h: 3.5, fontSize: 17, fontFace: 'Calibri', color: T.text, isTextBox: true, paraSpaceAfter: 8 },
     );
   };
   noteSlide(AGENDA[6], 7, r.processNote);
@@ -425,7 +494,7 @@ export async function exportMeetingPptx(r: MeetingReport, fileName: string) {
         { text: i.owner_name ?? '' },
         { text: i.due_date ?? '' },
       ]),
-    ], { ...tableOpts, colW: [0.5, 5.3, 1.6, 1.6], rowH: 0.48, fill: { color: LIGHT } });
+    ], { ...tableOpts, colW: [0.5, 5.3, 1.6, 1.6], rowH: 0.48, fill: { color: T.zebra } });
   }
 
   await pres.writeFile({ fileName });
